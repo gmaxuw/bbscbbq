@@ -42,7 +42,7 @@ interface Order {
   customer_phone: string
   pickup_time: string
   total_amount: number
-  order_status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled'
+  order_status: string
   payment_status: 'pending' | 'paid' | 'cancelled'
   created_at: string
   order_items?: Array<{
