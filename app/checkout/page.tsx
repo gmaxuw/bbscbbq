@@ -148,6 +148,27 @@ export default function CheckoutPage() {
         return
       }
 
+      // Validate customer name
+      if (!customerInfo.fullName || customerInfo.fullName.trim() === '') {
+        alert('Please enter your full name')
+        setIsProcessing(false)
+        return
+      }
+
+      // Validate customer email
+      if (!customerInfo.email || customerInfo.email.trim() === '') {
+        alert('Please enter your email address')
+        setIsProcessing(false)
+        return
+      }
+
+      // Validate customer phone
+      if (!customerInfo.phone || customerInfo.phone.trim() === '') {
+        alert('Please enter your phone number')
+        setIsProcessing(false)
+        return
+      }
+
       const branchId = customerInfo.branchId
       const pickupDateTime = new Date(customerInfo.pickupTime)
       const now = new Date()
@@ -176,9 +197,9 @@ export default function CheckoutPage() {
 
       // Prepare order data
       const orderData = {
-        customer_name: customerInfo.fullName,
-        customer_email: customerInfo.email,
-        customer_phone: customerInfo.phone,
+        customer_name: customerInfo.fullName.trim(),
+        customer_email: customerInfo.email.trim(),
+        customer_phone: customerInfo.phone.trim(),
         branch_id: branchId,
         pickup_time: pickupDateTime.toISOString(),
         cooking_start_time: cookingStartTime.toISOString(),
@@ -189,6 +210,12 @@ export default function CheckoutPage() {
         status: 'pending',
         reference_number: referenceNumber
       }
+
+      // Debug: Log the order data being sent
+      console.log('Order data being sent:', orderData)
+      console.log('Branch ID:', branchId)
+      console.log('Pickup time:', pickupDateTime.toISOString())
+      console.log('Cooking start time:', cookingStartTime.toISOString())
 
       let order: any
 
