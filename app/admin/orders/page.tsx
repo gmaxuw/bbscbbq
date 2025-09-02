@@ -51,6 +51,7 @@ interface Order {
   promo_code?: string
   promo_discount: number
   payment_status: 'pending' | 'paid' | 'cancelled'
+  payment_method?: string
   gcash_reference?: string
   payment_screenshot?: string
   status: string
