@@ -132,6 +132,7 @@ export default function CheckoutPage() {
     console.log('✅ Payment Method:', customerInfo.paymentMethod)
     if (customerInfo.paymentMethod === 'gcash') {
       console.log('✅ GCash Reference:', customerInfo.gcashReference ? 'FILLED' : 'MISSING')
+      console.log('✅ Payment Screenshot:', customerInfo.paymentScreenshot ? 'UPLOADED' : 'MISSING')
     }
     
     try {
@@ -626,6 +627,7 @@ export default function CheckoutPage() {
                         <input
                           type="file"
                           accept="image/*"
+                          name="paymentScreenshot"
                           onChange={(e) => {
                             const file = e.target.files?.[0]
                             if (file) {
