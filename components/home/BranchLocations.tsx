@@ -13,7 +13,7 @@ interface Branch {
   is_active: boolean
   hours?: string
   rating?: number
-  features?: string[]
+  features: string[]
   image?: string
 }
 
