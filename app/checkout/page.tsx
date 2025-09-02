@@ -249,7 +249,7 @@ export default function CheckoutPage() {
       // Generate unique reference number
       const referenceNumber = generateReferenceNumber()
 
-      // Prepare order data
+      // Prepare order data - FIXED to match database schema exactly
       const orderData = {
         customer_name: customerInfo.fullName.trim(),
         customer_email: customerInfo.email.trim(),
@@ -279,6 +279,8 @@ export default function CheckoutPage() {
       // Check if online or offline
       if (isOnline()) {
         // Create the order in Supabase
+        console.log('🚀 Attempting to create order with data:', orderData)
+        
         const { data, error: orderError } = await supabase
           .from('orders')
           .insert(orderData)
@@ -288,31 +290,40 @@ export default function CheckoutPage() {
         if (orderError) {
           console.error('❌ Supabase Order Error:', orderError)
           console.error('❌ Order Data that failed:', orderData)
+          console.error('❌ Error details:', JSON.stringify(orderError, null, 2))
           throw orderError
         }
+        
+        console.log('✅ Order created successfully:', data)
         order = data
+
+        // Create order items
+        const orderItems = items.map(item => ({
+          order_id: order.id,
+          product_id: item.id,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity
+        }))
+
+        console.log('🚀 Attempting to create order items:', orderItems)
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems)
+
+        if (itemsError) {
+          console.error('❌ Order Items Error:', itemsError)
+          console.error('❌ Order Items Data that failed:', orderItems)
+          throw itemsError
+        }
+        
+        console.log('✅ Order items created successfully')
       } else {
         // Store offline
         storeOrderOffline(orderData, referenceNumber)
         order = { id: `offline_${Date.now()}`, reference_number: referenceNumber }
         console.log('Order stored offline due to no internet connection')
-      }
-
-      // Create order items
-      const orderItems = items.map(item => ({
-        order_id: order.id,
-        product_id: item.id,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.price * item.quantity
-      }))
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems)
-
-      if (itemsError) {
-        throw itemsError
       }
 
       // Store customer email for order history lookup
