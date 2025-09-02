@@ -9,15 +9,19 @@ export async function middleware(req: NextRequest) {
   // Get the current session
   const { data: { session } } = await supabase.auth.getSession()
 
-  // Define protected routes
+  // Define protected routes (excluding login pages)
   const adminRoutes = ['/admin']
   const crewRoutes = ['/crew']
   const protectedRoutes = [...adminRoutes, ...crewRoutes]
 
-  // Check if the current path is protected
+  // Exclude login pages from protection
+  const isLoginPage = req.nextUrl.pathname === '/admin/login' || 
+                     req.nextUrl.pathname === '/crew/login'
+
+  // Check if the current path is protected (but not a login page)
   const isProtectedRoute = protectedRoutes.some(route => 
     req.nextUrl.pathname.startsWith(route)
-  )
+  ) && !isLoginPage
 
   if (isProtectedRoute) {
     // If no session, redirect to admin login
