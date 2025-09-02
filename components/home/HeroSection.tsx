@@ -38,7 +38,7 @@ export default function HeroSection() {
   const heroImages = [
     'https://images.unsplash.com/photo-1544025162-d76694265947?w=1200&h=800&fit=crop&crop=center&auto=format&q=80',
     'https://images.unsplash.com/photo-1558030006-450675393462?w=1200&h=800&fit=crop&crop=center&auto=format&q=80',
-    'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=1200&h=800&fit=crop&crop=center&auto=format&q=80'
+    'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=1200&h=800&fit=crop&crop=center&auto=format&q=80'
   ]
 
   // Fallback images in case external images fail
@@ -66,7 +66,7 @@ export default function HeroSection() {
             setImagesLoaded(true)
           }
           resolve(null)
-        }, 3000) // 3 second timeout per image
+        }, 5000) // 5 second timeout per image (increased from 3s)
         
         img.onload = () => {
           clearTimeout(imageTimeout)
@@ -102,7 +102,7 @@ export default function HeroSection() {
         console.warn('Overall image preloading timeout - showing content anyway')
         setImagesLoaded(true)
         resolve(null)
-      }, 8000) // 8 second overall timeout
+      }, 12000) // 12 second overall timeout (increased from 8s)
     })
 
     Promise.race([

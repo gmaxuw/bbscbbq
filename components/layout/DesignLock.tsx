@@ -151,6 +151,28 @@ export default function DesignLock({ pageName, allowedComponents = [] }: DesignL
       'bbq-section', 'bbq-container', 'bbq-gradient', 'bbq-gradient-text', 
       'bbq-shadow', 'bbq-backdrop-blur',
       
+      // Custom font classes
+      'font-bbq-fredoka', 'font-bbq-display',
+      
+      // Additional spacing classes
+      'p-2', 'p-3', 'p-4', 'p-6', 'p-8',
+      'px-2', 'px-3', 'px-4', 'px-6', 'px-8',
+      'py-2', 'py-3', 'py-4', 'py-6', 'py-8',
+      
+      // Background opacity classes
+      'bg-white/10', 'bg-white/20', 'bg-white/30', 'bg-white/40', 'bg-white/50',
+      'bg-white/60', 'bg-white/70', 'bg-white/80', 'bg-white/90',
+      'bg-black/10', 'bg-black/20', 'bg-black/30', 'bg-black/40', 'bg-black/50',
+      'bg-black/60', 'bg-black/70', 'bg-black/80', 'bg-black/90',
+      'bg-transparent',
+      
+      // Border opacity classes
+      'border-white/10', 'border-white/20', 'border-white/30', 'border-white/40', 'border-white/50',
+      'border-white/60', 'border-white/70', 'border-white/80', 'border-white/90',
+      
+      // Drop shadow classes
+      'drop-shadow-sm', 'drop-shadow-md', 'drop-shadow-lg', 'drop-shadow-xl', 'drop-shadow-2xl',
+      
       // Custom color classes
       'text-lays-dark-red', 'text-lays-bright-red', 'text-lays-orange-gold',
       'text-lays-light-yellow', 'text-lays-brown-gold', 'text-bbq-secondary',
