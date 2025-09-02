@@ -205,12 +205,8 @@ export default function OrderManagement() {
 
       if (error) throw error
 
-      // Update local state
-      setOrders(orders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: newStatus, updated_at: new Date().toISOString() }
-          : order
-      ))
+      // Update local state - reload from database to avoid type issues
+      await loadOrders()
 
       // Close modal if open
       setShowOrderModal(false)
