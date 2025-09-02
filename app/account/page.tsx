@@ -250,11 +250,30 @@ export default function AccountPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Connect to Supabase password reset
     console.log('Password reset requested for:', forgotPasswordEmail)
-    alert('Password reset link sent to your email!')
-    setShowForgotPassword(false)
-    setForgotPasswordEmail('')
+    
+    try {
+      const supabase = createClient()
+      
+      // Send password reset email using Supabase Auth
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: `${window.location.origin}/account?reset=true`
+      })
+      
+      if (error) {
+        console.error('Password reset error:', error)
+        alert('Error sending reset email. Please try again.')
+        return
+      }
+      
+      alert('Password reset link sent to your email! Check your inbox.')
+      setShowForgotPassword(false)
+      setForgotPasswordEmail('')
+      
+    } catch (error) {
+      console.error('Password reset error:', error)
+      alert('Error sending reset email. Please try again.')
+    }
   }
 
   if (isLoggedIn) {
