@@ -262,7 +262,8 @@ export default function CheckoutPage() {
         payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
         gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
         payment_screenshot: null, // Will be set later if uploaded
-        status: 'pending' // Fixed: database uses 'status', not 'order_status'
+        status: 'pending', // Fixed: database uses 'status', not 'order_status'
+        reference_number: referenceNumber // Add reference number
       }
 
       // Debug: Log the order data being sent
@@ -291,6 +292,10 @@ export default function CheckoutPage() {
           console.error('❌ Supabase Order Error:', orderError)
           console.error('❌ Order Data that failed:', orderData)
           console.error('❌ Error details:', JSON.stringify(orderError, null, 2))
+          console.error('❌ Error message:', orderError.message)
+          console.error('❌ Error code:', orderError.code)
+          console.error('❌ Error hint:', orderError.hint)
+          console.error('❌ Error details:', orderError.details)
           throw orderError
         }
         
