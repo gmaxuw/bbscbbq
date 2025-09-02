@@ -728,7 +728,7 @@ export default function PromoCodeManagement() {
                     }
                   </span>
                 </div>
-                {promo.minimum_order_amount > 0 && (
+                {promo.minimum_order_amount && promo.minimum_order_amount > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Min. Order:</span>
                     <span className="font-medium text-gray-900">
@@ -736,7 +736,7 @@ export default function PromoCodeManagement() {
                     </span>
                   </div>
                 )}
-                {promo.maximum_discount > 0 && (
+                {promo.maximum_discount && promo.maximum_discount > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Max. Discount:</span>
                     <span className="font-medium text-gray-900">
