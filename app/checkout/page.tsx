@@ -124,6 +124,9 @@ export default function CheckoutPage() {
     console.log('📋 Customer info:', customerInfo)
     console.log('🔍 Form validation starting...')
     
+    // Force show all data
+    alert(`Form Data:\nName: ${customerInfo.fullName}\nEmail: ${customerInfo.email}\nPhone: ${customerInfo.phone}\nBranch: ${customerInfo.branchId}\nPickup: ${customerInfo.pickupTime}\nGCash: ${customerInfo.gcashReference}\nScreenshot: ${customerInfo.paymentScreenshot ? 'YES' : 'NO'}`)
+    
     // Check each required field
     console.log('✅ Full Name:', customerInfo.fullName ? 'FILLED' : 'MISSING')
     console.log('✅ Email:', customerInfo.email ? 'FILLED' : 'MISSING')
