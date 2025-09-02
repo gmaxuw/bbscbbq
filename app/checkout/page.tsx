@@ -137,6 +137,8 @@ export default function CheckoutPage() {
     if (customerInfo.paymentMethod === 'gcash') {
       console.log('✅ GCash Reference:', customerInfo.gcashReference ? 'FILLED' : 'MISSING')
       console.log('✅ Payment Screenshot:', customerInfo.paymentScreenshot ? 'UPLOADED' : 'MISSING')
+    } else {
+      console.log('✅ Non-GCash payment method selected, skipping GCash validation')
     }
     
     try {
@@ -276,6 +278,8 @@ export default function CheckoutPage() {
           .single()
 
         if (orderError) {
+          console.error('❌ Supabase Order Error:', orderError)
+          console.error('❌ Order Data that failed:', orderData)
           throw orderError
         }
         order = data
