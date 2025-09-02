@@ -32,7 +32,7 @@ export default function CrewDashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
-  const [branches, setBranches] = useState([])
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([])
   const [statusFilter, setStatusFilter] = useState('all')
   const [isLoading, setIsLoading] = useState(true)
   const [showScanner, setShowScanner] = useState(false)
