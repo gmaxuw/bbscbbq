@@ -123,6 +123,17 @@ export default function CheckoutPage() {
     console.log('📋 Customer info:', customerInfo)
     console.log('🔍 Form validation starting...')
     
+    // Check each required field
+    console.log('✅ Full Name:', customerInfo.fullName ? 'FILLED' : 'MISSING')
+    console.log('✅ Email:', customerInfo.email ? 'FILLED' : 'MISSING')
+    console.log('✅ Phone:', customerInfo.phone ? 'FILLED' : 'MISSING')
+    console.log('✅ Branch ID:', customerInfo.branchId ? 'FILLED' : 'MISSING')
+    console.log('✅ Pickup Time:', customerInfo.pickupTime ? 'FILLED' : 'MISSING')
+    console.log('✅ Payment Method:', customerInfo.paymentMethod)
+    if (customerInfo.paymentMethod === 'gcash') {
+      console.log('✅ GCash Reference:', customerInfo.gcashReference ? 'FILLED' : 'MISSING')
+    }
+    
     try {
       // Validate GCash payment details if GCash is selected
       if (customerInfo.paymentMethod === 'gcash') {
