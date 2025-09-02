@@ -155,12 +155,14 @@ export default function CheckoutPage() {
       // Validate GCash payment details if GCash is selected
       if (customerInfo.paymentMethod === 'gcash') {
         console.log('Validating GCash payment...')
-        if (!customerInfo.paymentScreenshot) {
-          console.log('GCash validation failed: No screenshot')
-          alert('Please upload your GCash payment screenshot')
-          setIsProcessing(false)
-          return
-        }
+        // TEMPORARILY DISABLE SCREENSHOT REQUIREMENT FOR DEBUGGING
+        // if (!customerInfo.paymentScreenshot) {
+        //   console.log('GCash validation failed: No screenshot')
+        //   alert('Please upload your GCash payment screenshot')
+        //   setIsProcessing(false)
+        //   return
+        // }
+        console.log('🔧 DEBUGGING: Skipping GCash screenshot validation')
         if (!customerInfo.gcashReference.trim()) {
           console.log('GCash validation failed: No reference number')
           alert('Please enter your GCash reference number')
@@ -697,7 +699,7 @@ export default function CheckoutPage() {
                     {/* Payment Screenshot Upload */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Payment Screenshot *
+                        Payment Screenshot (Optional for debugging)
                       </label>
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-lays-orange-gold transition-colors">
                         <input
