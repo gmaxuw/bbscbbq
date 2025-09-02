@@ -72,6 +72,7 @@ export default function FeaturedMenu() {
           .select(`
             id,
             name,
+            description,
             price,
             commission_rate,
             category,
