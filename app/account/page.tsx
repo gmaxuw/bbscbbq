@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { User, LogIn, UserPlus, ArrowLeft, Package, Settings, LogOut } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
+import { createClient } from '@/lib/supabase'
 
 export default function AccountPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -74,46 +75,123 @@ export default function AccountPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // For demo purposes, we'll use a simple email-based "login"
-    // In a real app, this would connect to Supabase authentication
     console.log('Login attempt:', loginData)
     
-    // Store customer email for order lookup
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('customer_email', loginData.email)
+    try {
+      const supabase = createClient()
+      
+      // Check if customer exists in database
+      const { data: customer, error } = await supabase
+        .from('users')
+        .select('id, email, full_name, phone, role, is_active')
+        .eq('email', loginData.email)
+        .eq('role', 'customer')
+        .single()
+      
+      if (error || !customer) {
+        alert('No account found with this email address.')
+        return
+      }
+      
+      if (!customer.is_active) {
+        alert('This account has been deactivated.')
+        return
+      }
+      
+      console.log('Customer login successful:', customer)
+      
+      // Store customer data for order lookup and display
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('customer_email', customer.email)
+        localStorage.setItem('customer_name', customer.full_name)
+        localStorage.setItem('customer_phone', customer.phone || '')
+        localStorage.setItem('customer_id', customer.id)
+      }
+      
+      setUserEmail(customer.email)
+      setUserName(customer.full_name)
+      setUserPhone(customer.phone || '')
+      setIsLoggedIn(true)
+      
+    } catch (error) {
+      console.error('Login error:', error)
+      alert('Error logging in. Please try again.')
     }
-    setUserEmail(loginData.email)
-    setIsLoggedIn(true)
   }
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    // For demo purposes, we'll use a simple email-based "registration"
-    // In a real app, this would connect to Supabase authentication
+    
+    // Validate password confirmation
+    if (registerData.password !== registerData.confirmPassword) {
+      alert('Passwords do not match!')
+      return
+    }
+    
     console.log('Register attempt:', registerData)
     
-    // Store customer data for order lookup and display
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('customer_email', registerData.email)
-      localStorage.setItem('customer_name', registerData.fullName)
-      localStorage.setItem('customer_phone', registerData.phone)
+    try {
+      const supabase = createClient()
       
-      console.log('Stored in localStorage:', {
-        email: registerData.email,
-        name: registerData.fullName,
-        phone: registerData.phone
-      })
+      // Check if email already exists
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', registerData.email)
+        .single()
+      
+      if (existingUser) {
+        alert('An account with this email already exists!')
+        return
+      }
+      
+      // Insert new customer into database
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          email: registerData.email,
+          full_name: registerData.fullName,
+          phone: registerData.phone,
+          role: 'customer',
+          is_active: true
+        })
+        .select()
+        .single()
+      
+      if (insertError) {
+        console.error('Error creating customer account:', insertError)
+        alert('Error creating account. Please try again.')
+        return
+      }
+      
+      console.log('Customer account created successfully:', newUser)
+      
+      // Store customer data for order lookup and display
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('customer_email', registerData.email)
+        localStorage.setItem('customer_name', registerData.fullName)
+        localStorage.setItem('customer_phone', registerData.phone)
+        localStorage.setItem('customer_id', newUser.id)
+        
+        console.log('Stored in localStorage:', {
+          email: registerData.email,
+          name: registerData.fullName,
+          phone: registerData.phone,
+          id: newUser.id
+        })
+      }
+      
+      setUserEmail(registerData.email)
+      setUserName(registerData.fullName)
+      setUserPhone(registerData.phone)
+      setIsLoggedIn(true)
+      
+      alert('Account created successfully!')
+      
+    } catch (error) {
+      console.error('Registration error:', error)
+      alert('Error creating account. Please try again.')
     }
-    setUserEmail(registerData.email)
-    setUserName(registerData.fullName)
-    setUserPhone(registerData.phone)
-    setIsLoggedIn(true)
-    
-    console.log('Set state variables:', {
-      email: registerData.email,
-      name: registerData.fullName,
-      phone: registerData.phone
-    })
   }
 
   const handleLogout = () => {
@@ -121,6 +199,7 @@ export default function AccountPage() {
       localStorage.removeItem('customer_email')
       localStorage.removeItem('customer_name')
       localStorage.removeItem('customer_phone')
+      localStorage.removeItem('customer_id')
     }
     setUserEmail('')
     setUserName('')
