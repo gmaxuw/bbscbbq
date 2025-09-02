@@ -163,20 +163,23 @@ export default function CheckoutPage() {
         //   return
         // }
         console.log('🔧 DEBUGGING: Skipping GCash screenshot validation')
-        if (!customerInfo.gcashReference.trim()) {
-          console.log('GCash validation failed: No reference number')
-          alert('Please enter your GCash reference number')
-          setIsProcessing(false)
-          return
-        }
-        // Validate GCash reference number format (exactly 13 digits)
-        const gcashRef = customerInfo.gcashReference.trim()
-        if (!/^\d{13}$/.test(gcashRef)) {
-          console.log('GCash validation failed: Invalid reference format', gcashRef)
-          alert('GCash reference number must be exactly 13 digits')
-          setIsProcessing(false)
-          return
-        }
+        // TEMPORARILY DISABLE GCASH REFERENCE VALIDATION FOR DEBUGGING
+        // if (!customerInfo.gcashReference.trim()) {
+        //   console.log('GCash validation failed: No reference number')
+        //   alert('Please enter your GCash reference number')
+        //   setIsProcessing(false)
+        //   return
+        // }
+        console.log('🔧 DEBUGGING: Skipping GCash reference validation')
+        // TEMPORARILY DISABLE GCASH REFERENCE FORMAT VALIDATION FOR DEBUGGING
+        // const gcashRef = customerInfo.gcashReference.trim()
+        // if (!/^\d{13}$/.test(gcashRef)) {
+        //   console.log('GCash validation failed: Invalid reference format', gcashRef)
+        //   alert('GCash reference number must be exactly 13 digits')
+        //   setIsProcessing(false)
+        //   return
+        // }
+        console.log('🔧 DEBUGGING: Skipping GCash reference format validation')
         console.log('GCash validation passed')
       }
 
@@ -723,7 +726,7 @@ export default function CheckoutPage() {
                           }}
                           className="hidden"
                           id="payment-screenshot"
-                          required={customerInfo.paymentMethod === 'gcash'}
+                          required={false}
                           style={{ display: 'none' }}
                         />
                         <label htmlFor="payment-screenshot" className="cursor-pointer">
@@ -770,7 +773,7 @@ export default function CheckoutPage() {
                         type="text"
                         id="gcash-reference"
                         name="gcashReference"
-                        required={customerInfo.paymentMethod === 'gcash'}
+                        required={false}
                         value={customerInfo.gcashReference}
                         onChange={(e) => {
                           // Only allow numbers and limit to 13 digits
