@@ -64,10 +64,30 @@ export default function ResetPasswordPage() {
       
       setSuccess(true)
       
-      // Redirect to account page after 3 seconds
-      setTimeout(() => {
-        router.push('/account')
-      }, 3000)
+      // Check if user is admin/crew and redirect accordingly
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Check if user is admin or crew
+        const { data: adminUser } = await supabase
+          .from('admin_users')
+          .select('role')
+          .eq('user_id', user.id)
+          .single()
+        
+        // Redirect based on user type after 3 seconds
+        setTimeout(() => {
+          if (adminUser && (adminUser.role === 'admin' || adminUser.role === 'crew')) {
+            router.push('/admin/login')
+          } else {
+            router.push('/account')
+          }
+        }, 3000)
+      } else {
+        // Default to account page
+        setTimeout(() => {
+          router.push('/account')
+        }, 3000)
+      }
       
     } catch (error) {
       console.error('Password reset error:', error)
