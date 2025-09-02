@@ -116,6 +116,7 @@ export default function CheckoutPage() {
   }
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
+    console.log('🔥 FORM SUBMIT BUTTON CLICKED!')
     e.preventDefault()
     setIsProcessing(true)
     
@@ -773,6 +774,7 @@ export default function CheckoutPage() {
               <button
                 type="submit"
                 disabled={isProcessing}
+                onClick={() => console.log('🔥 BUTTON CLICKED!')}
                 className="bbq-button-primary w-full py-4 text-lg font-semibold flex items-center justify-center space-x-2"
               >
                 {isProcessing ? (
