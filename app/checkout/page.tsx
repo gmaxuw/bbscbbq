@@ -631,7 +631,16 @@ export default function CheckoutPage() {
                           onChange={(e) => {
                             const file = e.target.files?.[0]
                             if (file) {
-                              setCustomerInfo({...customerInfo, paymentScreenshot: file})
+                              // Create a custom filename with user info
+                              const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+                              const customerName = customerInfo.fullName.replace(/[^a-zA-Z0-9]/g, '_')
+                              const fileExtension = file.name.split('.').pop()
+                              const customFile = new File([file], `payment_${customerName}_${timestamp}.${fileExtension}`, {
+                                type: file.type,
+                                lastModified: file.lastModified
+                              })
+                              setCustomerInfo({...customerInfo, paymentScreenshot: customFile})
+                              console.log('📸 Custom filename created:', customFile.name)
                             }
                           }}
                           className="hidden"
