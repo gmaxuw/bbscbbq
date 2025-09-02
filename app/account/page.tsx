@@ -180,7 +180,8 @@ export default function AccountPage() {
           data: {
             full_name: registerData.fullName,
             phone: registerData.phone
-          }
+          },
+          emailRedirectTo: 'https://bbqsurigaocitybbq.vercel.app/account'
         }
       })
       
@@ -292,7 +293,7 @@ export default function AccountPage() {
       
       // Send password reset email using Supabase Auth
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `${window.location.origin}/account?reset=true`
+        redirectTo: `https://bbqsurigaocitybbq.vercel.app/account?reset=true`
       })
       
       if (error) {
