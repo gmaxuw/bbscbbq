@@ -38,6 +38,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
+// Export createClient function for new pages
+export const createClient = () => supabase
+
 // Database table names for type safety
 export const TABLES = {
   USERS: 'users',

@@ -34,6 +34,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import AdminLayout from '@/components/admin/AdminLayout'
 import * as XLSX from 'xlsx'
+// @ts-ignore - file-saver types not available
 import { saveAs } from 'file-saver'
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 
