@@ -119,8 +119,9 @@ export default function CheckoutPage() {
     e.preventDefault()
     setIsProcessing(true)
     
-    console.log('Form submitted!')
-    console.log('Customer info:', customerInfo)
+    console.log('🚀 FORM SUBMITTED!')
+    console.log('📋 Customer info:', customerInfo)
+    console.log('🔍 Form validation starting...')
     
     try {
       // Validate GCash payment details if GCash is selected
