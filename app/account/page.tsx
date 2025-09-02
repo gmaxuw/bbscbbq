@@ -86,7 +86,7 @@ export default function AccountPage() {
         .select('id, email, full_name, phone, role, is_active')
         .eq('email', loginData.email)
         .eq('role', 'customer')
-        .single()
+        .maybeSingle()
       
       if (error || !customer) {
         alert('No account found with this email address.')
@@ -138,7 +138,7 @@ export default function AccountPage() {
         .from('users')
         .select('email')
         .eq('email', registerData.email)
-        .single()
+        .maybeSingle()
       
       if (existingUser) {
         alert('An account with this email already exists!')
