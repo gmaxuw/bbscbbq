@@ -257,20 +257,19 @@ export default function CheckoutPage() {
         customer_phone: customerInfo.phone.trim(),
         branch_id: branchId,
         pickup_time: pickupDateTime.toISOString(),
-        cooking_start_time: cookingStartTime.toISOString(),
         total_amount: total,
-        payment_method: customerInfo.paymentMethod,
+        total_commission: 0, // Will be calculated from order items
         payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
         gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
-        status: 'pending',
-        reference_number: referenceNumber
+        payment_screenshot: null, // Will be set later if uploaded
+        order_status: 'pending' // Fixed: was 'status', should be 'order_status'
       }
 
       // Debug: Log the order data being sent
+      console.log('🚀 ENHANCED LOGGING IS WORKING - NEW VERSION DEPLOYED!')
       console.log('Order data being sent:', orderData)
       console.log('Branch ID:', branchId)
       console.log('Pickup time:', pickupDateTime.toISOString())
-      console.log('Cooking start time:', cookingStartTime.toISOString())
       console.log('Customer info:', customerInfo)
       console.log('Items:', items)
       console.log('Total:', total)
@@ -298,13 +297,14 @@ export default function CheckoutPage() {
         console.log('✅ Order created successfully:', data)
         order = data
 
-        // Create order items
+        // Create order items - FIXED to match database schema
         const orderItems = items.map(item => ({
           order_id: order.id,
           product_id: item.id,
           quantity: item.quantity,
           unit_price: item.price,
-          total_price: item.price * item.quantity
+          unit_commission: item.commission || 0, // Add commission field
+          subtotal: item.price * item.quantity // Fixed: was 'total_price', should be 'subtotal'
         }))
 
         console.log('🚀 Attempting to create order items:', orderItems)
@@ -320,6 +320,21 @@ export default function CheckoutPage() {
         }
         
         console.log('✅ Order items created successfully')
+
+        // Calculate total commission and update the order
+        const totalCommission = orderItems.reduce((sum, item) => sum + (item.unit_commission * item.quantity), 0)
+        
+        const { error: updateError } = await supabase
+          .from('orders')
+          .update({ total_commission: totalCommission })
+          .eq('id', order.id)
+
+        if (updateError) {
+          console.error('❌ Order Update Error:', updateError)
+          // Don't throw here, order was created successfully
+        } else {
+          console.log('✅ Order commission updated successfully:', totalCommission)
+        }
       } else {
         // Store offline
         storeOrderOffline(orderData, referenceNumber)

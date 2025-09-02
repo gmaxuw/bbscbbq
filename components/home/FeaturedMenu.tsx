@@ -70,7 +70,13 @@ export default function FeaturedMenu() {
         const { data, error } = await supabase
           .from('products')
           .select(`
-            *,
+            id,
+            name,
+            price,
+            commission,
+            category,
+            is_available,
+            created_at,
             product_images (
               id,
               image_url,
@@ -173,7 +179,8 @@ export default function FeaturedMenu() {
             name: product.name,
             price: product.price,
             image: getProductImage(product),
-            category: product.category
+            category: product.category,
+            commission: product.commission || 0
           })
         }
         

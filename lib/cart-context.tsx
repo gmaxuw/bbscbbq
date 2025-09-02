@@ -9,6 +9,7 @@ interface CartItem {
   quantity: number
   image?: string
   category: string
+  commission?: number
 }
 
 interface CartContextType {
