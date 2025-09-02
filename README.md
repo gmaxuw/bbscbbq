@@ -1,4 +1,5 @@
 # 🍖 Surigao City BBQ Stalls - Complete Order Management System
+<!-- Force new deployment -->
 
 A professional, full-featured BBQ restaurant website with complete order management, built with Next.js, Supabase, and deployed on Vercel.
 
