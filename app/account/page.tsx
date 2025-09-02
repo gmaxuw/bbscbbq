@@ -23,14 +23,14 @@ export default function AccountPage() {
     confirmPassword: ''
   })
 
-  // Sample user data - will be replaced with real data from database
+  // User data - will be replaced with real data from database
   const userData = {
-    name: 'John Smith',
-    email: 'john@example.com',
-    phone: '+63-917-123-4567',
-    joinDate: '2024-01-15',
-    totalOrders: 12,
-    favoriteItems: ['BBQ Pork Belly', 'BBQ Chicken Wings']
+    name: localStorage.getItem('customer_name') || registerData.fullName || 'Guest User',
+    email: userEmail || 'guest@example.com',
+    phone: localStorage.getItem('customer_phone') || registerData.phone || '+63-917-000-0000',
+    joinDate: new Date().toISOString().split('T')[0],
+    totalOrders: 0, // This will be calculated from actual orders
+    favoriteItems: [] // This will be calculated from actual orders
   }
 
   // Check for existing customer session on page load
@@ -60,14 +60,18 @@ export default function AccountPage() {
     // In a real app, this would connect to Supabase authentication
     console.log('Register attempt:', registerData)
     
-    // Store customer email for order lookup
+    // Store customer data for order lookup and display
     localStorage.setItem('customer_email', registerData.email)
+    localStorage.setItem('customer_name', registerData.fullName)
+    localStorage.setItem('customer_phone', registerData.phone)
     setUserEmail(registerData.email)
     setIsLoggedIn(true)
   }
 
   const handleLogout = () => {
     localStorage.removeItem('customer_email')
+    localStorage.removeItem('customer_name')
+    localStorage.removeItem('customer_phone')
     setUserEmail('')
     setIsLoggedIn(false)
   }
