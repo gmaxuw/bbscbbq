@@ -295,6 +295,11 @@ export default function CheckoutPage() {
       //   }
       // }
 
+      // Calculate total commission from cart items
+      const totalCommission = cartItems.reduce((sum, item) => {
+        return sum + (item.commission || 0) * item.quantity
+      }, 0)
+
       // Prepare order data - FIXED to match database schema exactly
       const orderData = {
         customer_name: customerInfo.fullName.trim(),
@@ -303,12 +308,12 @@ export default function CheckoutPage() {
         branch_id: branchId,
         pickup_time: pickupDateTime.toISOString(),
         total_amount: total,
-        payment_method: customerInfo.paymentMethod, // Add payment method
+        total_commission: totalCommission, // Add total commission
         payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
         gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
         payment_screenshot: screenshotUrl, // Use uploaded screenshot URL
-        status: 'pending', // Fixed: database uses 'status', not 'order_status'
-        reference_number: referenceNumber // Add reference number
+        order_status: 'pending', // Fixed: database uses 'order_status', not 'status'
+        // Note: payment_method and reference_number are not in the database schema
       }
 
       // Debug: Log the order data being sent
@@ -353,7 +358,8 @@ export default function CheckoutPage() {
           product_id: item.id,
           quantity: item.quantity,
           unit_price: item.price,
-          total_price: item.price * item.quantity // Fixed: database uses 'total_price', not 'subtotal'
+          unit_commission: item.commission || 0, // Add unit commission
+          subtotal: item.price * item.quantity // Fixed: database uses 'subtotal', not 'total_price'
         }))
 
         console.log('🚀 Attempting to create order items:', orderItems)
