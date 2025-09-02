@@ -24,7 +24,13 @@ export default function CheckoutPage() {
     gcashReference: '',
     paymentScreenshot: null as File | null
   })
-  const [branches, setBranches] = useState([])
+  const [branches, setBranches] = useState<Array<{
+    id: string;
+    name: string;
+    address: string;
+    phone: string;
+    manager_name: string;
+  }>>([])
   const { items, getTotalPrice, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
