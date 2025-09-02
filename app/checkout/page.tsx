@@ -12,6 +12,7 @@ import { isOnline, storeOrderOffline, setupOfflineListener } from '@/lib/offline
 
 export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [orderComplete, setOrderComplete] = useState(false)
   const [isCartLoaded, setIsCartLoaded] = useState(false)
   const [orderNumber, setOrderNumber] = useState('')
@@ -250,6 +251,42 @@ export default function CheckoutPage() {
       // Generate unique reference number
       const referenceNumber = generateReferenceNumber()
 
+      // Upload payment screenshot if provided
+      let screenshotUrl = null
+      if (customerInfo.paymentScreenshot) {
+        console.log('📸 Uploading payment screenshot...')
+        setIsUploading(true)
+        try {
+          const fileExt = customerInfo.paymentScreenshot.name.split('.').pop()
+          const fileName = `payment-${referenceNumber}.${fileExt}`
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('payment-screenshots')
+            .upload(fileName, customerInfo.paymentScreenshot)
+
+          if (uploadError) {
+            console.error('❌ Screenshot upload failed:', uploadError)
+            throw uploadError
+          }
+
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('payment-screenshots')
+            .getPublicUrl(fileName)
+
+          screenshotUrl = urlData.publicUrl
+          console.log('✅ Screenshot uploaded successfully:', screenshotUrl)
+        } catch (error) {
+          console.error('❌ Screenshot upload error:', error)
+          alert('Failed to upload payment screenshot. Please try again.')
+          setIsProcessing(false)
+          setIsUploading(false)
+          return
+        } finally {
+          setIsUploading(false)
+        }
+      }
+
       // Prepare order data - FIXED to match database schema exactly
       const orderData = {
         customer_name: customerInfo.fullName.trim(),
@@ -261,7 +298,7 @@ export default function CheckoutPage() {
         payment_method: customerInfo.paymentMethod, // Add payment method
         payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
         gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
-        payment_screenshot: null, // Will be set later if uploaded
+        payment_screenshot: screenshotUrl, // Use uploaded screenshot URL
         status: 'pending', // Fixed: database uses 'status', not 'order_status'
         reference_number: referenceNumber // Add reference number
       }
@@ -809,11 +846,16 @@ export default function CheckoutPage() {
               {/* Place Order Button */}
               <button
                 type="submit"
-                disabled={isProcessing}
+                disabled={isProcessing || isUploading}
                 onClick={() => console.log('🔥 BUTTON CLICKED!')}
                 className="bbq-button-primary w-full py-4 text-lg font-semibold flex items-center justify-center space-x-2"
               >
-                {isProcessing ? (
+                {isUploading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Uploading Screenshot...</span>
+                  </>
+                ) : isProcessing ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     <span>Processing Order...</span>
