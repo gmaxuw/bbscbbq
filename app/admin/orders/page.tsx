@@ -53,7 +53,7 @@ interface Order {
   payment_status: 'pending' | 'paid' | 'cancelled'
   gcash_reference?: string
   payment_screenshot?: string
-  status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled'
+  status: string
   created_at: string
   updated_at: string
   branch?: {
@@ -160,7 +160,7 @@ export default function OrderManagement() {
       }
 
       console.log('✅ Orders loaded successfully:', data?.length || 0, 'orders')
-      setOrders((data || []) as Order[])
+      setOrders(data || [])
     } catch (error) {
       console.error('Failed to load orders:', error)
     } finally {
@@ -205,10 +205,10 @@ export default function OrderManagement() {
 
       if (error) throw error
 
-      // Update local state with proper type casting
+      // Update local state
       setOrders(orders.map(order => 
         order.id === orderId 
-          ? { ...order, status: newStatus as Order['status'], updated_at: new Date().toISOString() }
+          ? { ...order, status: newStatus, updated_at: new Date().toISOString() }
           : order
       ))
 
