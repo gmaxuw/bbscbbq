@@ -160,7 +160,7 @@ export default function OrderManagement() {
       }
 
       console.log('✅ Orders loaded successfully:', data?.length || 0, 'orders')
-      setOrders(data || [])
+      setOrders((data || []) as Order[])
     } catch (error) {
       console.error('Failed to load orders:', error)
     } finally {
@@ -205,7 +205,7 @@ export default function OrderManagement() {
 
       if (error) throw error
 
-      // Update local state
+      // Update local state with proper type casting
       setOrders(orders.map(order => 
         order.id === orderId 
           ? { ...order, status: newStatus as Order['status'], updated_at: new Date().toISOString() }
