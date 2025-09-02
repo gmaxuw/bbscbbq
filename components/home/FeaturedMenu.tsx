@@ -64,6 +64,8 @@ export default function FeaturedMenu() {
       try {
         setIsLoading(true)
         console.log('🛒 Loading products from database...')
+        console.log('📱 Mobile Debug - User Agent:', navigator.userAgent)
+        console.log('📱 Mobile Debug - Screen size:', window.innerWidth, 'x', window.innerHeight)
         
         const { data, error } = await supabase
           .from('products')
@@ -81,19 +83,28 @@ export default function FeaturedMenu() {
 
         if (error) {
           console.error('❌ Database error:', error)
+          console.error('❌ Error details:', error.message, error.details, error.hint)
           throw error
         }
 
         console.log('✅ Products loaded:', data?.length || 0, 'items')
         console.log('📱 Products data:', data)
+        console.log('📱 Mobile Debug - Products state will be set to:', data || [])
         
         setProducts(data || [])
         setHasMoreProducts((data || []).length === PRODUCTS_PER_PAGE)
         setCurrentPage(0)
+        
+        // Additional mobile debug
+        setTimeout(() => {
+          console.log('📱 Mobile Debug - Products state after 1 second:', products)
+        }, 1000)
       } catch (error) {
         console.error('❌ Failed to load products:', error)
+        console.error('❌ Full error object:', error)
       } finally {
         setIsLoading(false)
+        console.log('📱 Mobile Debug - Loading finished, isLoading set to false')
       }
     }
 
@@ -208,6 +219,7 @@ export default function FeaturedMenu() {
 
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+            {console.log('📱 Mobile Debug - Showing loading state')}
             {[...Array(4)].map((_, index) => (
               <div key={index} className="bbq-card animate-pulse">
                 <div className="h-48 bg-gray-200 rounded-t-lg"></div>
@@ -222,6 +234,8 @@ export default function FeaturedMenu() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+            {console.log('📱 Mobile Debug - Rendering products:', products.length, 'items')}
+            {console.log('📱 Mobile Debug - Products array:', products)}
             {products.map((item, index) => (
             <div 
               key={item.id} 
@@ -342,6 +356,7 @@ export default function FeaturedMenu() {
 
         {!isLoading && products.length === 0 && (
           <div className="text-center py-12">
+            {console.log('📱 Mobile Debug - Showing no products message')}
             <div className="text-gray-500 mb-4">No products available at the moment.</div>
             <Link 
               href="/admin/products" 
