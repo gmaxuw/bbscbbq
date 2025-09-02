@@ -140,7 +140,7 @@ export default function CrewDashboard() {
         id: userData.id,
         full_name: userData.full_name,
         branch_id: userData.branch_id,
-        branch_name: userData.branches?.name || 'Unknown Branch'
+        branch_name: userData.branches?.[0]?.name || 'Unknown Branch'
       })
     } catch (error) {
       console.error('Auth check failed:', error)
