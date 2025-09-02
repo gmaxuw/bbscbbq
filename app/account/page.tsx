@@ -414,7 +414,7 @@ export default function AccountPage() {
                   <input
                     type="password"
                     required
-                    value={registerData.password}
+                    value={registerData.confirmPassword}
                     onChange={(e) => setRegisterData({...registerData, confirmPassword: e.target.value})}
                     className="bbq-input w-full"
                     placeholder="Confirm your password"
