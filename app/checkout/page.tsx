@@ -117,6 +117,7 @@ export default function CheckoutPage() {
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
     console.log('🔥 FORM SUBMIT BUTTON CLICKED!')
+    console.log('🚀 ENHANCED LOGGING IS WORKING - NEW VERSION DEPLOYED!')
     e.preventDefault()
     setIsProcessing(true)
     
@@ -673,6 +674,7 @@ export default function CheckoutPage() {
                           className="hidden"
                           id="payment-screenshot"
                           required={customerInfo.paymentMethod === 'gcash'}
+                          style={{ display: 'none' }}
                         />
                         <label htmlFor="payment-screenshot" className="cursor-pointer">
                           {customerInfo.paymentScreenshot ? (
