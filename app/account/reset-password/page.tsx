@@ -23,8 +23,11 @@ export default function ResetPasswordPage() {
     // Check if we have the necessary parameters from the reset link
     const accessToken = searchParams.get('access_token')
     const refreshToken = searchParams.get('refresh_token')
+    const type = searchParams.get('type')
     
-    if (!accessToken || !refreshToken) {
+    // For password reset, we need either access_token + refresh_token OR type=recovery
+    // If neither is present, show error
+    if ((!accessToken || !refreshToken) && type !== 'recovery') {
       setError('Invalid or expired reset link. Please request a new password reset.')
     }
   }, [searchParams])
