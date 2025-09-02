@@ -25,9 +25,9 @@ export default function AccountPage() {
 
   // User data - will be replaced with real data from database
   const userData = {
-    name: localStorage.getItem('customer_name') || registerData.fullName || 'Guest User',
+    name: (typeof window !== 'undefined' ? localStorage.getItem('customer_name') : null) || registerData.fullName || 'Guest User',
     email: userEmail || 'guest@example.com',
-    phone: localStorage.getItem('customer_phone') || registerData.phone || '+63-917-000-0000',
+    phone: (typeof window !== 'undefined' ? localStorage.getItem('customer_phone') : null) || registerData.phone || '+63-917-000-0000',
     joinDate: new Date().toISOString().split('T')[0],
     totalOrders: 0, // This will be calculated from actual orders
     favoriteItems: [] // This will be calculated from actual orders
@@ -35,10 +35,12 @@ export default function AccountPage() {
 
   // Check for existing customer session on page load
   useEffect(() => {
-    const customerEmail = localStorage.getItem('customer_email')
-    if (customerEmail) {
-      setUserEmail(customerEmail)
-      setIsLoggedIn(true)
+    if (typeof window !== 'undefined') {
+      const customerEmail = localStorage.getItem('customer_email')
+      if (customerEmail) {
+        setUserEmail(customerEmail)
+        setIsLoggedIn(true)
+      }
     }
   }, [])
 
@@ -49,7 +51,9 @@ export default function AccountPage() {
     console.log('Login attempt:', loginData)
     
     // Store customer email for order lookup
-    localStorage.setItem('customer_email', loginData.email)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('customer_email', loginData.email)
+    }
     setUserEmail(loginData.email)
     setIsLoggedIn(true)
   }
@@ -61,17 +65,21 @@ export default function AccountPage() {
     console.log('Register attempt:', registerData)
     
     // Store customer data for order lookup and display
-    localStorage.setItem('customer_email', registerData.email)
-    localStorage.setItem('customer_name', registerData.fullName)
-    localStorage.setItem('customer_phone', registerData.phone)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('customer_email', registerData.email)
+      localStorage.setItem('customer_name', registerData.fullName)
+      localStorage.setItem('customer_phone', registerData.phone)
+    }
     setUserEmail(registerData.email)
     setIsLoggedIn(true)
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('customer_email')
-    localStorage.removeItem('customer_name')
-    localStorage.removeItem('customer_phone')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('customer_email')
+      localStorage.removeItem('customer_name')
+      localStorage.removeItem('customer_phone')
+    }
     setUserEmail('')
     setIsLoggedIn(false)
   }
