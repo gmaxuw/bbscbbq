@@ -97,6 +97,7 @@ export default function HeroSection() {
 
         if (error) {
           console.error('Error fetching hero settings:', error)
+          console.error('Error details:', error.message, error.details, error.hint)
           // Use default settings if fetch fails
           setSettings({
             id: 1,
@@ -123,6 +124,7 @@ export default function HeroSection() {
             trust_item_3_label: 'Fresh & Local'
           })
         } else {
+          console.log('Hero settings loaded successfully:', data)
           setSettings(data)
         }
       } catch (error) {
@@ -273,6 +275,13 @@ export default function HeroSection() {
               {settings?.subtitle || 'BBQ Stalls'}
             </span>
           </h1>
+          
+          {/* Debug info - remove this after testing */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-white/50 mb-4">
+              Debug: Title="{settings?.title}", Subtitle="{settings?.subtitle}"
+            </div>
+          )}
 
           {/* Subtitle */}
           <p className="text-xl md:text-2xl text-gray-200 mb-8 max-w-2xl mx-auto leading-relaxed animate-slide-up">
