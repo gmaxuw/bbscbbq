@@ -30,12 +30,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedCart = localStorage.getItem('bbq-cart')
+      console.log('🛒 Loading cart from localStorage:', savedCart)
       if (savedCart) {
         try {
-          setItems(JSON.parse(savedCart))
+          const parsedCart = JSON.parse(savedCart)
+          console.log('🛒 Parsed cart:', parsedCart)
+          setItems(parsedCart)
         } catch (error) {
           console.error('Failed to load cart from localStorage:', error)
         }
+      } else {
+        console.log('🛒 No saved cart found in localStorage')
       }
     }
   }, [])
@@ -43,24 +48,30 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Save cart to localStorage whenever items change
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      console.log('🛒 Saving cart to localStorage:', items)
       localStorage.setItem('bbq-cart', JSON.stringify(items))
     }
   }, [items])
 
   const addItem = (newItem: Omit<CartItem, 'quantity'>) => {
+    console.log('🛒 Adding item to cart:', newItem)
     setItems(prevItems => {
       const existingItem = prevItems.find(item => item.id === newItem.id)
       
       if (existingItem) {
         // Update quantity if item already exists
-        return prevItems.map(item =>
+        const updatedItems = prevItems.map(item =>
           item.id === newItem.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )
+        console.log('🛒 Updated existing item, new cart:', updatedItems)
+        return updatedItems
       } else {
         // Add new item with quantity 1
-        return [...prevItems, { ...newItem, quantity: 1 }]
+        const newItems = [...prevItems, { ...newItem, quantity: 1 }]
+        console.log('🛒 Added new item, new cart:', newItems)
+        return newItems
       }
     })
   }
