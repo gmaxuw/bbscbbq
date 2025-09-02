@@ -37,6 +37,7 @@ interface Product {
   name: string
   description: string
   price: number
+  commission_rate: number
   category: string
   is_available: boolean
   product_images?: Array<{
