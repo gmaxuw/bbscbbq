@@ -80,16 +80,33 @@ export default function AccountPage() {
     try {
       const supabase = createClient()
       
-      // Check if customer exists in database
-      const { data: customer, error } = await supabase
+      // Use Supabase Auth for proper authentication
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password
+      })
+      
+      if (authError) {
+        console.error('Authentication error:', authError)
+        alert('Invalid email or password. Please try again.')
+        return
+      }
+      
+      if (!authData.user) {
+        alert('Login failed. Please try again.')
+        return
+      }
+      
+      // Get customer data from users table
+      const { data: customer, error: customerError } = await supabase
         .from('users')
         .select('id, email, full_name, phone, role, is_active')
         .eq('email', loginData.email)
         .eq('role', 'customer')
         .maybeSingle()
       
-      if (error || !customer) {
-        alert('No account found with this email address.')
+      if (customerError || !customer) {
+        alert('Customer account not found.')
         return
       }
       
@@ -145,10 +162,34 @@ export default function AccountPage() {
         return
       }
       
-      // Insert new customer into database
+      // Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: registerData.email,
+        password: registerData.password,
+        options: {
+          data: {
+            full_name: registerData.fullName,
+            phone: registerData.phone
+          }
+        }
+      })
+      
+      if (authError) {
+        console.error('Auth registration error:', authError)
+        alert('Error creating account. Please try again.')
+        return
+      }
+      
+      if (!authData.user) {
+        alert('Account creation failed. Please try again.')
+        return
+      }
+      
+      // Insert customer data into users table
       const { data: newUser, error: insertError } = await supabase
         .from('users')
         .insert({
+          id: authData.user.id, // Use the auth user ID
           email: registerData.email,
           full_name: registerData.fullName,
           phone: registerData.phone,
