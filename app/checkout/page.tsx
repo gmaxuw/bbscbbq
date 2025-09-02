@@ -119,15 +119,21 @@ export default function CheckoutPage() {
     e.preventDefault()
     setIsProcessing(true)
     
+    console.log('Form submitted!')
+    console.log('Customer info:', customerInfo)
+    
     try {
       // Validate GCash payment details if GCash is selected
       if (customerInfo.paymentMethod === 'gcash') {
+        console.log('Validating GCash payment...')
         if (!customerInfo.paymentScreenshot) {
+          console.log('GCash validation failed: No screenshot')
           alert('Please upload your GCash payment screenshot')
           setIsProcessing(false)
           return
         }
         if (!customerInfo.gcashReference.trim()) {
+          console.log('GCash validation failed: No reference number')
           alert('Please enter your GCash reference number')
           setIsProcessing(false)
           return
@@ -135,46 +141,60 @@ export default function CheckoutPage() {
         // Validate GCash reference number format (exactly 13 digits)
         const gcashRef = customerInfo.gcashReference.trim()
         if (!/^\d{13}$/.test(gcashRef)) {
+          console.log('GCash validation failed: Invalid reference format', gcashRef)
           alert('GCash reference number must be exactly 13 digits')
           setIsProcessing(false)
           return
         }
+        console.log('GCash validation passed')
       }
 
       // Validate branch selection
+      console.log('Validating branch selection...', customerInfo.branchId)
       if (!customerInfo.branchId) {
+        console.log('Branch validation failed: No branch selected')
         alert('Please select a pickup branch')
         setIsProcessing(false)
         return
       }
 
       // Validate pickup time
+      console.log('Validating pickup time...', customerInfo.pickupTime)
       if (!customerInfo.pickupTime) {
+        console.log('Pickup time validation failed: No time selected')
         alert('Please select a pickup time')
         setIsProcessing(false)
         return
       }
 
       // Validate customer name
+      console.log('Validating customer name...', customerInfo.fullName)
       if (!customerInfo.fullName || customerInfo.fullName.trim() === '') {
+        console.log('Customer name validation failed: Empty name')
         alert('Please enter your full name')
         setIsProcessing(false)
         return
       }
 
       // Validate customer email
+      console.log('Validating customer email...', customerInfo.email)
       if (!customerInfo.email || customerInfo.email.trim() === '') {
+        console.log('Customer email validation failed: Empty email')
         alert('Please enter your email address')
         setIsProcessing(false)
         return
       }
 
       // Validate customer phone
+      console.log('Validating customer phone...', customerInfo.phone)
       if (!customerInfo.phone || customerInfo.phone.trim() === '') {
+        console.log('Customer phone validation failed: Empty phone')
         alert('Please enter your phone number')
         setIsProcessing(false)
         return
       }
+
+      console.log('All validations passed!')
 
       const branchId = customerInfo.branchId
       const pickupDateTime = new Date(customerInfo.pickupTime)
@@ -223,6 +243,9 @@ export default function CheckoutPage() {
       console.log('Branch ID:', branchId)
       console.log('Pickup time:', pickupDateTime.toISOString())
       console.log('Cooking start time:', cookingStartTime.toISOString())
+      console.log('Customer info:', customerInfo)
+      console.log('Items:', items)
+      console.log('Total:', total)
 
       let order: any
 
