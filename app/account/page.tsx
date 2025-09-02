@@ -150,16 +150,26 @@ export default function AccountPage() {
     try {
       const supabase = createClient()
       
-      // Check if email already exists
+      // Check if email already exists in users table
       const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('email')
         .eq('email', registerData.email)
         .maybeSingle()
       
+      // If user exists in database but not in auth, we need to clean up
       if (existingUser) {
-        alert('An account with this email already exists!')
-        return
+        // Check if auth user exists
+        const { data: authUser } = await supabase.auth.getUser()
+        
+        if (!authUser.user || authUser.user.email !== registerData.email) {
+          // User exists in database but not in auth - this is old data
+          // We'll update the existing record instead of creating new one
+          console.log('Found old user record, will update with new auth data')
+        } else {
+          alert('An account with this email already exists!')
+          return
+        }
       }
       
       // Create user in Supabase Auth
@@ -185,24 +195,49 @@ export default function AccountPage() {
         return
       }
       
-      // Insert customer data into users table
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id, // Use the auth user ID
-          email: registerData.email,
-          full_name: registerData.fullName,
-          phone: registerData.phone,
-          role: 'customer',
-          is_active: true
-        })
-        .select()
-        .single()
-      
-      if (insertError) {
-        console.error('Error creating customer account:', insertError)
-        alert('Error creating account. Please try again.')
-        return
+      // Insert or update customer data in users table
+      let newUser
+      if (existingUser) {
+        // Update existing record with new auth ID
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({
+            id: authData.user.id, // Update with new auth user ID
+            full_name: registerData.fullName,
+            phone: registerData.phone,
+            is_active: true
+          })
+          .eq('email', registerData.email)
+          .select()
+          .single()
+        
+        if (updateError) {
+          console.error('Error updating customer account:', updateError)
+          alert('Error updating account. Please try again.')
+          return
+        }
+        newUser = updatedUser
+      } else {
+        // Insert new record
+        const { data: insertedUser, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: authData.user.id, // Use the auth user ID
+            email: registerData.email,
+            full_name: registerData.fullName,
+            phone: registerData.phone,
+            role: 'customer',
+            is_active: true
+          })
+          .select()
+          .single()
+        
+        if (insertError) {
+          console.error('Error creating customer account:', insertError)
+          alert('Error creating account. Please try again.')
+          return
+        }
+        newUser = insertedUser
       }
       
       console.log('Customer account created successfully:', newUser)
