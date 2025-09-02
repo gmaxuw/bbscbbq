@@ -19,7 +19,8 @@ export default function CheckoutPage() {
     email: '',
     phone: '',
     branchId: '',
-    paymentMethod: 'cash',
+    pickupTime: '',
+    paymentMethod: 'gcash',
     gcashReference: '',
     paymentScreenshot: null as File | null
   })
@@ -110,7 +111,18 @@ export default function CheckoutPage() {
         return
       }
 
+      // Validate pickup time
+      if (!customerInfo.pickupTime) {
+        alert('Please select a pickup time')
+        setIsProcessing(false)
+        return
+      }
+
       const branchId = customerInfo.branchId
+      const pickupDateTime = new Date(customerInfo.pickupTime)
+      
+      // Calculate cooking start time (30 minutes before pickup)
+      const cookingStartTime = new Date(pickupDateTime.getTime() - 30 * 60 * 1000)
 
       // Create the order
       const { data: order, error: orderError } = await supabase
@@ -120,12 +132,13 @@ export default function CheckoutPage() {
           customer_email: customerInfo.email,
           customer_phone: customerInfo.phone,
           branch_id: branchId,
+          pickup_time: pickupDateTime.toISOString(),
+          cooking_start_time: cookingStartTime.toISOString(),
           total_amount: total,
           payment_method: customerInfo.paymentMethod,
-          payment_status: customerInfo.paymentMethod === 'cash' ? 'pending' : 'paid',
+          payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
           gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
-          status: 'pending',
-          estimated_ready_time: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes from now
+          status: 'pending'
         })
         .select()
         .single()
@@ -358,6 +371,23 @@ export default function CheckoutPage() {
                       📍 Choose the branch where you'll pick up your order
                     </p>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Pickup Time *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={customerInfo.pickupTime}
+                      onChange={(e) => setCustomerInfo({...customerInfo, pickupTime: e.target.value})}
+                      className="bbq-input w-full"
+                      min={new Date().toISOString().slice(0, 16)}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      ⏰ Choose when you want to pick up your order (minimum 2 hours advance)
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -370,7 +400,6 @@ export default function CheckoutPage() {
                 
                 <div className="space-y-3">
                   {[
-                    { value: 'cash', label: 'Cash on Pickup', description: 'Pay when you pick up your order' },
                     { value: 'gcash', label: 'GCash', description: 'Pay via GCash mobile payment' },
                     { value: 'card', label: 'Credit/Debit Card', description: 'Pay with your card' },
                     { value: 'paymaya', label: 'PayMaya', description: 'Pay via PayMaya wallet' }
@@ -485,6 +514,11 @@ export default function CheckoutPage() {
                         <li>Complete the payment and take a screenshot</li>
                         <li>Upload the screenshot and enter the reference number above</li>
                       </ol>
+                      <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded">
+                        <p className="text-sm text-orange-800">
+                          <strong>🍖 Cooking Schedule:</strong> We'll start cooking your order 30 minutes before your pickup time to ensure it's fresh and hot when you arrive!
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
