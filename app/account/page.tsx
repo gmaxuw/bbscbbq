@@ -35,6 +35,15 @@ export default function AccountPage() {
     favoriteItems: [] // This will be calculated from actual orders
   }
 
+  // Debug logging to see what's happening
+  console.log('Account Page Debug:', {
+    userName,
+    userEmail,
+    userPhone,
+    registerData,
+    userData
+  })
+
   // Check for existing customer session on page load
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -42,11 +51,23 @@ export default function AccountPage() {
       const customerName = localStorage.getItem('customer_name')
       const customerPhone = localStorage.getItem('customer_phone')
       
+      console.log('localStorage Debug:', {
+        customerEmail,
+        customerName,
+        customerPhone
+      })
+      
       if (customerEmail) {
         setUserEmail(customerEmail)
         setUserName(customerName || '')
         setUserPhone(customerPhone || '')
         setIsLoggedIn(true)
+        
+        console.log('Setting user data:', {
+          email: customerEmail,
+          name: customerName,
+          phone: customerPhone
+        })
       }
     }
   }, [])
@@ -76,11 +97,23 @@ export default function AccountPage() {
       localStorage.setItem('customer_email', registerData.email)
       localStorage.setItem('customer_name', registerData.fullName)
       localStorage.setItem('customer_phone', registerData.phone)
+      
+      console.log('Stored in localStorage:', {
+        email: registerData.email,
+        name: registerData.fullName,
+        phone: registerData.phone
+      })
     }
     setUserEmail(registerData.email)
     setUserName(registerData.fullName)
     setUserPhone(registerData.phone)
     setIsLoggedIn(true)
+    
+    console.log('Set state variables:', {
+      email: registerData.email,
+      name: registerData.fullName,
+      phone: registerData.phone
+    })
   }
 
   const handleLogout = () => {
