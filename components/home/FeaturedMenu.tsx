@@ -217,26 +217,30 @@ export default function FeaturedMenu() {
           </p>
         </div>
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-            {console.log('📱 Mobile Debug - Showing loading state')}
-            {[...Array(4)].map((_, index) => (
-              <div key={index} className="bbq-card animate-pulse">
-                <div className="h-48 bg-gray-200 rounded-t-lg"></div>
-                <div className="p-6">
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-6 bg-gray-200 rounded mb-3"></div>
-                  <div className="h-3 bg-gray-200 rounded mb-4"></div>
-                  <div className="h-10 bg-gray-200 rounded"></div>
-                </div>
+        {(() => {
+          if (isLoading) {
+            console.log('📱 Mobile Debug - Showing loading state')
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="bbq-card animate-pulse">
+                    <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                    <div className="p-6">
+                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-6 bg-gray-200 rounded mb-3"></div>
+                      <div className="h-3 bg-gray-200 rounded mb-4"></div>
+                      <div className="h-10 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-            {console.log('📱 Mobile Debug - Rendering products:', products.length, 'items')}
-            {console.log('📱 Mobile Debug - Products array:', products)}
-            {products.map((item, index) => (
+            )
+          } else {
+            console.log('📱 Mobile Debug - Rendering products:', products.length, 'items')
+            console.log('📱 Mobile Debug - Products array:', products)
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+                {products.map((item, index) => (
             <div 
               key={item.id} 
               className="bbq-card group cursor-pointer overflow-hidden animate-slide-up"
@@ -350,22 +354,26 @@ export default function FeaturedMenu() {
                 </button>
               </div>
             </div>
-          ))}
-          </div>
-        )}
+                ))}
+              </div>
+            )
+          }
+        })()}
 
-        {!isLoading && products.length === 0 && (
-          <div className="text-center py-12">
-            {console.log('📱 Mobile Debug - Showing no products message')}
-            <div className="text-gray-500 mb-4">No products available at the moment.</div>
-            <Link 
-              href="/admin/products" 
-              className="bbq-button-primary"
-            >
-              Add Products
-            </Link>
-          </div>
-        )}
+        {!isLoading && products.length === 0 && (() => {
+          console.log('📱 Mobile Debug - Showing no products message')
+          return (
+            <div className="text-center py-12">
+              <div className="text-gray-500 mb-4">No products available at the moment.</div>
+              <Link 
+                href="/admin/products" 
+                className="bbq-button-primary"
+              >
+                Add Products
+              </Link>
+            </div>
+          )
+        })()}
 
         {!isLoading && hasMoreProducts && (
           <div className="text-center animate-fade-in">
