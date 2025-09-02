@@ -296,7 +296,7 @@ export default function CheckoutPage() {
       // }
 
       // Calculate total commission from cart items
-      const totalCommission = cartItems.reduce((sum, item) => {
+      const totalCommission = items.reduce((sum, item) => {
         return sum + (item.commission || 0) * item.quantity
       }, 0)
 
