@@ -228,7 +228,7 @@ export default function CheckoutPage() {
       const pickupDateTime = new Date(customerInfo.pickupTime)
       const now = new Date()
       
-      // Validate pickup time is at least 1 hour from now
+      // Validate pickup time is at least 1 hour from now (24-hour operation)
       const minPickupTime = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour from now
       if (pickupDateTime < minPickupTime) {
         alert('Pickup time must be at least 1 hour from now')
@@ -236,10 +236,10 @@ export default function CheckoutPage() {
         return
       }
       
-      // Validate pickup time is not more than 8 days from now
-      const maxPickupTime = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000) // 8 days from now
+      // Validate pickup time is not more than 24 hours from now (24-hour operation)
+      const maxPickupTime = new Date(now.getTime() + 24 * 60 * 60 * 1000) // 24 hours from now
       if (pickupDateTime > maxPickupTime) {
-        alert('Pickup time cannot be more than 8 days in advance')
+        alert('Pickup time cannot be more than 24 hours in advance')
         setIsProcessing(false)
         return
       }
@@ -605,10 +605,10 @@ export default function CheckoutPage() {
                       onChange={(e) => setCustomerInfo({...customerInfo, pickupTime: e.target.value})}
                       className="bbq-input w-full"
                       min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
-                      max={new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                      max={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      ⏰ Choose when you want to pick up your order (1 hour to 8 days advance)
+                      ⏰ Choose when you want to pick up your order (1 hour to 24 hours advance)
                     </p>
                   </div>
                 </div>
@@ -760,7 +760,7 @@ export default function CheckoutPage() {
                           <strong>🍖 Cooking Schedule:</strong> We'll start cooking your order 30 minutes before your pickup time to ensure it's fresh and hot when you arrive!
                         </p>
                         <p className="text-xs text-orange-700 mt-2">
-                          <strong>📅 Advance Orders:</strong> You can place orders up to 8 days in advance (minimum 1 hour notice)
+                          <strong>📅 Advance Orders:</strong> You can place orders up to 24 hours in advance (minimum 1 hour notice)
                         </p>
                       </div>
                     </div>

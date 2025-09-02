@@ -46,7 +46,7 @@ export default function BranchLocations() {
       // Add default features and images for each branch
       const branchesWithDefaults = (data || []).map((branch, index) => ({
         ...branch,
-        hours: '10:00 AM - 10:00 PM',
+        hours: '24 Hours Open',
         rating: 4.5 + (index * 0.1), // Vary ratings slightly
         features: getBranchFeatures(branch.name),
         image: getBranchImage(branch.name, index)
