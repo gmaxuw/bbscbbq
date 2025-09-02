@@ -208,7 +208,7 @@ export default function OrderManagement() {
       // Update local state
       setOrders(orders.map(order => 
         order.id === orderId 
-          ? { ...order, status: newStatus, updated_at: new Date().toISOString() }
+          ? { ...order, status: newStatus as Order['status'], updated_at: new Date().toISOString() }
           : order
       ))
 
