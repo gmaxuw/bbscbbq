@@ -7,6 +7,8 @@ import { ArrowLeft, CreditCard, MapPin, Phone, User, CheckCircle, Upload, Image 
 import DesignLock from '@/components/layout/DesignLock'
 import { useCart } from '@/lib/cart-context'
 import { createClient } from '@/lib/supabase'
+import { generateReferenceNumber, generateQRCode } from '@/lib/qr-generator'
+import { isOnline, storeOrderOffline, setupOfflineListener } from '@/lib/offline-storage'
 
 export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false)
@@ -24,6 +26,7 @@ export default function CheckoutPage() {
     gcashReference: '',
     paymentScreenshot: null as File | null
   })
+  const [orderForSomeoneElse, setOrderForSomeoneElse] = useState(false)
   const [branches, setBranches] = useState<Array<{
     id: string;
     name: string;
@@ -65,6 +68,27 @@ export default function CheckoutPage() {
     }
 
     fetchBranches()
+  }, [supabase])
+
+  // Auto-fill customer info if logged in
+  useEffect(() => {
+    const customerEmail = localStorage.getItem('customer_email')
+    const customerName = localStorage.getItem('customer_name')
+    const customerPhone = localStorage.getItem('customer_phone')
+
+    if (customerEmail && customerName) {
+      setCustomerInfo(prev => ({
+        ...prev,
+        fullName: customerName,
+        email: customerEmail,
+        phone: customerPhone || ''
+      }))
+    }
+  }, [])
+
+  // Setup offline listener
+  useEffect(() => {
+    setupOfflineListener(supabase)
   }, [supabase])
 
   // Redirect to cart if empty (but only after cart is loaded)
@@ -147,27 +171,45 @@ export default function CheckoutPage() {
       // Calculate cooking start time (30 minutes before pickup)
       const cookingStartTime = new Date(pickupDateTime.getTime() - 30 * 60 * 1000)
 
-      // Create the order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          customer_name: customerInfo.fullName,
-          customer_email: customerInfo.email,
-          customer_phone: customerInfo.phone,
-          branch_id: branchId,
-          pickup_time: pickupDateTime.toISOString(),
-          cooking_start_time: cookingStartTime.toISOString(),
-          total_amount: total,
-          payment_method: customerInfo.paymentMethod,
-          payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
-          gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
-          status: 'pending'
-        })
-        .select()
-        .single()
+      // Generate unique reference number
+      const referenceNumber = generateReferenceNumber()
 
-      if (orderError) {
-        throw orderError
+      // Prepare order data
+      const orderData = {
+        customer_name: customerInfo.fullName,
+        customer_email: customerInfo.email,
+        customer_phone: customerInfo.phone,
+        branch_id: branchId,
+        pickup_time: pickupDateTime.toISOString(),
+        cooking_start_time: cookingStartTime.toISOString(),
+        total_amount: total,
+        payment_method: customerInfo.paymentMethod,
+        payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
+        gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
+        status: 'pending',
+        reference_number: referenceNumber
+      }
+
+      let order: any
+
+      // Check if online or offline
+      if (isOnline()) {
+        // Create the order in Supabase
+        const { data, error: orderError } = await supabase
+          .from('orders')
+          .insert(orderData)
+          .select()
+          .single()
+
+        if (orderError) {
+          throw orderError
+        }
+        order = data
+      } else {
+        // Store offline
+        storeOrderOffline(orderData, referenceNumber)
+        order = { id: `offline_${Date.now()}`, reference_number: referenceNumber }
+        console.log('Order stored offline due to no internet connection')
       }
 
       // Create order items
@@ -227,8 +269,12 @@ export default function CheckoutPage() {
 
       console.log('Order created successfully:', order)
 
+      // Generate QR code
+      const qrCodeUrl = await generateQRCode(referenceNumber)
+
       // Store order details for display
-      setOrderNumber(order.order_number || 'N/A')
+      setOrderNumber(referenceNumber)
+      setQrCodeUrl(qrCodeUrl)
       
       // Clear cart and show success
       clearCart()
@@ -254,8 +300,11 @@ export default function CheckoutPage() {
             
             {orderNumber && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-green-600 mb-1">Your Order Number</p>
-                <p className="text-2xl font-bold text-green-800">{orderNumber}</p>
+                <p className="text-sm text-green-600 mb-1">Your Order Reference Number</p>
+                <p className="text-2xl font-bold text-green-800 font-mono">{orderNumber}</p>
+                <p className="text-xs text-green-600 mt-2">
+                  📱 Show this number or QR code when picking up your order
+                </p>
               </div>
             )}
             
@@ -329,6 +378,38 @@ export default function CheckoutPage() {
                   <User className="w-5 h-5 mr-2 text-lays-dark-red" />
                   Customer Information
                 </h2>
+                
+                {/* Order for Someone Else Option */}
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={orderForSomeoneElse}
+                      onChange={(e) => {
+                        setOrderForSomeoneElse(e.target.checked)
+                        if (!e.target.checked) {
+                          // Reset to logged-in user info
+                          const customerEmail = localStorage.getItem('customer_email')
+                          const customerName = localStorage.getItem('customer_name')
+                          const customerPhone = localStorage.getItem('customer_phone')
+                          setCustomerInfo(prev => ({
+                            ...prev,
+                            fullName: customerName || '',
+                            email: customerEmail || '',
+                            phone: customerPhone || ''
+                          }))
+                        }
+                      }}
+                      className="rounded border-gray-300 text-lays-dark-red focus:ring-lays-dark-red"
+                    />
+                    <span className="text-sm font-medium text-blue-800">
+                      📦 Order for someone else (I'll pay, they'll pick up)
+                    </span>
+                  </label>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Check this if you're ordering for a friend/family member who will pick up the order
+                  </p>
+                </div>
                 
                 <div className="space-y-4">
                   <div>
