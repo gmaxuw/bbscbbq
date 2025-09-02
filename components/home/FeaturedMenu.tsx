@@ -73,7 +73,7 @@ export default function FeaturedMenu() {
             id,
             name,
             price,
-            commission,
+            commission_rate,
             category,
             is_available,
             created_at,
@@ -180,7 +180,7 @@ export default function FeaturedMenu() {
             price: product.price,
             image: getProductImage(product),
             category: product.category,
-            commission: product.commission || 0
+            commission: product.commission_rate || 0 // Fixed: use commission_rate from database
           })
         }
         

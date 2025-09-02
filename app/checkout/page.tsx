@@ -258,11 +258,11 @@ export default function CheckoutPage() {
         branch_id: branchId,
         pickup_time: pickupDateTime.toISOString(),
         total_amount: total,
-        total_commission: 0, // Will be calculated from order items
+        payment_method: customerInfo.paymentMethod, // Add payment method
         payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
         gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
         payment_screenshot: null, // Will be set later if uploaded
-        order_status: 'pending' // Fixed: was 'status', should be 'order_status'
+        status: 'pending' // Fixed: database uses 'status', not 'order_status'
       }
 
       // Debug: Log the order data being sent
@@ -303,8 +303,7 @@ export default function CheckoutPage() {
           product_id: item.id,
           quantity: item.quantity,
           unit_price: item.price,
-          unit_commission: item.commission || 0, // Add commission field
-          subtotal: item.price * item.quantity // Fixed: was 'total_price', should be 'subtotal'
+          total_price: item.price * item.quantity // Fixed: database uses 'total_price', not 'subtotal'
         }))
 
         console.log('🚀 Attempting to create order items:', orderItems)
@@ -321,20 +320,9 @@ export default function CheckoutPage() {
         
         console.log('✅ Order items created successfully')
 
-        // Calculate total commission and update the order
-        const totalCommission = orderItems.reduce((sum, item) => sum + (item.unit_commission * item.quantity), 0)
-        
-        const { error: updateError } = await supabase
-          .from('orders')
-          .update({ total_commission: totalCommission })
-          .eq('id', order.id)
-
-        if (updateError) {
-          console.error('❌ Order Update Error:', updateError)
-          // Don't throw here, order was created successfully
-        } else {
-          console.log('✅ Order commission updated successfully:', totalCommission)
-        }
+        // Commission is tracked in products table, not orders table
+        // No need to update orders table with commission data
+        console.log('✅ Order items created successfully - commission tracked in products table')
       } else {
         // Store offline
         storeOrderOffline(orderData, referenceNumber)
