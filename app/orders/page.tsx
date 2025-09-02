@@ -1,0 +1,341 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { ArrowLeft, Package, Clock, CheckCircle, XCircle, Eye, MapPin, Phone } from 'lucide-react'
+import { createClient } from '@/lib/supabase'
+import DesignLock from '@/components/layout/DesignLock'
+
+interface OrderItem {
+  id: string
+  product_id: string
+  quantity: number
+  unit_price: number
+  subtotal: number
+  product: {
+    name: string
+    image_url?: string
+  }
+}
+
+interface Order {
+  id: string
+  order_number: string
+  customer_name: string
+  customer_email: string
+  customer_phone: string
+  delivery_address: string
+  status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
+  total_amount: number
+  promo_discount?: number
+  payment_method: string
+  gcash_reference?: string
+  payment_screenshot?: string
+  created_at: string
+  order_items: OrderItem[]
+}
+
+export default function CustomerOrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [showOrderDetails, setShowOrderDetails] = useState(false)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadOrders()
+  }, [])
+
+  const loadOrders = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Get current user's email from localStorage or session
+      const userEmail = localStorage.getItem('customer_email') || 'demo@example.com'
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            *,
+            product:products (
+              name,
+              image_url
+            )
+          )
+        `)
+        .eq('customer_email', userEmail)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error loading orders:', error)
+        return
+      }
+
+      setOrders(data || [])
+    } catch (error) {
+      console.error('Error loading orders:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'text-yellow-600 bg-yellow-100'
+      case 'preparing':
+        return 'text-blue-600 bg-blue-100'
+      case 'ready':
+        return 'text-green-600 bg-green-100'
+      case 'delivered':
+        return 'text-green-600 bg-green-100'
+      case 'cancelled':
+        return 'text-red-600 bg-red-100'
+      default:
+        return 'text-gray-600 bg-gray-100'
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Clock className="w-4 h-4" />
+      case 'preparing':
+        return <Package className="w-4 h-4" />
+      case 'ready':
+        return <CheckCircle className="w-4 h-4" />
+      case 'delivered':
+        return <CheckCircle className="w-4 h-4" />
+      case 'cancelled':
+        return <XCircle className="w-4 h-4" />
+      default:
+        return <Clock className="w-4 h-4" />
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const viewOrderDetails = (order: Order) => {
+    setSelectedOrder(order)
+    setShowOrderDetails(true)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <DesignLock pageName="Customer Orders Page" />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="w-8 h-8 border-4 border-lays-dark-red border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading your orders...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <DesignLock pageName="Customer Orders Page" />
+      
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="flex items-center space-x-4">
+            <Link 
+              href="/account" 
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </Link>
+            <div className="flex items-center space-x-3">
+              <Package className="w-6 h-6 text-lays-dark-red" />
+              <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {orders.length === 0 ? (
+          <div className="text-center py-12">
+            <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Orders Yet</h3>
+            <p className="text-gray-600 mb-6">You haven't placed any orders yet. Start exploring our delicious BBQ menu!</p>
+            <Link 
+              href="/"
+              className="bbq-button-primary"
+            >
+              Browse Menu
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {orders.map((order) => (
+              <div key={order.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Order #{order.order_number}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {formatDate(order.created_at)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
+                      {getStatusIcon(order.status)}
+                      <span className="capitalize">{order.status}</span>
+                    </div>
+                    <p className="text-lg font-bold text-gray-900 mt-1">
+                      ₱{(order.total_amount || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Delivery Address</h4>
+                    <p className="text-sm text-gray-600 flex items-start space-x-2">
+                      <MapPin className="w-4 h-4 mt-0.5 text-gray-400" />
+                      <span>{order.delivery_address}</span>
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Contact Info</h4>
+                    <p className="text-sm text-gray-600 flex items-center space-x-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <span>{order.customer_phone}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    {order.order_items?.length || 0} item{(order.order_items?.length || 0) !== 1 ? 's' : ''}
+                  </div>
+                  <button
+                    onClick={() => viewOrderDetails(order)}
+                    className="bbq-button-secondary flex items-center space-x-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>View Details</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Order Details Modal */}
+      {showOrderDetails && selectedOrder && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => setShowOrderDetails(false)}></div>
+            
+            <div className="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Order #{selectedOrder.order_number}
+                </h3>
+                <button
+                  onClick={() => setShowOrderDetails(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Order Status */}
+              <div className="mb-6">
+                <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(selectedOrder.status)}`}>
+                  {getStatusIcon(selectedOrder.status)}
+                  <span className="capitalize">{selectedOrder.status}</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  Placed on {formatDate(selectedOrder.created_at)}
+                </p>
+              </div>
+
+              {/* Order Items */}
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-900 mb-3">Order Items</h4>
+                <div className="space-y-3">
+                  {selectedOrder.order_items?.map((item) => (
+                    <div key={item.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                        {item.product?.image_url ? (
+                          <img 
+                            src={item.product.image_url} 
+                            alt={item.product.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <Package className="w-6 h-6 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-medium text-gray-900">{item.product?.name}</h5>
+                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-gray-900">₱{(item.subtotal || 0).toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">₱{(item.unit_price || 0).toLocaleString()} each</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Order Summary */}
+              <div className="border-t pt-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="text-gray-900">₱{((selectedOrder.total_amount || 0) + (selectedOrder.promo_discount || 0)).toLocaleString()}</span>
+                  </div>
+                  {selectedOrder.promo_discount && selectedOrder.promo_discount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Discount:</span>
+                      <span className="text-green-600">-₱{(selectedOrder.promo_discount || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-semibold border-t pt-2">
+                    <span className="text-gray-900">Total:</span>
+                    <span className="text-gray-900">₱{(selectedOrder.total_amount || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Info */}
+              {selectedOrder.payment_method === 'gcash' && (
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2">GCash Payment</h4>
+                  {selectedOrder.gcash_reference && (
+                    <p className="text-sm text-gray-600">
+                      Reference: {selectedOrder.gcash_reference}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

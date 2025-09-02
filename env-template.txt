@@ -1,0 +1,124 @@
+# 🔐 ADMIN DASHBOARD ENVIRONMENT VARIABLES 🛡️
+# 
+# This file contains all required environment variables for the admin dashboard:
+# - Supabase database connection
+# - Storage bucket configuration
+# - Authentication settings
+# - API endpoints
+# 
+# ⚠️  WARNING: Copy this to .env.local and fill in your actual values
+# 🔒  STATUS: TEMPLATE - Requires your Supabase credentials
+# 📍  LOCATION: Project root directory
+# 🎯  PURPOSE: Configure Supabase connection and admin dashboard
+
+# =============================================================================
+# SUPABASE CONFIGURATION (REQUIRED)
+# =============================================================================
+
+# Your Supabase project URL (found in Supabase dashboard)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+
+# Your Supabase anonymous/public key (found in Supabase dashboard)
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+
+# Your Supabase service role key (for admin operations - keep secret!)
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+
+# =============================================================================
+# STORAGE BUCKET NAMES (REQUIRED)
+# =============================================================================
+
+# Payment screenshot storage bucket
+NEXT_PUBLIC_PAYMENT_BUCKET=payment-screenshots
+
+# Product images storage bucket
+NEXT_PUBLIC_PRODUCT_BUCKET=product-images
+
+# =============================================================================
+# ADMIN DASHBOARD SETTINGS (OPTIONAL)
+# =============================================================================
+
+# Admin dashboard base URL
+NEXT_PUBLIC_ADMIN_URL=/admin
+
+# Crew dashboard base URL
+NEXT_PUBLIC_CREW_URL=/crew
+
+# Real-time update interval (in milliseconds)
+NEXT_PUBLIC_REALTIME_INTERVAL=30000
+
+# Maximum file upload size (in bytes) - 5MB default
+NEXT_PUBLIC_MAX_UPLOAD_SIZE=5242880
+
+# =============================================================================
+# SECURITY SETTINGS (OPTIONAL)
+# =============================================================================
+
+# Session timeout (in minutes) - 8 hours default
+NEXT_PUBLIC_SESSION_TIMEOUT=480
+
+# Maximum login attempts before lockout
+NEXT_PUBLIC_MAX_LOGIN_ATTEMPTS=5
+
+# Lockout duration (in minutes)
+NEXT_PUBLIC_LOCKOUT_DURATION=30
+
+# =============================================================================
+# REPORTING & EXPORT SETTINGS (OPTIONAL)
+# =============================================================================
+
+# Default date range for reports (in days)
+NEXT_PUBLIC_DEFAULT_REPORT_DAYS=30
+
+# Maximum export records per request
+NEXT_PUBLIC_MAX_EXPORT_RECORDS=10000
+
+# CSV export delimiter
+NEXT_PUBLIC_CSV_DELIMITER=,
+
+# =============================================================================
+# NOTIFICATION SETTINGS (OPTIONAL)
+# =============================================================================
+
+# Enable email notifications
+NEXT_PUBLIC_ENABLE_EMAIL_NOTIFICATIONS=false
+
+# Enable SMS notifications
+NEXT_PUBLIC_ENABLE_SMS_NOTIFICATIONS=false
+
+# =============================================================================
+# DEVELOPMENT SETTINGS (OPTIONAL)
+# =============================================================================
+
+# Enable debug logging
+NEXT_PUBLIC_DEBUG_MODE=false
+
+# Enable development features
+NEXT_PUBLIC_DEV_MODE=false
+
+# =============================================================================
+# SETUP INSTRUCTIONS
+# =============================================================================
+
+# 1. Copy this file to .env.local
+# 2. Go to your Supabase dashboard
+# 3. Copy your project URL and anon key
+# 4. Replace the placeholder values above
+# 5. Restart your development server
+
+# =============================================================================
+# SUPABASE DASHBOARD LOCATIONS
+# =============================================================================
+
+# Project URL: Settings > API > Project URL
+# Anon Key: Settings > API > anon public
+# Service Role: Settings > API > service_role secret
+
+# =============================================================================
+# SECURITY NOTES
+# =============================================================================
+
+# ⚠️  NEVER commit .env.local to version control
+# ⚠️  NEVER expose service role key in client-side code
+# ⚠️  ALWAYS use environment variables for sensitive data
+# ⚠️  REGULARLY rotate your Supabase keys

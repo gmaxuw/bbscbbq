@@ -1,0 +1,136 @@
+import { MapPin, Phone, Clock, Star } from 'lucide-react'
+
+const branches = [
+  {
+    id: 'surigao-main',
+    name: 'Surigao Main Branch',
+    address: '123 Main Street, Surigao City',
+    phone: '+63 946 365 7331',
+    hours: '10:00 AM - 10:00 PM',
+    rating: 4.8,
+    features: ['Parking Available', 'Dine-in', 'Takeout', 'Delivery'],
+    image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop&crop=center'
+  },
+  {
+    id: 'borromeo',
+    name: 'Borromeo Branch',
+    address: '456 Borromeo Street, Surigao City',
+    phone: '+63 946 365 7331',
+    hours: '10:00 AM - 10:00 PM',
+    rating: 4.7,
+    features: ['Parking Available', 'Takeout', 'Delivery'],
+    image: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400&h=300&fit=crop&crop=center'
+  },
+  {
+    id: 'national-highway',
+    name: 'National Highway Branch',
+    address: '789 National Highway, Surigao City',
+    phone: '+63 946 365 7331',
+    hours: '10:00 AM - 10:00 PM',
+    rating: 4.6,
+    features: ['Highway Access', 'Takeout', 'Drive-thru'],
+    image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=300&fit=crop&crop=center'
+  },
+  {
+    id: 'siargao',
+    name: 'Siargao Branch',
+    address: '321 Beach Road, Siargao Island',
+    phone: '+63 946 365 7331',
+    hours: '10:00 AM - 10:00 PM',
+    rating: 4.9,
+    features: ['Beach View', 'Tourist Friendly', 'Takeout'],
+    image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop&crop=center'
+  }
+]
+
+export default function BranchLocations() {
+  return (
+    <section className="bbq-section bg-white">
+      <div className="bbq-container">
+        <div className="text-center mb-16 animate-fade-in">
+          <div className="inline-flex items-center space-x-2 bg-lays-dark-red/10 text-lays-dark-red rounded-full px-4 py-2 mb-4">
+            <MapPin className="w-5 h-5" />
+            <span className="font-medium text-sm">Our Locations</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bbq-display font-bold text-gray-900 mb-6">
+            Find Us Near You
+          </h2>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            With 4 convenient locations across Surigao and Siargao, 
+            we're never too far from serving you the best BBQ in town.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {branches.map((branch, index) => (
+            <div 
+              key={branch.id} 
+              className="bbq-card group hover:shadow-2xl transition-all duration-300 animate-slide-up"
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <div className="relative h-48 overflow-hidden rounded-t-2xl">
+                <div 
+                  className="w-full h-full bg-cover bg-center bg-no-repeat transition-transform duration-500 group-hover:scale-110"
+                  style={{ backgroundImage: `url(${branch.image})` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                
+                <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm text-lays-dark-red font-bold px-3 py-1 rounded-full flex items-center space-x-1">
+                  <Star className="w-3 h-3 fill-current" />
+                  <span>{branch.rating}</span>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-lays-dark-red transition-colors duration-200">
+                  {branch.name}
+                </h3>
+
+                <div className="flex items-start space-x-2 mb-3">
+                  <MapPin className="w-5 h-5 text-lays-dark-red mt-0.5 flex-shrink-0" />
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {branch.address}
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2 mb-3">
+                  <Phone className="w-5 h-5 text-lays-dark-red" />
+                  <span className="text-gray-600 text-sm">{branch.phone}</span>
+                </div>
+
+                <div className="flex items-center space-x-2 mb-4">
+                  <Clock className="w-5 h-5 text-lays-dark-red" />
+                  <span className="text-gray-600 text-sm">{branch.hours}</span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {branch.features.map((feature, featureIndex) => (
+                    <span 
+                      key={featureIndex}
+                      className="text-xs bg-lays-dark-red/10 text-lays-dark-red px-2 py-1 rounded-full"
+                    >
+                      {feature}
+                    </span>
+                  ))}
+                </div>
+
+                <button className="w-full bg-lays-dark-red hover:bg-lays-bright-red text-white font-semibold py-2 rounded-lg transition-colors duration-200">
+                  Order from This Branch
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-center mt-16 animate-fade-in">
+          <p className="text-gray-600 mb-6">
+            Can't decide which branch to visit? Check out our interactive map!
+          </p>
+          <button className="bbq-button-secondary text-lg px-8 py-4">
+            View Interactive Map
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}

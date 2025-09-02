@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Fredoka:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --font-inter: 'Inter', sans-serif;
+    --font-playfair: 'Playfair Display', serif;
+    --font-fredoka: 'Fredoka', sans-serif;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+@layer components {
+  .bbq-gradient {
+    background: linear-gradient(135deg, #AB0E14 0%, #EF1C24 100%);
+  }
+  
+  .bbq-gradient-text {
+    background: linear-gradient(135deg, #AB0E14 0%, #EF1C24 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .bbq-shadow {
+    box-shadow: 0 10px 25px -5px rgba(171, 14, 20, 0.1), 0 10px 10px -5px rgba(171, 14, 20, 0.04);
+  }
+  
+  .bbq-card {
+    @apply bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300;
+  }
+  
+  .bbq-button-primary {
+    @apply bg-lays-dark-red hover:bg-lays-bright-red text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95;
+  }
+  
+  .bbq-button-secondary {
+    @apply bg-white hover:bg-gray-50 text-lays-dark-red font-semibold py-3 px-6 rounded-xl border-2 border-lays-dark-red transition-all duration-200 transform hover:scale-105 active:scale-95;
+  }
+  
+  .bbq-input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-lays-dark-red focus:border-transparent transition-all duration-200;
+  }
+  
+  .bbq-section {
+    @apply py-16 px-4 sm:px-6 lg:px-8;
+  }
+  
+  .bbq-container {
+    @apply max-w-7xl mx-auto;
+  }
+}
+
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .bbq-backdrop-blur {
+    backdrop-filter: blur(8px);
+  }
+}
