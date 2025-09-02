@@ -16,27 +16,35 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 // Environment variables for Supabase configuration
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Validate environment variables (only in development)
-if (process.env.NODE_ENV === 'development' && (!supabaseUrl || !supabaseAnonKey)) {
-  throw new Error('Missing Supabase environment variables. Please check your .env.local file.')
-}
+// Check if we have valid environment variables
+const hasValidEnvVars = supabaseUrl && supabaseAnonKey && 
+  supabaseUrl.startsWith('https://') && 
+  !supabaseUrl.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9')
 
-// Create Supabase client
-export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
-    }
-  }
-})
+// Create Supabase client with fallback for build time
+export const supabase = hasValidEnvVars 
+  ? createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
+      }
+    })
+  : createSupabaseClient('https://placeholder.supabase.co', 'placeholder-key', {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      }
+    })
 
 // Export createClient function for new pages
 export const createClient = () => supabase
