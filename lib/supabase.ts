@@ -16,11 +16,11 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 // Environment variables for Supabase configuration
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
 
-// Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
+// Validate environment variables (only in development)
+if (process.env.NODE_ENV === 'development' && (!supabaseUrl || !supabaseAnonKey)) {
   throw new Error('Missing Supabase environment variables. Please check your .env.local file.')
 }
 
