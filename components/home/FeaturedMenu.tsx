@@ -1,5 +1,5 @@
 /**
- * 🛡️ FINAL FEATURED MENU DESIGN - DO NOT MODIFY 🛡️
+ * FINAL FEATURED MENU DESIGN - DO NOT MODIFY
  * 
  * This featured menu is LOCKED and should NEVER be changed:
  * - 4 featured BBQ dishes with images
@@ -11,10 +11,10 @@
  * - Responsive grid layout
  * - Smooth hover effects and transitions
  * 
- * ⚠️  WARNING: Any changes to this featured menu will break the ordering experience
- * 🔒  STATUS: LOCKED - Final design approved by user
- * 📍  LOCATION: Homepage featured dishes section
- * 🎯  PURPOSE: Showcase popular dishes and enable easy ordering
+ * WARNING: Any changes to this featured menu will break the ordering experience
+ * STATUS: LOCKED - Final design approved by user
+ * LOCATION: Homepage featured dishes section
+ * PURPOSE: Showcase popular dishes and enable easy ordering
  * 
  * If you need to modify the featured menu, you MUST:
  * 1. Get explicit user approval
@@ -63,9 +63,9 @@ export default function FeaturedMenu() {
     const loadProducts = async () => {
       try {
         setIsLoading(true)
-        console.log('🛒 Loading products from database...')
-        console.log('📱 Mobile Debug - User Agent:', navigator.userAgent)
-        console.log('📱 Mobile Debug - Screen size:', window.innerWidth, 'x', window.innerHeight)
+        console.log('Loading products from database...')
+        console.log('Mobile Debug - User Agent:', navigator.userAgent)
+        console.log('Mobile Debug - Screen size:', window.innerWidth, 'x', window.innerHeight)
         
         const { data, error } = await supabase
           .from('products')
@@ -82,14 +82,14 @@ export default function FeaturedMenu() {
           .limit(PRODUCTS_PER_PAGE)
 
         if (error) {
-          console.error('❌ Database error:', error)
-          console.error('❌ Error details:', error.message, error.details, error.hint)
+          console.error('Database error:', error)
+          console.error('Error details:', error.message, error.details, error.hint)
           throw error
         }
 
-        console.log('✅ Products loaded:', data?.length || 0, 'items')
-        console.log('📱 Products data:', data)
-        console.log('📱 Mobile Debug - Products state will be set to:', data || [])
+        console.log('Products loaded:', data?.length || 0, 'items')
+        console.log('Products data:', data)
+        console.log('Mobile Debug - Products state will be set to:', data || [])
         
         setProducts(data || [])
         setHasMoreProducts((data || []).length === PRODUCTS_PER_PAGE)
@@ -97,14 +97,14 @@ export default function FeaturedMenu() {
         
         // Additional mobile debug
         setTimeout(() => {
-          console.log('📱 Mobile Debug - Products state after 1 second:', products)
+          console.log('Mobile Debug - Products state after 1 second:', products)
         }, 1000)
       } catch (error) {
-        console.error('❌ Failed to load products:', error)
-        console.error('❌ Full error object:', error)
+        console.error('Failed to load products:', error)
+        console.error('Full error object:', error)
       } finally {
         setIsLoading(false)
-        console.log('📱 Mobile Debug - Loading finished, isLoading set to false')
+        console.log('Mobile Debug - Loading finished, isLoading set to false')
       }
     }
 
@@ -219,7 +219,7 @@ export default function FeaturedMenu() {
 
         {(() => {
           if (isLoading) {
-            console.log('📱 Mobile Debug - Showing loading state')
+            console.log('Mobile Debug - Showing loading state')
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
                 {[...Array(4)].map((_, index) => (
@@ -236,8 +236,8 @@ export default function FeaturedMenu() {
               </div>
             )
           } else {
-            console.log('📱 Mobile Debug - Rendering products:', products.length, 'items')
-            console.log('📱 Mobile Debug - Products array:', products)
+            console.log('Mobile Debug - Rendering products:', products.length, 'items')
+            console.log('Mobile Debug - Products array:', products)
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
                 {products.map((item, index) => (
@@ -285,7 +285,7 @@ export default function FeaturedMenu() {
                   </div>
                   <div className="flex items-center space-x-1">
                     <Flame className="w-4 h-4 text-lays-bright-red" />
-                    <span>🔥</span>
+                    <span>Hot</span>
                   </div>
                 </div>
 
@@ -361,7 +361,7 @@ export default function FeaturedMenu() {
         })()}
 
         {!isLoading && products.length === 0 && (() => {
-          console.log('📱 Mobile Debug - Showing no products message')
+          console.log('Mobile Debug - Showing no products message')
           return (
             <div className="text-center py-12">
               <div className="text-gray-500 mb-4">No products available at the moment.</div>
@@ -400,7 +400,7 @@ export default function FeaturedMenu() {
         {!isLoading && !hasMoreProducts && products.length > 0 && (
           <div className="text-center animate-fade-in">
             <div className="text-gray-500 text-lg">
-              🎉 You've seen all our products! Happy ordering!
+              You've seen all our products! Happy ordering!
             </div>
           </div>
         )}

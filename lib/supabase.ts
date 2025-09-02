@@ -1,5 +1,5 @@
 /**
- * 🔐 SUPABASE CLIENT CONFIGURATION - ADMIN DASHBOARD 🛡️
+ * SUPABASE CLIENT CONFIGURATION - ADMIN DASHBOARD
  * 
  * This file provides Supabase client configuration for the admin dashboard:
  * - Database connection and authentication
@@ -7,10 +7,10 @@
  * - Storage buckets for payment screenshots
  * - Error handling and logging
  * 
- * ⚠️  WARNING: This is part of the admin dashboard system
- * 🔒  STATUS: INTEGRATED - Uses locked design system
- * 📍  LOCATION: Core infrastructure for admin functionality
- * 🎯  PURPOSE: Provide Supabase access for all admin operations
+ * WARNING: This is part of the admin dashboard system
+ * STATUS: INTEGRATED - Uses locked design system
+ * LOCATION: Core infrastructure for admin functionality
+ * PURPOSE: Provide Supabase access for all admin operations
  */
 
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
@@ -26,7 +26,7 @@ const hasValidEnvVars = supabaseUrl && supabaseAnonKey &&
 
 // Debug logging for mobile troubleshooting
 if (typeof window !== 'undefined') {
-  console.log('🔧 Supabase Client Debug:', {
+  console.log('Supabase Client Debug:', {
     hasValidEnvVars,
     supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'undefined',
     supabaseAnonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'undefined'
