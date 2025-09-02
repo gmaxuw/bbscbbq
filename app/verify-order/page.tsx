@@ -15,6 +15,7 @@ interface Order {
   pickup_time: string
   cooking_start_time: string
   total_amount: number
+  payment_method: string
   payment_status: string
   status: string
   branch_id: string
