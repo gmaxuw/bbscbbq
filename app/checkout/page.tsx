@@ -438,9 +438,11 @@ export default function CheckoutPage() {
                 
                 {/* Order for Someone Else Option */}
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <label className="flex items-center space-x-2 cursor-pointer">
+                  <label htmlFor="order-for-someone-else" className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
+                      id="order-for-someone-else"
+                      name="orderForSomeoneElse"
                       checked={orderForSomeoneElse}
                       onChange={(e) => {
                         setOrderForSomeoneElse(e.target.checked)
@@ -470,11 +472,13 @@ export default function CheckoutPage() {
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="customer-name" className="block text-sm font-medium text-gray-700 mb-2">
                       Full Name *
                     </label>
                     <input
                       type="text"
+                      id="customer-name"
+                      name="customerName"
                       required
                       value={customerInfo.fullName}
                       onChange={(e) => setCustomerInfo({...customerInfo, fullName: e.target.value})}
@@ -484,11 +488,13 @@ export default function CheckoutPage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="customer-email" className="block text-sm font-medium text-gray-700 mb-2">
                       Email Address *
                     </label>
                     <input
                       type="email"
+                      id="customer-email"
+                      name="customerEmail"
                       required
                       value={customerInfo.email}
                       onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
@@ -498,11 +504,13 @@ export default function CheckoutPage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="customer-phone" className="block text-sm font-medium text-gray-700 mb-2">
                       Phone Number *
                     </label>
                     <input
                       type="tel"
+                      id="customer-phone"
+                      name="customerPhone"
                       required
                       value={customerInfo.phone}
                       onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
@@ -512,10 +520,12 @@ export default function CheckoutPage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="pickup-branch" className="block text-sm font-medium text-gray-700 mb-2">
                       Pickup Branch *
                     </label>
                     <select
+                      id="pickup-branch"
+                      name="pickupBranch"
                       required
                       value={customerInfo.branchId}
                       onChange={(e) => setCustomerInfo({...customerInfo, branchId: e.target.value})}
@@ -534,11 +544,13 @@ export default function CheckoutPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="pickup-time" className="block text-sm font-medium text-gray-700 mb-2">
                       Pickup Time *
                     </label>
                     <input
                       type="datetime-local"
+                      id="pickup-time"
+                      name="pickupTime"
                       required
                       value={customerInfo.pickupTime}
                       onChange={(e) => setCustomerInfo({...customerInfo, pickupTime: e.target.value})}
@@ -649,11 +661,13 @@ export default function CheckoutPage() {
 
                     {/* GCash Reference Number */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="gcash-reference" className="block text-sm font-medium text-gray-700 mb-2">
                         GCash Reference Number *
                       </label>
                       <input
                         type="text"
+                        id="gcash-reference"
+                        name="gcashReference"
                         required={customerInfo.paymentMethod === 'gcash'}
                         value={customerInfo.gcashReference}
                         onChange={(e) => {
