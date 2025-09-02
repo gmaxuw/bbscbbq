@@ -120,6 +120,23 @@ export default function CheckoutPage() {
 
       const branchId = customerInfo.branchId
       const pickupDateTime = new Date(customerInfo.pickupTime)
+      const now = new Date()
+      
+      // Validate pickup time is at least 1 hour from now
+      const minPickupTime = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour from now
+      if (pickupDateTime < minPickupTime) {
+        alert('Pickup time must be at least 1 hour from now')
+        setIsProcessing(false)
+        return
+      }
+      
+      // Validate pickup time is not more than 8 days from now
+      const maxPickupTime = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000) // 8 days from now
+      if (pickupDateTime > maxPickupTime) {
+        alert('Pickup time cannot be more than 8 days in advance')
+        setIsProcessing(false)
+        return
+      }
       
       // Calculate cooking start time (30 minutes before pickup)
       const cookingStartTime = new Date(pickupDateTime.getTime() - 30 * 60 * 1000)
@@ -382,10 +399,11 @@ export default function CheckoutPage() {
                       value={customerInfo.pickupTime}
                       onChange={(e) => setCustomerInfo({...customerInfo, pickupTime: e.target.value})}
                       className="bbq-input w-full"
-                      min={new Date().toISOString().slice(0, 16)}
+                      min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
+                      max={new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      ⏰ Choose when you want to pick up your order (minimum 2 hours advance)
+                      ⏰ Choose when you want to pick up your order (1 hour to 8 days advance)
                     </p>
                   </div>
                 </div>
@@ -517,6 +535,9 @@ export default function CheckoutPage() {
                       <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded">
                         <p className="text-sm text-orange-800">
                           <strong>🍖 Cooking Schedule:</strong> We'll start cooking your order 30 minutes before your pickup time to ensure it's fresh and hot when you arrive!
+                        </p>
+                        <p className="text-xs text-orange-700 mt-2">
+                          <strong>📅 Advance Orders:</strong> You can place orders up to 8 days in advance (minimum 1 hour notice)
                         </p>
                       </div>
                     </div>
