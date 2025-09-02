@@ -132,6 +132,13 @@ export default function CheckoutPage() {
           setIsProcessing(false)
           return
         }
+        // Validate GCash reference number format (exactly 13 digits)
+        const gcashRef = customerInfo.gcashReference.trim()
+        if (!/^\d{13}$/.test(gcashRef)) {
+          alert('GCash reference number must be exactly 13 digits')
+          setIsProcessing(false)
+          return
+        }
       }
 
       // Validate branch selection
@@ -626,12 +633,17 @@ export default function CheckoutPage() {
                         type="text"
                         required={customerInfo.paymentMethod === 'gcash'}
                         value={customerInfo.gcashReference}
-                        onChange={(e) => setCustomerInfo({...customerInfo, gcashReference: e.target.value})}
+                        onChange={(e) => {
+                          // Only allow numbers and limit to 13 digits
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 13)
+                          setCustomerInfo({...customerInfo, gcashReference: value})
+                        }}
                         className="bbq-input w-full font-mono text-lg"
-                        placeholder="Enter the reference number from your GCash payment"
+                        placeholder="Enter 13-digit GCash reference number"
+                        maxLength={13}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        💡 Find this number in your GCash app after making the payment
+                        💡 Enter exactly 13 digits from your GCash payment confirmation
                       </p>
                     </div>
 
