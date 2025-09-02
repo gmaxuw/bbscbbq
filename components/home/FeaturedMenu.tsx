@@ -63,6 +63,8 @@ export default function FeaturedMenu() {
     const loadProducts = async () => {
       try {
         setIsLoading(true)
+        console.log('🛒 Loading products from database...')
+        
         const { data, error } = await supabase
           .from('products')
           .select(`
@@ -77,13 +79,19 @@ export default function FeaturedMenu() {
           .order('created_at', { ascending: false })
           .limit(PRODUCTS_PER_PAGE)
 
-        if (error) throw error
+        if (error) {
+          console.error('❌ Database error:', error)
+          throw error
+        }
 
+        console.log('✅ Products loaded:', data?.length || 0, 'items')
+        console.log('📱 Products data:', data)
+        
         setProducts(data || [])
         setHasMoreProducts((data || []).length === PRODUCTS_PER_PAGE)
         setCurrentPage(0)
       } catch (error) {
-        console.error('Failed to load products:', error)
+        console.error('❌ Failed to load products:', error)
       } finally {
         setIsLoading(false)
       }

@@ -24,6 +24,15 @@ const hasValidEnvVars = supabaseUrl && supabaseAnonKey &&
   supabaseUrl.startsWith('https://') && 
   !supabaseUrl.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9')
 
+// Debug logging for mobile troubleshooting
+if (typeof window !== 'undefined') {
+  console.log('🔧 Supabase Client Debug:', {
+    hasValidEnvVars,
+    supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'undefined',
+    supabaseAnonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'undefined'
+  })
+}
+
 // Create Supabase client with fallback for build time
 export const supabase = hasValidEnvVars 
   ? createSupabaseClient(supabaseUrl, supabaseAnonKey, {

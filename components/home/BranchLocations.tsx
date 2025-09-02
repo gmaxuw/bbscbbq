@@ -1,49 +1,91 @@
-import { MapPin, Phone, Clock, Star } from 'lucide-react'
+'use client'
 
-const branches = [
-  {
-    id: 'surigao-main',
-    name: 'Surigao Main Branch',
-    address: '123 Main Street, Surigao City',
-    phone: '+63 946 365 7331',
-    hours: '10:00 AM - 10:00 PM',
-    rating: 4.8,
-    features: ['Parking Available', 'Dine-in', 'Takeout', 'Delivery'],
-    image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: 'borromeo',
-    name: 'Borromeo Branch',
-    address: '456 Borromeo Street, Surigao City',
-    phone: '+63 946 365 7331',
-    hours: '10:00 AM - 10:00 PM',
-    rating: 4.7,
-    features: ['Parking Available', 'Takeout', 'Delivery'],
-    image: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: 'national-highway',
-    name: 'National Highway Branch',
-    address: '789 National Highway, Surigao City',
-    phone: '+63 946 365 7331',
-    hours: '10:00 AM - 10:00 PM',
-    rating: 4.6,
-    features: ['Highway Access', 'Takeout', 'Drive-thru'],
-    image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: 'siargao',
-    name: 'Siargao Branch',
-    address: '321 Beach Road, Siargao Island',
-    phone: '+63 946 365 7331',
-    hours: '10:00 AM - 10:00 PM',
-    rating: 4.9,
-    features: ['Beach View', 'Tourist Friendly', 'Takeout'],
-    image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop&crop=center'
-  }
-]
+import { useState, useEffect } from 'react'
+import { MapPin, Phone, Clock, Star, Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase'
+
+interface Branch {
+  id: string
+  name: string
+  address: string
+  phone: string
+  manager_name: string
+  is_active: boolean
+  hours?: string
+  rating?: number
+  features?: string[]
+  image?: string
+}
 
 export default function BranchLocations() {
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadBranches()
+  }, [])
+
+  const loadBranches = async () => {
+    try {
+      setLoading(true)
+      const supabase = createClient()
+      
+      const { data, error } = await supabase
+        .from('branches')
+        .select('id, name, address, phone, manager_name, is_active')
+        .eq('is_active', true)
+        .order('created_at')
+
+      if (error) {
+        console.error('Error loading branches:', error)
+        setError('Failed to load branch locations')
+        return
+      }
+
+      // Add default features and images for each branch
+      const branchesWithDefaults = (data || []).map((branch, index) => ({
+        ...branch,
+        hours: '10:00 AM - 10:00 PM',
+        rating: 4.5 + (index * 0.1), // Vary ratings slightly
+        features: getBranchFeatures(branch.name),
+        image: getBranchImage(branch.name, index)
+      }))
+
+      setBranches(branchesWithDefaults)
+    } catch (err) {
+      console.error('Error loading branches:', err)
+      setError('Failed to load branch locations')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getBranchFeatures = (branchName: string): string[] => {
+    const name = branchName.toLowerCase()
+    if (name.includes('siargao')) {
+      return ['Beach View', 'Tourist Friendly', 'Takeout', 'Delivery']
+    } else if (name.includes('highway')) {
+      return ['Highway Access', 'Takeout', 'Drive-thru', 'Parking Available']
+    } else if (name.includes('main') || name.includes('borromeo')) {
+      return ['Parking Available', 'Dine-in', 'Takeout', 'Delivery']
+    } else {
+      return ['Takeout', 'Delivery', 'Dine-in']
+    }
+  }
+
+  const getBranchImage = (branchName: string, index: number): string => {
+    const name = branchName.toLowerCase()
+    if (name.includes('siargao')) {
+      return 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop&crop=center'
+    } else if (name.includes('highway')) {
+      return 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=300&fit=crop&crop=center'
+    } else if (name.includes('main') || name.includes('borromeo')) {
+      return 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop&crop=center'
+    } else {
+      return 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400&h=300&fit=crop&crop=center'
+    }
+  }
   return (
     <section className="bbq-section bg-white">
       <div className="bbq-container">
@@ -56,13 +98,44 @@ export default function BranchLocations() {
             Find Us Near You
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            With 4 convenient locations across Surigao and Siargao, 
-            we're never too far from serving you the best BBQ in town.
+            {loading ? (
+              'Loading our branch locations...'
+            ) : (
+              `With ${branches.length} convenient locations across Surigao and Siargao, 
+              we're never too far from serving you the best BBQ in town.`
+            )}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {branches.map((branch, index) => (
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-16">
+            <div className="flex items-center space-x-3">
+              <Loader2 className="w-6 h-6 animate-spin text-lays-dark-red" />
+              <span className="text-gray-600">Loading branch locations...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="text-center py-16">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+              <p className="text-red-600 mb-4">{error}</p>
+              <button 
+                onClick={loadBranches}
+                className="bbq-button-primary"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Branch Cards */}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {branches.map((branch, index) => (
             <div 
               key={branch.id} 
               className="bbq-card group hover:shadow-2xl transition-all duration-300 animate-slide-up"
@@ -98,10 +171,21 @@ export default function BranchLocations() {
                   <span className="text-gray-600 text-sm">{branch.phone}</span>
                 </div>
 
-                <div className="flex items-center space-x-2 mb-4">
+                <div className="flex items-center space-x-2 mb-3">
                   <Clock className="w-5 h-5 text-lays-dark-red" />
                   <span className="text-gray-600 text-sm">{branch.hours}</span>
                 </div>
+
+                {branch.manager_name && (
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-5 h-5 bg-lays-orange-gold rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">M</span>
+                    </div>
+                    <span className="text-gray-600 text-sm">
+                      Manager: {branch.manager_name}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-2 mb-4">
                   {branch.features.map((feature, featureIndex) => (
@@ -119,8 +203,9 @@ export default function BranchLocations() {
                 </button>
               </div>
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="text-center mt-16 animate-fade-in">
           <p className="text-gray-600 mb-6">

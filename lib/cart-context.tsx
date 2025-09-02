@@ -28,19 +28,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Load cart from localStorage on mount
   useEffect(() => {
-    const savedCart = localStorage.getItem('bbq-cart')
-    if (savedCart) {
-      try {
-        setItems(JSON.parse(savedCart))
-      } catch (error) {
-        console.error('Failed to load cart from localStorage:', error)
+    if (typeof window !== 'undefined') {
+      const savedCart = localStorage.getItem('bbq-cart')
+      if (savedCart) {
+        try {
+          setItems(JSON.parse(savedCart))
+        } catch (error) {
+          console.error('Failed to load cart from localStorage:', error)
+        }
       }
     }
   }, [])
 
   // Save cart to localStorage whenever items change
   useEffect(() => {
-    localStorage.setItem('bbq-cart', JSON.stringify(items))
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bbq-cart', JSON.stringify(items))
+    }
   }, [items])
 
   const addItem = (newItem: Omit<CartItem, 'quantity'>) => {
