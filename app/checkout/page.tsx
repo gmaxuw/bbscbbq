@@ -18,11 +18,12 @@ export default function CheckoutPage() {
     fullName: '',
     email: '',
     phone: '',
-    address: '',
+    branchId: '',
     paymentMethod: 'cash',
     gcashReference: '',
     paymentScreenshot: null as File | null
   })
+  const [branches, setBranches] = useState([])
   const { items, getTotalPrice, clearCart } = useCart()
   const router = useRouter()
   const supabase = createClient()
@@ -35,6 +36,29 @@ export default function CheckoutPage() {
 
     return () => clearTimeout(timer)
   }, [])
+
+  // Fetch branches for pickup selection
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('branches')
+          .select('id, name, address, phone, manager_name')
+          .eq('is_active', true)
+          .order('created_at', { ascending: true })
+
+        if (error) {
+          console.error('Error fetching branches:', error)
+        } else {
+          setBranches(data || [])
+        }
+      } catch (error) {
+        console.error('Error fetching branches:', error)
+      }
+    }
+
+    fetchBranches()
+  }, [supabase])
 
   // Redirect to cart if empty (but only after cart is loaded)
   useEffect(() => {
@@ -79,18 +103,14 @@ export default function CheckoutPage() {
         }
       }
 
-      // Get the first branch (you can modify this logic later)
-      const { data: branches } = await supabase
-        .from('branches')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-
-      if (!branches || branches.length === 0) {
-        throw new Error('No active branches found')
+      // Validate branch selection
+      if (!customerInfo.branchId) {
+        alert('Please select a pickup branch')
+        setIsProcessing(false)
+        return
       }
 
-      const branchId = branches[0].id
+      const branchId = customerInfo.branchId
 
       // Create the order
       const { data: order, error: orderError } = await supabase
@@ -99,7 +119,6 @@ export default function CheckoutPage() {
           customer_name: customerInfo.fullName,
           customer_email: customerInfo.email,
           customer_phone: customerInfo.phone,
-          delivery_address: customerInfo.address,
           branch_id: branchId,
           total_amount: total,
           payment_method: customerInfo.paymentMethod,
@@ -320,15 +339,24 @@ export default function CheckoutPage() {
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Delivery Address *
+                      Pickup Branch *
                     </label>
-                    <textarea
+                    <select
                       required
-                      value={customerInfo.address}
-                      onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
-                      className="bbq-input w-full h-24 resize-none"
-                      placeholder="Enter your delivery address"
-                    />
+                      value={customerInfo.branchId}
+                      onChange={(e) => setCustomerInfo({...customerInfo, branchId: e.target.value})}
+                      className="bbq-input w-full"
+                    >
+                      <option value="">Select a pickup branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name} - {branch.address}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      📍 Choose the branch where you'll pick up your order
+                    </p>
                   </div>
                 </div>
               </div>
@@ -342,7 +370,7 @@ export default function CheckoutPage() {
                 
                 <div className="space-y-3">
                   {[
-                    { value: 'cash', label: 'Cash on Delivery', description: 'Pay when your order arrives' },
+                    { value: 'cash', label: 'Cash on Pickup', description: 'Pay when you pick up your order' },
                     { value: 'gcash', label: 'GCash', description: 'Pay via GCash mobile payment' },
                     { value: 'card', label: 'Credit/Debit Card', description: 'Pay with your card' },
                     { value: 'paymaya', label: 'PayMaya', description: 'Pay via PayMaya wallet' }
