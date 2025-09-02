@@ -293,7 +293,7 @@ export default function AccountPage() {
       
       // Send password reset email using Supabase Auth
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `https://bbqsurigaocitybbq.vercel.app/account?reset=true`
+        redirectTo: `https://bbqsurigaocitybbq.vercel.app/account/reset-password`
       })
       
       if (error) {
