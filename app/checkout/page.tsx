@@ -125,7 +125,15 @@ export default function CheckoutPage() {
     console.log('🔍 Form validation starting...')
     
     // Force show all data
-    alert(`Form Data:\nName: ${customerInfo.fullName}\nEmail: ${customerInfo.email}\nPhone: ${customerInfo.phone}\nBranch: ${customerInfo.branchId}\nPickup: ${customerInfo.pickupTime}\nGCash: ${customerInfo.gcashReference}\nScreenshot: ${customerInfo.paymentScreenshot ? 'YES' : 'NO'}`)
+    alert(`Form Data:\nName: ${customerInfo.fullName}\nEmail: ${customerInfo.email}\nPhone: ${customerInfo.phone}\nBranch: ${customerInfo.branchId}\nPickup: ${customerInfo.pickupTime}\nPayment: ${customerInfo.paymentMethod}\nGCash: ${customerInfo.gcashReference}\nScreenshot: ${customerInfo.paymentScreenshot ? 'YES' : 'NO'}`)
+    
+    // Check if we have items in cart
+    console.log('🛒 Cart items:', items)
+    if (items.length === 0) {
+      alert('❌ No items in cart! Please add items to cart first.')
+      setIsProcessing(false)
+      return
+    }
     
     // Check each required field
     console.log('✅ Full Name:', customerInfo.fullName ? 'FILLED' : 'MISSING')
