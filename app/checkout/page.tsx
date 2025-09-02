@@ -251,41 +251,44 @@ export default function CheckoutPage() {
       // Generate unique reference number
       const referenceNumber = generateReferenceNumber()
 
-      // Upload payment screenshot if provided
+      // TEMPORARILY SKIP SCREENSHOT UPLOAD FOR DEBUGGING
       let screenshotUrl = null
-      if (customerInfo.paymentScreenshot) {
-        console.log('📸 Uploading payment screenshot...')
-        setIsUploading(true)
-        try {
-          const fileExt = customerInfo.paymentScreenshot.name.split('.').pop()
-          const fileName = `payment-${referenceNumber}.${fileExt}`
+      console.log('🔧 DEBUGGING: Skipping screenshot upload to isolate the issue')
+      
+      // Upload payment screenshot if provided
+      // if (customerInfo.paymentScreenshot) {
+      //   console.log('📸 Uploading payment screenshot...')
+      //   setIsUploading(true)
+      //   try {
+      //     const fileExt = customerInfo.paymentScreenshot.name.split('.').pop()
+      //     const fileName = `payment-${referenceNumber}.${fileExt}`
           
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('payment-screenshots')
-            .upload(fileName, customerInfo.paymentScreenshot)
+      //     const { data: uploadData, error: uploadError } = await supabase.storage
+      //       .from('payment-screenshots')
+      //       .upload(fileName, customerInfo.paymentScreenshot)
 
-          if (uploadError) {
-            console.error('❌ Screenshot upload failed:', uploadError)
-            throw uploadError
-          }
+      //     if (uploadError) {
+      //       console.error('❌ Screenshot upload failed:', uploadError)
+      //       throw uploadError
+      //     }
 
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('payment-screenshots')
-            .getPublicUrl(fileName)
+      //     // Get public URL
+      //     const { data: urlData } = supabase.storage
+      //       .from('payment-screenshots')
+      //       .getPublicUrl(fileName)
 
-          screenshotUrl = urlData.publicUrl
-          console.log('✅ Screenshot uploaded successfully:', screenshotUrl)
-        } catch (error) {
-          console.error('❌ Screenshot upload error:', error)
-          alert('Failed to upload payment screenshot. Please try again.')
-          setIsProcessing(false)
-          setIsUploading(false)
-          return
-        } finally {
-          setIsUploading(false)
-        }
-      }
+      //     screenshotUrl = urlData.publicUrl
+      //     console.log('✅ Screenshot uploaded successfully:', screenshotUrl)
+      //   } catch (error) {
+      //     console.error('❌ Screenshot upload error:', error)
+      //     alert('Failed to upload payment screenshot. Please try again.')
+      //     setIsProcessing(false)
+      //     setIsUploading(false)
+      //     return
+      //   } finally {
+      //     setIsUploading(false)
+      //   }
+      // }
 
       // Prepare order data - FIXED to match database schema exactly
       const orderData = {
