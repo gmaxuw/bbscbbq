@@ -19,19 +19,20 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+// Check if we have valid environment variables
+const hasValidEnvVars = supabaseUrl && supabaseAnonKey && 
+  supabaseUrl.startsWith('https://') && 
+  !supabaseUrl.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9')
+
 // Debug: Log environment variables (only in development)
 if (process.env.NODE_ENV === 'development') {
   console.log('🔍 Environment Variables Debug:', {
     supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING',
     supabaseAnonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 30)}...` : 'MISSING',
-    nodeEnv: process.env.NODE_ENV
+    nodeEnv: process.env.NODE_ENV,
+    hasValidEnvVars: hasValidEnvVars
   })
 }
-
-// Check if we have valid environment variables
-const hasValidEnvVars = supabaseUrl && supabaseAnonKey && 
-  supabaseUrl.startsWith('https://') && 
-  !supabaseUrl.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9')
 
 // Debug logging for mobile troubleshooting
 if (typeof window !== 'undefined') {
