@@ -131,12 +131,12 @@ export default function CrewManagement() {
 
       // Filter crew members and get branch info
       const crewUsers = authUsers.users.filter(user => 
-        user.raw_user_meta_data?.role === 'crew'
+        user.user_metadata?.role === 'crew'
       )
 
       const crewWithBranchNames = await Promise.all(
         crewUsers.map(async (user) => {
-          const branchId = user.raw_user_meta_data?.branch_id
+          const branchId = user.user_metadata?.branch_id
           let branchName = 'No Branch Assigned'
           
           if (branchId) {
