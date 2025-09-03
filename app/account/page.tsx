@@ -97,37 +97,34 @@ export default function AccountPage() {
         return
       }
       
-      // Get customer data from users table
-      const { data: customer, error: customerError } = await supabase
-        .from('users')
-        .select('id, email, full_name, phone, role, is_active')
-        .eq('email', loginData.email)
-        .eq('role', 'customer')
-        .maybeSingle()
+      // Get customer data from auth.users with role metadata
+      const { data: { user } } = await supabase.auth.getUser()
       
-      if (customerError || !customer) {
+      if (!user) {
         alert('Customer account not found.')
         return
       }
       
-      if (!customer.is_active) {
-        alert('This account has been deactivated.')
+      // Check if user has customer role
+      const userRole = user.raw_user_meta_data?.role
+      if (userRole !== 'customer') {
+        alert('This account is not a customer account.')
         return
       }
       
-      console.log('Customer login successful:', customer)
+      console.log('Customer login successful:', user)
       
       // Store customer data for order lookup and display
       if (typeof window !== 'undefined') {
-        localStorage.setItem('customer_email', customer.email)
-        localStorage.setItem('customer_name', customer.full_name)
-        localStorage.setItem('customer_phone', customer.phone || '')
-        localStorage.setItem('customer_id', customer.id)
+        localStorage.setItem('customer_email', user.email || '')
+        localStorage.setItem('customer_name', user.user_metadata?.full_name || '')
+        localStorage.setItem('customer_phone', user.user_metadata?.phone || '')
+        localStorage.setItem('customer_id', user.id)
       }
       
-      setUserEmail(customer.email)
-      setUserName(customer.full_name)
-      setUserPhone(customer.phone || '')
+      setUserEmail(user.email || '')
+      setUserName(user.user_metadata?.full_name || '')
+      setUserPhone(user.user_metadata?.phone || '')
       setIsLoggedIn(true)
       
     } catch (error) {
@@ -150,38 +147,25 @@ export default function AccountPage() {
     try {
       const supabase = createClient()
       
-      // Check if email already exists in users table
-      const { data: existingUser, error: checkError } = await supabase
-        .from('users')
-        .select('email')
-        .eq('email', registerData.email)
-        .maybeSingle()
+      // Check if email already exists in auth.users
+      const { data: existingAuthUser } = await supabase.auth.getUser()
       
-      // If user exists in database but not in auth, we need to clean up
-      if (existingUser) {
-        // Check if auth user exists
-        const { data: authUser } = await supabase.auth.getUser()
-        
-        if (!authUser.user || authUser.user.email !== registerData.email) {
-          // User exists in database but not in auth - this is old data
-          // We'll update the existing record instead of creating new one
-          console.log('Found old user record, will update with new auth data')
-        } else {
-          alert('An account with this email already exists!')
-          return
-        }
+      if (existingAuthUser.user && existingAuthUser.user.email === registerData.email) {
+        alert('An account with this email already exists!')
+        return
       }
       
-      // Create user in Supabase Auth
+      // Create user in Supabase Auth with customer role
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: registerData.email,
         password: registerData.password,
         options: {
           data: {
             full_name: registerData.fullName,
-            phone: registerData.phone
+            phone: registerData.phone,
+            role: 'customer' // Set customer role in metadata
           },
-          emailRedirectTo: 'https://bbqsurigaocitybbq.vercel.app/account'
+          emailRedirectTo: 'https://bbscbbq.vercel.app/account'
         }
       })
       
@@ -196,65 +180,20 @@ export default function AccountPage() {
         return
       }
       
-      // Insert or update customer data in users table
-      let newUser
-      if (existingUser) {
-        // Update existing record with new auth ID
-        const { data: updatedUser, error: updateError } = await supabase
-          .from('users')
-          .update({
-            id: authData.user.id, // Update with new auth user ID
-            full_name: registerData.fullName,
-            phone: registerData.phone,
-            is_active: true
-          })
-          .eq('email', registerData.email)
-          .select()
-          .single()
-        
-        if (updateError) {
-          console.error('Error updating customer account:', updateError)
-          alert('Error updating account. Please try again.')
-          return
-        }
-        newUser = updatedUser
-      } else {
-        // Insert new record
-        const { data: insertedUser, error: insertError } = await supabase
-          .from('users')
-          .insert({
-            id: authData.user.id, // Use the auth user ID
-            email: registerData.email,
-            full_name: registerData.fullName,
-            phone: registerData.phone,
-            role: 'customer',
-            is_active: true
-          })
-          .select()
-          .single()
-        
-        if (insertError) {
-          console.error('Error creating customer account:', insertError)
-          alert('Error creating account. Please try again.')
-          return
-        }
-        newUser = insertedUser
-      }
-      
-      console.log('Customer account created successfully:', newUser)
+      console.log('Customer account created successfully:', authData.user)
       
       // Store customer data for order lookup and display
       if (typeof window !== 'undefined') {
         localStorage.setItem('customer_email', registerData.email)
         localStorage.setItem('customer_name', registerData.fullName)
         localStorage.setItem('customer_phone', registerData.phone)
-        localStorage.setItem('customer_id', newUser.id)
+        localStorage.setItem('customer_id', authData.user.id)
         
         console.log('Stored in localStorage:', {
           email: registerData.email,
           name: registerData.fullName,
           phone: registerData.phone,
-          id: newUser.id
+          id: authData.user.id
         })
       }
       
@@ -293,7 +232,7 @@ export default function AccountPage() {
       
       // Send password reset email using Supabase Auth
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `https://bbqsurigaocitybbq.vercel.app/account/reset-password`
+        redirectTo: `https://bbscbbq.vercel.app/account/reset-password`
       })
       
       if (error) {

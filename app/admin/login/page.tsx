@@ -111,45 +111,12 @@ export default function AdminLoginPage() {
         return
       }
 
-      // Check if user is admin - try both admin_users table and users table
-      let adminUser = null
-      let adminError = null
+      // Check if user has admin role in auth.users metadata
+      const userRole = data.user.raw_user_meta_data?.role
+      console.log('User role from metadata:', userRole)
 
-      console.log('Checking admin access for user ID:', data.user.id)
-
-      // First, try the new admin_users table
-      const { data: newAdminUser, error: newAdminError } = await supabase
-        .from('admin_users')
-        .select('role, is_active')
-        .eq('user_id', data.user.id)
-        .single()
-
-      console.log('Admin users table query result:', { newAdminUser, newAdminError })
-
-      if (newAdminUser) {
-        adminUser = newAdminUser
-        console.log('Found admin in admin_users table:', adminUser)
-      } else {
-        // If not found in admin_users, try the old users table
-        const { data: oldAdminUser, error: oldAdminError } = await supabase
-          .from('users')
-          .select('role, is_active')
-          .eq('id', data.user.id)
-          .eq('role', 'admin')
-          .single()
-
-        console.log('Users table query result:', { oldAdminUser, oldAdminError })
-
-        if (oldAdminUser) {
-          adminUser = oldAdminUser
-          console.log('Found admin in old users table, consider migrating to admin_users table')
-        } else {
-          adminError = oldAdminError
-        }
-      }
-
-      if (adminError || !adminUser) {
-        console.log('Admin access denied:', { adminError, adminUser })
+      if (userRole !== 'admin' && userRole !== 'crew') {
+        console.log('Access denied - user role:', userRole)
         setError('Access denied. You are not authorized to access admin features. Please contact support to set up your admin account.')
         // Sign out the user since they're not admin
         await supabase.auth.signOut()
@@ -157,21 +124,14 @@ export default function AdminLoginPage() {
         return
       }
 
-      if (!adminUser.is_active) {
-        setError('Your admin account has been deactivated. Please contact support.')
-        await supabase.auth.signOut()
-        setIsLoading(false)
-        return
-      }
-
       // Store admin role in localStorage for quick access
-      localStorage.setItem('admin_role', adminUser.role)
+      localStorage.setItem('admin_role', userRole)
       localStorage.setItem('admin_user_id', data.user.id)
 
       // Redirect based on role
-      if (adminUser.role === 'admin') {
+      if (userRole === 'admin') {
         router.push('/admin/orders')
-      } else if (adminUser.role === 'crew') {
+      } else if (userRole === 'crew') {
         router.push('/crew')
       } else {
         setError('Invalid admin role. Please contact support.')
