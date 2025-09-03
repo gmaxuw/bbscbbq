@@ -15,20 +15,50 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   
   const router = useRouter()
   const searchParams = useSearchParams()
 
   useEffect(() => {
     // Check if we have the necessary parameters from the reset link
-    const accessToken = searchParams.get('access_token')
-    const refreshToken = searchParams.get('refresh_token')
-    const type = searchParams.get('type')
+    // Supabase uses hash fragments (#) for password reset links
+    const hash = window.location.hash
+    const urlParams = new URLSearchParams(hash.substring(1)) // Remove the # and parse
+    
+    const accessToken = urlParams.get('access_token') || searchParams.get('access_token')
+    const refreshToken = urlParams.get('refresh_token') || searchParams.get('refresh_token')
+    const type = urlParams.get('type') || searchParams.get('type')
+    const isAdminParam = urlParams.get('admin') === 'true' || searchParams.get('admin') === 'true'
+    setIsAdmin(isAdminParam)
+    
+    console.log('Password reset URL analysis:', {
+      hash,
+      accessToken: accessToken ? 'present' : 'missing',
+      refreshToken: refreshToken ? 'present' : 'missing',
+      type,
+      isAdmin: isAdminParam,
+      searchParams: Object.fromEntries(searchParams.entries())
+    })
     
     // For password reset, we need either access_token + refresh_token OR type=recovery
     // If neither is present, show error
     if ((!accessToken || !refreshToken) && type !== 'recovery') {
-      setError('Invalid or expired reset link. Please request a new password reset.')
+      // Check if user is already authenticated (they might have clicked the link while logged in)
+      const checkAuth = async () => {
+        try {
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            setError('You are already logged in. If you want to change your password, please log out first and try again.')
+          } else {
+            setError('Invalid or expired reset link. Please request a new password reset.')
+          }
+        } catch (error) {
+          setError('Invalid or expired reset link. Please request a new password reset.')
+        }
+      }
+      checkAuth()
     }
   }, [searchParams])
 
@@ -64,30 +94,40 @@ export default function ResetPasswordPage() {
       
       setSuccess(true)
       
-      // Check if user is admin/crew and redirect accordingly
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        // Check if user is admin or crew
-        const { data: adminUser } = await supabase
-          .from('admin_users')
-          .select('role')
-          .eq('user_id', user.id)
-          .single()
-        
-        // Redirect based on user type after 3 seconds
-        setTimeout(() => {
-          if (adminUser && (adminUser.role === 'admin' || adminUser.role === 'crew')) {
-            router.push('/admin/login')
+      // Check if this is an admin password reset
+      const hash = window.location.hash
+      const urlParams = new URLSearchParams(hash.substring(1))
+      const isAdmin = urlParams.get('admin') === 'true' || searchParams.get('admin') === 'true'
+      const adminEmail = urlParams.get('email') || searchParams.get('email')
+      
+      console.log('Password reset context:', { isAdmin, adminEmail, hash, searchParams: Object.fromEntries(searchParams.entries()) })
+      
+      // Redirect based on user type after 3 seconds
+      setTimeout(async () => {
+        if (isAdmin) {
+          router.push('/admin/login')
+        } else {
+          // Check if user is admin/crew and redirect accordingly
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            // Check if user is admin or crew
+            const { data: adminUser } = await supabase
+              .from('admin_users')
+              .select('role')
+              .eq('user_id', user.id)
+              .single()
+            
+            if (adminUser && (adminUser.role === 'admin' || adminUser.role === 'crew')) {
+              router.push('/admin/login')
+            } else {
+              router.push('/account')
+            }
           } else {
+            // Default to account page
             router.push('/account')
           }
-        }, 3000)
-      } else {
-        // Default to account page
-        setTimeout(() => {
-          router.push('/account')
-        }, 3000)
-      }
+        }
+      }, 3000)
       
     } catch (error) {
       console.error('Password reset error:', error)
@@ -110,7 +150,10 @@ export default function ResetPasswordPage() {
             
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Password Updated!</h1>
             <p className="text-gray-600 mb-6">
-              Your password has been successfully updated. You will be redirected to your account page shortly.
+              {isAdmin 
+                ? "Your admin password has been successfully updated. You will be redirected to the admin login page shortly."
+                : "Your password has been successfully updated. You will be redirected to your account page shortly."
+              }
             </p>
             
             <Link 
@@ -162,6 +205,18 @@ export default function ResetPasswordPage() {
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
               <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* Debug Information - Remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Debug Information:</h3>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>URL Hash: {typeof window !== 'undefined' ? window.location.hash : 'N/A'}</p>
+                <p>Search Params: {JSON.stringify(Object.fromEntries(searchParams.entries()))}</p>
+                <p>Full URL: {typeof window !== 'undefined' ? window.location.href : 'N/A'}</p>
+              </div>
             </div>
           )}
 

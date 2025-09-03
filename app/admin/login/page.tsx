@@ -13,6 +13,9 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [isRedirecting, setIsRedirecting] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
   
   const router = useRouter()
   const supabase = createClient()
@@ -24,12 +27,31 @@ export default function AdminLoginPage() {
         const { data: { session } } = await supabase.auth.getSession()
         
         if (session?.user) {
-          // Check if user is admin
-          const { data: adminUser } = await supabase
+          // Check if user is admin - try both tables
+          let adminUser = null
+
+          // First, try the new admin_users table
+          const { data: newAdminUser } = await supabase
             .from('admin_users')
             .select('role')
             .eq('user_id', session.user.id)
             .single()
+
+          if (newAdminUser) {
+            adminUser = newAdminUser
+          } else {
+            // If not found in admin_users, try the old users table
+            const { data: oldAdminUser } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', session.user.id)
+              .eq('role', 'admin')
+              .single()
+
+            if (oldAdminUser) {
+              adminUser = oldAdminUser
+            }
+          }
 
           if (adminUser && (adminUser.role === 'admin' || adminUser.role === 'crew')) {
             setIsRedirecting(true)
@@ -89,15 +111,46 @@ export default function AdminLoginPage() {
         return
       }
 
-      // Check if user is admin
-      const { data: adminUser, error: adminError } = await supabase
+      // Check if user is admin - try both admin_users table and users table
+      let adminUser = null
+      let adminError = null
+
+      console.log('Checking admin access for user ID:', data.user.id)
+
+      // First, try the new admin_users table
+      const { data: newAdminUser, error: newAdminError } = await supabase
         .from('admin_users')
         .select('role, is_active')
         .eq('user_id', data.user.id)
         .single()
 
+      console.log('Admin users table query result:', { newAdminUser, newAdminError })
+
+      if (newAdminUser) {
+        adminUser = newAdminUser
+        console.log('Found admin in admin_users table:', adminUser)
+      } else {
+        // If not found in admin_users, try the old users table
+        const { data: oldAdminUser, error: oldAdminError } = await supabase
+          .from('users')
+          .select('role, is_active')
+          .eq('id', data.user.id)
+          .eq('role', 'admin')
+          .single()
+
+        console.log('Users table query result:', { oldAdminUser, oldAdminError })
+
+        if (oldAdminUser) {
+          adminUser = oldAdminUser
+          console.log('Found admin in old users table, consider migrating to admin_users table')
+        } else {
+          adminError = oldAdminError
+        }
+      }
+
       if (adminError || !adminUser) {
-        setError('Access denied. You are not authorized to access admin features.')
+        console.log('Admin access denied:', { adminError, adminUser })
+        setError('Access denied. You are not authorized to access admin features. Please contact support to set up your admin account.')
         // Sign out the user since they're not admin
         await supabase.auth.signOut()
         setIsLoading(false)
@@ -130,6 +183,65 @@ export default function AdminLoginPage() {
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log('Admin password reset requested for:', forgotPasswordEmail)
+    
+    try {
+      setIsResettingPassword(true)
+      setError('')
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(forgotPasswordEmail)) {
+        setError('Please enter a valid email address')
+        setIsResettingPassword(false)
+        return
+      }
+
+      // Check if the email belongs to an admin user
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
+        .select('email, role, is_active')
+        .eq('email', forgotPasswordEmail.toLowerCase().trim())
+        .single()
+
+      if (adminError || !adminUser) {
+        setError('No admin account found with this email address')
+        setIsResettingPassword(false)
+        return
+      }
+
+      if (!adminUser.is_active) {
+        setError('This admin account has been deactivated. Please contact support.')
+        setIsResettingPassword(false)
+        return
+      }
+
+      // Send password reset email using Supabase Auth with proper admin redirect
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: `${window.location.origin}/account/reset-password?admin=true&email=${encodeURIComponent(forgotPasswordEmail)}`
+      })
+      
+      if (error) {
+        console.error('Admin password reset error:', error)
+        setError('Error sending reset email. Please try again.')
+        setIsResettingPassword(false)
+        return
+      }
+      
+      alert('Password reset link sent to your email! Check your inbox and follow the instructions.')
+      setShowForgotPassword(false)
+      setForgotPasswordEmail('')
+      
+    } catch (error) {
+      console.error('Admin password reset error:', error)
+      setError('Error sending reset email. Please try again.')
+    } finally {
+      setIsResettingPassword(false)
     }
   }
 
@@ -239,6 +351,75 @@ export default function AdminLoginPage() {
               )}
             </button>
           </form>
+
+          {/* Forgot Password Link */}
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="text-sm text-gray-600 hover:text-lays-dark-red transition-colors"
+              disabled={isLoading}
+            >
+              Forgot your password?
+            </button>
+          </div>
+
+          {/* Forgot Password Form */}
+          {showForgotPassword && (
+            <div className="mt-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Reset Admin Password</h3>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-2">
+                    Admin Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="forgot-email"
+                    value={forgotPasswordEmail}
+                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    className="bbq-input w-full"
+                    placeholder="admin@bbqrestaurant.com"
+                    required
+                    disabled={isResettingPassword}
+                  />
+                </div>
+                
+                <div className="flex space-x-3">
+                  <button
+                    type="submit"
+                    disabled={isResettingPassword}
+                    className="bbq-button-primary flex-1 flex items-center justify-center space-x-2"
+                  >
+                    {isResettingPassword ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4" />
+                        <span>Send Reset Link</span>
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false)
+                      setForgotPasswordEmail('')
+                      setError('')
+                    }}
+                    className="bbq-button-secondary px-4"
+                    disabled={isResettingPassword}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Security Notice */}
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

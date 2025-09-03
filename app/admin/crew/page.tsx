@@ -124,22 +124,41 @@ export default function CrewManagement() {
     try {
       setIsLoading(true)
 
-      // Load crew members
-      const { data: crewData, error: crewError } = await supabase
-        .from('users')
-        .select(`
-          *,
-          branches(name)
-        `)
-        .eq('role', 'crew')
-        .order('full_name')
+      // Load crew members from auth.users
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
 
-      if (crewError) throw crewError
+      if (authError) throw authError
 
-      const crewWithBranchNames = crewData?.map(member => ({
-        ...member,
-        branch_name: member.branches?.name || 'Unassigned'
-      })) || []
+      // Filter crew members and get branch info
+      const crewUsers = authUsers.users.filter(user => 
+        user.raw_user_meta_data?.role === 'crew'
+      )
+
+      const crewWithBranchNames = await Promise.all(
+        crewUsers.map(async (user) => {
+          const branchId = user.raw_user_meta_data?.branch_id
+          let branchName = 'No Branch Assigned'
+          
+          if (branchId) {
+            const { data: branchData } = await supabase
+              .from('branches')
+              .select('name')
+              .eq('id', branchId)
+              .single()
+            branchName = branchData?.name || 'Unknown Branch'
+          }
+
+          return {
+            id: user.id,
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Crew Member',
+            branch_id: branchId,
+            branch_name: branchName,
+            is_active: true, // All auth users are active by default
+            created_at: user.created_at
+          }
+        })
+      )
 
       setCrewMembers(crewWithBranchNames)
 
@@ -246,19 +265,34 @@ export default function CrewManagement() {
           ip_address: '127.0.0.1'
         })
       } else {
-        // Create new crew member (placeholder password)
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            email: formData.email.trim(),
+        // Create new crew member using Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email: formData.email.trim(),
+          password: 'TempPassword123!', // Temporary password - crew should change this
+          user_metadata: {
             full_name: formData.full_name.trim(),
-            password_hash: '$2a$10$placeholder.hash.for.crew.password',
             role: 'crew',
-            branch_id: formData.branch_id || null,
-            is_active: formData.is_active
-          })
+            branch_id: formData.branch_id || null
+          },
+          email_confirm: true // Auto-confirm email
+        })
 
-        if (error) throw error
+        if (authError) throw authError
+
+        // Update the user's metadata with crew role and branch
+        if (authData.user) {
+          const { error: updateError } = await supabase.auth.admin.updateUserById(
+            authData.user.id,
+            {
+              user_metadata: {
+                full_name: formData.full_name.trim(),
+                role: 'crew',
+                branch_id: formData.branch_id || null
+              }
+            }
+          )
+          if (updateError) throw updateError
+        }
 
         // Log the action
         await supabase.from('system_logs').insert({

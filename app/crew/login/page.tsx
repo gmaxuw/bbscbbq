@@ -68,26 +68,29 @@ export default function CrewLogin() {
       if (signInError) throw signInError
 
       if (data.user) {
-        // Verify crew role
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role, branch_id, is_active')
-          .eq('id', data.user.id)
-          .single()
+        // Verify crew role using the new system
+        const userRole = data.user.raw_user_meta_data?.role
+        const userBranchId = data.user.raw_user_meta_data?.branch_id
 
-        if (userError) throw userError
+        console.log('Crew login - User role:', userRole)
+        console.log('Crew login - User branch ID:', userBranchId)
 
-        if (userData.role !== 'crew') {
+        if (userRole !== 'crew') {
           await supabase.auth.signOut()
           setError('Access denied. This login is for crew members only.')
           return
         }
 
-        if (!userData.is_active) {
+        if (!userBranchId) {
           await supabase.auth.signOut()
-          setError('Your account has been deactivated. Please contact your administrator.')
+          setError('Your crew account is not assigned to a branch. Please contact your administrator.')
           return
         }
+
+        // Store crew info in localStorage for quick access
+        localStorage.setItem('crew_role', userRole)
+        localStorage.setItem('crew_branch_id', userBranchId)
+        localStorage.setItem('crew_user_id', data.user.id)
 
         // Redirect to crew dashboard
         router.push('/crew/dashboard')

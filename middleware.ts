@@ -31,29 +31,25 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-    // Check if user is admin or crew
+    // Check if user is admin or crew using the new system
     try {
-      const { data: adminUser } = await supabase
-        .from('admin_users')
-        .select('role, is_active')
-        .eq('user_id', session.user.id)
-        .single()
+      const userRole = session.user.raw_user_meta_data?.role
 
-      if (!adminUser || !adminUser.is_active) {
-        // User is not admin/crew or account is inactive
+      if (!userRole || (userRole !== 'admin' && userRole !== 'crew')) {
+        // User is not admin/crew
         const redirectUrl = new URL('/admin/login', req.url)
         redirectUrl.searchParams.set('error', 'access_denied')
         return NextResponse.redirect(redirectUrl)
       }
 
       // Check role-based access
-      if (req.nextUrl.pathname.startsWith('/admin') && adminUser.role !== 'admin') {
+      if (req.nextUrl.pathname.startsWith('/admin') && userRole !== 'admin') {
         // Non-admin trying to access admin routes
         const redirectUrl = new URL('/crew', req.url)
         return NextResponse.redirect(redirectUrl)
       }
 
-      if (req.nextUrl.pathname.startsWith('/crew') && adminUser.role !== 'crew' && adminUser.role !== 'admin') {
+      if (req.nextUrl.pathname.startsWith('/crew') && userRole !== 'crew' && userRole !== 'admin') {
         // Non-crew trying to access crew routes
         const redirectUrl = new URL('/admin/login', req.url)
         redirectUrl.searchParams.set('error', 'access_denied')

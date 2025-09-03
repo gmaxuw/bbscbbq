@@ -117,30 +117,35 @@ export default function CrewDashboard() {
         return
       }
 
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select(`
-          id,
-          full_name,
-          branch_id,
-          branches(name)
-        `)
-        .eq('id', user.id)
-        .eq('role', 'crew')
-        .eq('is_active', true)
+      // Get crew info from user metadata and branch info
+      const userRole = user.raw_user_meta_data?.role
+      const userBranchId = user.raw_user_meta_data?.branch_id
+
+      if (userRole !== 'crew' || !userBranchId) {
+        await supabase.auth.signOut()
+        router.push('/crew/login')
+        return
+      }
+
+      // Get branch name
+      const { data: branchData, error: branchError } = await supabase
+        .from('branches')
+        .select('name')
+        .eq('id', userBranchId)
         .single()
 
-      if (error || !userData) {
+      if (branchError) {
+        console.error('Error fetching branch:', branchError)
         await supabase.auth.signOut()
         router.push('/crew/login')
         return
       }
 
       setCrewMember({
-        id: userData.id,
-        full_name: userData.full_name,
-        branch_id: userData.branch_id,
-        branch_name: userData.branches?.[0]?.name || 'Unknown Branch'
+        id: user.id,
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Crew Member',
+        branch_id: userBranchId,
+        branch_name: branchData?.name || 'Unknown Branch'
       })
     } catch (error) {
       console.error('Auth check failed:', error)
