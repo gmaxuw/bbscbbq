@@ -152,6 +152,7 @@ export default function CrewManagement() {
             id: user.id,
             email: user.email || '',
             full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Crew Member',
+            role: user.user_metadata?.role || 'crew',
             branch_id: branchId,
             branch_name: branchName,
             is_active: true, // All auth users are active by default
