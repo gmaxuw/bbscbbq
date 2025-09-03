@@ -106,7 +106,7 @@ export default function AccountPage() {
       }
       
       // Check if user has customer role
-      const userRole = user.raw_user_meta_data?.role
+      const userRole = user.user_metadata?.role || user.raw_user_meta_data?.role
       if (userRole !== 'customer') {
         alert('This account is not a customer account.')
         return

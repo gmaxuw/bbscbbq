@@ -112,7 +112,7 @@ export default function AdminLoginPage() {
       }
 
       // Check if user has admin role in auth.users metadata
-      const userRole = data.user.raw_user_meta_data?.role
+      const userRole = data.user.user_metadata?.role || data.user.raw_user_meta_data?.role
       console.log('User role from metadata:', userRole)
 
       if (userRole !== 'admin' && userRole !== 'crew') {
