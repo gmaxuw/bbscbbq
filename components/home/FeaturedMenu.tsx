@@ -37,9 +37,9 @@ interface Product {
   name: string
   description: string
   price: number
-  commission_rate: number
+  commission: number
   category: string
-  is_available: boolean
+  is_active: boolean
   product_images?: Array<{
     id: string
     image_url: string
@@ -75,9 +75,9 @@ export default function FeaturedMenu() {
             name,
             description,
             price,
-            commission_rate,
+            commission,
             category,
-            is_available,
+            is_active,
             created_at,
             product_images (
               id,
@@ -85,7 +85,7 @@ export default function FeaturedMenu() {
               is_primary
             )
           `)
-          .eq('is_available', true)
+          .eq('is_active', true)
           .order('created_at', { ascending: false })
           .limit(PRODUCTS_PER_PAGE)
 
@@ -136,7 +136,7 @@ export default function FeaturedMenu() {
             is_primary
           )
         `)
-        .eq('is_available', true)
+        .eq('is_active', true)
         .order('created_at', { ascending: false })
         .range(nextPage * PRODUCTS_PER_PAGE, (nextPage + 1) * PRODUCTS_PER_PAGE - 1)
 
@@ -182,7 +182,7 @@ export default function FeaturedMenu() {
             price: product.price,
             image: getProductImage(product),
             category: product.category,
-            commission: product.commission_rate || 0 // Fixed: use commission_rate from database
+            commission: product.commission || 0 // Fixed: use commission from database
           })
         }
         

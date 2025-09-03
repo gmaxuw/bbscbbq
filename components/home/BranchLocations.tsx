@@ -9,7 +9,7 @@ interface Branch {
   name: string
   address: string
   phone: string
-  manager_name: string
+  manager_name?: string
   is_active: boolean
   hours?: string
   rating?: number
@@ -33,7 +33,7 @@ export default function BranchLocations() {
       
       const { data, error } = await supabase
         .from('branches')
-        .select('id, name, address, phone, manager_name, is_active')
+        .select('id, name, address, phone, is_active')
         .eq('is_active', true)
         .order('created_at')
 
