@@ -33,7 +33,7 @@ export async function middleware(req: NextRequest) {
 
     // Check if user is admin or crew using the new system
     try {
-      const userRole = session.user.raw_user_meta_data?.role
+      const userRole = session.user.user_metadata?.role
 
       if (!userRole || (userRole !== 'admin' && userRole !== 'crew')) {
         // User is not admin/crew

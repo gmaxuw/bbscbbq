@@ -69,8 +69,8 @@ export default function CrewLogin() {
 
       if (data.user) {
         // Verify crew role using the new system
-        const userRole = data.user.raw_user_meta_data?.role
-        const userBranchId = data.user.raw_user_meta_data?.branch_id
+        const userRole = data.user.user_metadata?.role
+        const userBranchId = data.user.user_metadata?.branch_id
 
         console.log('Crew login - User role:', userRole)
         console.log('Crew login - User branch ID:', userBranchId)

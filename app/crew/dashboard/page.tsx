@@ -118,8 +118,8 @@ export default function CrewDashboard() {
       }
 
       // Get crew info from user metadata and branch info
-      const userRole = user.raw_user_meta_data?.role
-      const userBranchId = user.raw_user_meta_data?.branch_id
+      const userRole = user.user_metadata?.role
+      const userBranchId = user.user_metadata?.branch_id
 
       if (userRole !== 'crew' || !userBranchId) {
         await supabase.auth.signOut()
