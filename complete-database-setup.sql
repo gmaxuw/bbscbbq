@@ -218,6 +218,12 @@ $$ language 'plpgsql';
 -- 4. CREATE TRIGGERS
 -- ========================================
 
+-- Drop existing triggers first to avoid conflicts
+DROP TRIGGER IF EXISTS trigger_set_order_number ON orders;
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
+DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
+DROP TRIGGER IF EXISTS hero_settings_updated_at ON hero_settings;
+
 -- Trigger to auto-generate order numbers
 CREATE TRIGGER trigger_set_order_number
     BEFORE INSERT ON orders
@@ -273,6 +279,31 @@ ALTER TABLE system_logs ENABLE ROW LEVEL SECURITY;
 -- 7. CREATE RLS POLICIES (COMPREHENSIVE ACCESS)
 -- ========================================
 
+-- Drop existing policies first to avoid conflicts
+DROP POLICY IF EXISTS "Admin full access branches" ON branches;
+DROP POLICY IF EXISTS "Public branch access" ON branches;
+DROP POLICY IF EXISTS "Admin full access crew_attendance" ON crew_attendance;
+DROP POLICY IF EXISTS "Allow hero settings updates" ON hero_settings;
+DROP POLICY IF EXISTS "Hero settings are viewable by everyone" ON hero_settings;
+DROP POLICY IF EXISTS "Public hero_settings access" ON hero_settings;
+DROP POLICY IF EXISTS "Admin full access order_items" ON order_items;
+DROP POLICY IF EXISTS "Crew branch access order_items" ON order_items;
+DROP POLICY IF EXISTS "Customer own order items" ON order_items;
+DROP POLICY IF EXISTS "Admin full access orders" ON orders;
+DROP POLICY IF EXISTS "Crew branch access orders" ON orders;
+DROP POLICY IF EXISTS "Customer own orders" ON orders;
+DROP POLICY IF EXISTS "Allow product image deletion" ON product_images;
+DROP POLICY IF EXISTS "Allow product image updates" ON product_images;
+DROP POLICY IF EXISTS "Allow product image uploads" ON product_images;
+DROP POLICY IF EXISTS "Product images are viewable by everyone" ON product_images;
+DROP POLICY IF EXISTS "Public product_images access" ON product_images;
+DROP POLICY IF EXISTS "Admin full access products" ON products;
+DROP POLICY IF EXISTS "Public product access" ON products;
+DROP POLICY IF EXISTS "Admin full access promo_codes" ON promo_codes;
+DROP POLICY IF EXISTS "Public promo code access" ON promo_codes;
+DROP POLICY IF EXISTS "Admin full access sales_reports" ON sales_reports;
+DROP POLICY IF EXISTS "Admin full access system_logs" ON system_logs;
+
 -- Public access for products (menu display)
 CREATE POLICY "Public product access" ON products 
 FOR SELECT USING (is_active = true);
@@ -293,40 +324,16 @@ FOR SELECT USING (true);
 CREATE POLICY "Public promo code access" ON promo_codes 
 FOR SELECT USING (is_active = true);
 
--- Allow order insertion (for customer orders)
+-- Orders policies - simplified to avoid conflicts
 CREATE POLICY "Allow order insertion" ON orders
   FOR INSERT WITH CHECK (true);
 
--- Allow order viewing (for order verification)
-CREATE POLICY "Allow order viewing" ON orders
-  FOR SELECT USING (true);
-
--- Allow order updates (for status updates)
 CREATE POLICY "Allow order updates" ON orders
   FOR UPDATE USING (true);
 
--- Allow order items access
-CREATE POLICY "Allow order items read" ON order_items
-FOR SELECT USING (true);
-
--- Allow order items insertion
+-- Order items policies
 CREATE POLICY "Allow order items insertion" ON order_items
 FOR INSERT WITH CHECK (true);
-
--- Customer can view their own orders
-CREATE POLICY "Customer own orders" ON orders FOR SELECT USING (
-  auth.uid() IS NOT NULL AND 
-  customer_email = (SELECT email FROM auth.users WHERE id = auth.uid())
-);
-
--- Customer can view their own order items
-CREATE POLICY "Customer own order items" ON order_items FOR SELECT USING (
-  auth.uid() IS NOT NULL AND 
-  order_id IN (
-    SELECT id FROM orders 
-    WHERE customer_email = (SELECT email FROM auth.users WHERE id = auth.uid())
-  )
-);
 
 -- ========================================
 -- 8. INSERT INITIAL DATA
@@ -358,11 +365,9 @@ INSERT INTO products (name, description, price, commission, image_url, category,
 -- Pork & Beef
 ('Pork Belly (Liempo)', 'Premium pork belly, marinated and grilled to perfection', 150.00, 4.00, '/images/products/liempo.jpg', 'pork', true, true),
 ('Pork Ribs (BBQ Ribs)', 'Tender pork ribs with our signature BBQ sauce', 180.00, 4.50, '/images/products/ribs.jpg', 'pork', true, true),
-('Beef Skewers (Beef BBQ)', 'Tender beef cubes on skewers, marinated in special sauce', 120.00, 3.50, '/images/products/beef-skewers.jpg', 'beef', false, true),
 
 -- Special Items
-('BBQ Combo Platter', 'Mixed selection of our best BBQ items', 250.00, 6.00, '/images/products/combo-platter.jpg', 'combo', true, true),
-('Family Pack', 'Large portion perfect for sharing with family', 400.00, 8.00, '/images/products/family-pack.jpg', 'combo', false, true)
+-- (BBQ Combo Platter and Family Pack removed - not needed)
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert default hero settings
