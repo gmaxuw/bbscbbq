@@ -40,11 +40,7 @@ interface Product {
   commission: number
   category: string
   is_active: boolean
-  product_images?: Array<{
-    id: string
-    image_url: string
-    is_primary: boolean
-  }>
+  image_url?: string
 }
 
 export default function FeaturedMenu() {
@@ -79,11 +75,7 @@ export default function FeaturedMenu() {
             category,
             is_active,
             created_at,
-            product_images (
-              id,
-              image_url,
-              is_primary
-            )
+            image_url
           `)
           .eq('is_active', true)
           .order('created_at', { ascending: false })
@@ -129,12 +121,15 @@ export default function FeaturedMenu() {
       const { data, error } = await supabase
         .from('products')
         .select(`
-          *,
-          product_images (
-            id,
-            image_url,
-            is_primary
-          )
+          id,
+          name,
+          description,
+          price,
+          commission,
+          category,
+          is_active,
+          created_at,
+          image_url
         `)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -202,9 +197,8 @@ export default function FeaturedMenu() {
 
   // Helper function to get product image
   const getProductImage = (product: Product) => {
-    if (product.product_images && product.product_images.length > 0) {
-      const primaryImage = product.product_images.find(img => img.is_primary)
-      return primaryImage?.image_url || product.product_images[0].image_url
+    if (product.image_url) {
+      return product.image_url
     }
     // Fallback to a default BBQ image
     return 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=300&fit=crop&crop=center'
