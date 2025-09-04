@@ -162,21 +162,15 @@ export default function AdminLoginPage() {
         return
       }
 
-      // Check if the email belongs to an admin user in auth.users
-      const { data: { users }, error: adminError } = await supabase.auth.admin.listUsers()
+      // Check if the email belongs to an admin user by querying the admin_users table
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('email', forgotPasswordEmail.toLowerCase().trim())
+        .eq('is_active', true)
+        .single()
       
-      if (adminError) {
-        setError('Error checking admin account. Please try again.')
-        setIsResettingPassword(false)
-        return
-      }
-
-      const adminUser = users?.find(user => 
-        user.email === forgotPasswordEmail.toLowerCase().trim() && 
-        user.user_metadata?.role === 'admin'
-      )
-
-      if (!adminUser) {
+      if (adminError || !adminUser) {
         setError('No admin account found with this email address')
         setIsResettingPassword(false)
         return
