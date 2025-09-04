@@ -117,11 +117,21 @@ export default function CrewDashboard() {
         return
       }
 
-      // Get crew info from user metadata and branch info
-      const userRole = user.user_metadata?.role
-      const userBranchId = user.user_metadata?.branch_id
+      // Get crew info from admin_users table
+      const { data: crewUser, error: crewError } = await supabase
+        .from('admin_users')
+        .select('role, branch_id, name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single()
 
-      if (userRole !== 'crew' || !userBranchId) {
+      if (crewError || !crewUser) {
+        await supabase.auth.signOut()
+        router.push('/crew/login')
+        return
+      }
+
+      if (crewUser.role !== 'crew' || !crewUser.branch_id) {
         await supabase.auth.signOut()
         router.push('/crew/login')
         return
@@ -131,7 +141,7 @@ export default function CrewDashboard() {
       const { data: branchData, error: branchError } = await supabase
         .from('branches')
         .select('name')
-        .eq('id', userBranchId)
+        .eq('id', crewUser.branch_id)
         .single()
 
       if (branchError) {
@@ -143,8 +153,8 @@ export default function CrewDashboard() {
 
       setCrewMember({
         id: user.id,
-        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Crew Member',
-        branch_id: userBranchId,
+        full_name: crewUser.name || user.email?.split('@')[0] || 'Crew Member',
+        branch_id: crewUser.branch_id,
         branch_name: branchData?.name || 'Unknown Branch'
       })
     } catch (error) {

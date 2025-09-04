@@ -68,29 +68,40 @@ export default function CrewLogin() {
       if (signInError) throw signInError
 
       if (data.user) {
-        // Verify crew role using the new system
-        const userRole = data.user.user_metadata?.role
-        const userBranchId = data.user.user_metadata?.branch_id
+        // Verify crew role from admin_users table
+        const { data: crewUser, error: crewError } = await supabase
+          .from('admin_users')
+          .select('role, branch_id, name')
+          .eq('user_id', data.user.id)
+          .eq('is_active', true)
+          .single()
 
-        console.log('Crew login - User role:', userRole)
-        console.log('Crew login - User branch ID:', userBranchId)
+        if (crewError || !crewUser) {
+          await supabase.auth.signOut()
+          setError('Access denied. Your crew account is not found or inactive.')
+          return
+        }
 
-        if (userRole !== 'crew') {
+        console.log('Crew login - User role:', crewUser.role)
+        console.log('Crew login - User branch ID:', crewUser.branch_id)
+
+        if (crewUser.role !== 'crew') {
           await supabase.auth.signOut()
           setError('Access denied. This login is for crew members only.')
           return
         }
 
-        if (!userBranchId) {
+        if (!crewUser.branch_id) {
           await supabase.auth.signOut()
           setError('Your crew account is not assigned to a branch. Please contact your administrator.')
           return
         }
 
         // Store crew info in localStorage for quick access
-        localStorage.setItem('crew_role', userRole)
-        localStorage.setItem('crew_branch_id', userBranchId)
+        localStorage.setItem('crew_role', crewUser.role)
+        localStorage.setItem('crew_branch_id', crewUser.branch_id)
         localStorage.setItem('crew_user_id', data.user.id)
+        localStorage.setItem('crew_name', crewUser.name)
 
         // Redirect to crew dashboard
         router.push('/crew/dashboard')

@@ -30,27 +30,16 @@ export default function AdminLoginPage() {
           // Check if user is admin - try both tables
           let adminUser = null
 
-          // First, try the new admin_users table
-          const { data: newAdminUser } = await supabase
+          // Check the admin_users table
+          const { data: adminUserData, error: adminError } = await supabase
             .from('admin_users')
             .select('role')
             .eq('user_id', session.user.id)
+            .eq('is_active', true)
             .single()
 
-          if (newAdminUser) {
-            adminUser = newAdminUser
-          } else {
-            // If not found in admin_users, try the old users table
-            const { data: oldAdminUser } = await supabase
-              .from('users')
-              .select('role')
-              .eq('id', session.user.id)
-              .eq('role', 'admin')
-              .single()
-
-            if (oldAdminUser) {
-              adminUser = oldAdminUser
-            }
+          if (adminUserData && !adminError) {
+            adminUser = adminUserData
           }
 
           if (adminUser && (adminUser.role === 'admin' || adminUser.role === 'crew')) {
@@ -111,9 +100,25 @@ export default function AdminLoginPage() {
         return
       }
 
-      // Check if user has admin role in auth.users metadata
-      const userRole = data.user.user_metadata?.role
-      console.log('User role from metadata:', userRole)
+      // Check if user has admin role in admin_users table
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .eq('is_active', true)
+        .single()
+
+      if (adminError || !adminUser) {
+        console.log('Access denied - user not found in admin_users table')
+        setError('Access denied. You are not authorized to access admin features. Please contact support to set up your admin account.')
+        // Sign out the user since they're not admin
+        await supabase.auth.signOut()
+        setIsLoading(false)
+        return
+      }
+
+      const userRole = adminUser.role
+      console.log('User role from admin_users table:', userRole)
 
       if (userRole !== 'admin' && userRole !== 'crew') {
         console.log('Access denied - user role:', userRole)

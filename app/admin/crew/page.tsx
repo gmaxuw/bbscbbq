@@ -100,20 +100,21 @@ export default function CrewManagement() {
         return
       }
 
-      // Verify admin role by email (more reliable)
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('role, full_name')
-        .eq('email', user.email)
+      // Verify admin role from admin_users table
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
+        .select('role, name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .single()
 
-      if (error || userData?.role !== 'admin') {
+      if (adminError || !adminUser || adminUser.role !== 'admin') {
         await supabase.auth.signOut()
         router.push('/admin/login')
         return
       }
 
-      setUser(userData)
+      setUser({ role: adminUser.role, full_name: adminUser.name })
     } catch (error) {
       console.error('Auth check failed:', error)
       router.push('/admin/login')
@@ -124,39 +125,37 @@ export default function CrewManagement() {
     try {
       setIsLoading(true)
 
-      // Load crew members from auth.users
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
+      // Load crew members from admin_users table
+      const { data: crewUsers, error: crewError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('role', 'crew')
+        .eq('is_active', true)
 
-      if (authError) throw authError
-
-      // Filter crew members and get branch info
-      const crewUsers = authUsers.users.filter(user => 
-        user.user_metadata?.role === 'crew'
-      )
+      if (crewError) throw crewError
 
       const crewWithBranchNames = await Promise.all(
-        crewUsers.map(async (user) => {
-          const branchId = user.user_metadata?.branch_id
+        (crewUsers || []).map(async (crewUser) => {
           let branchName = 'No Branch Assigned'
           
-          if (branchId) {
+          if (crewUser.branch_id) {
             const { data: branchData } = await supabase
               .from('branches')
               .select('name')
-              .eq('id', branchId)
+              .eq('id', crewUser.branch_id)
               .single()
             branchName = branchData?.name || 'Unknown Branch'
           }
 
           return {
-            id: user.id,
-            email: user.email || '',
-            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Crew Member',
-            role: user.user_metadata?.role || 'crew',
-            branch_id: branchId,
+            id: crewUser.user_id,
+            email: crewUser.email,
+            full_name: crewUser.name,
+            role: crewUser.role,
+            branch_id: crewUser.branch_id,
             branch_name: branchName,
-            is_active: true, // All auth users are active by default
-            created_at: user.created_at
+            is_active: crewUser.is_active,
+            created_at: crewUser.created_at
           }
         })
       )

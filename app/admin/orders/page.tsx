@@ -118,13 +118,27 @@ export default function OrderManagement() {
         return
       }
 
-      // Check user role from auth.users metadata
-      const userRole = user.user_metadata?.role
-      const userName = user.user_metadata?.full_name || user.email
+      // Check user role from admin_users table
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users')
+        .select('role, name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single()
+
+      if (adminError || !adminUser) {
+        console.log('❌ User not found in admin_users table, redirecting to login')
+        await supabase.auth.signOut()
+        router.push('/admin/login')
+        return
+      }
+
+      const userRole = adminUser.role
+      const userName = adminUser.name || user.email
 
       console.log('👤 User data:', { userRole, userName })
 
-      if (!userRole || !['admin', 'crew'].includes(userRole)) {
+      if (!['admin', 'crew'].includes(userRole)) {
         console.log('❌ User not authorized, redirecting to login')
         await supabase.auth.signOut()
         router.push('/admin/login')
