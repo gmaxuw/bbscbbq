@@ -24,15 +24,27 @@ interface Order {
   customer_name: string
   customer_email: string
   customer_phone: string
-  delivery_address: string
-  status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
-  total_amount: number
+  branch_id: string
+  pickup_time: string
+  subtotal: number
   promo_discount?: number
+  total_amount: number
+  total_commission: number
   payment_method: string
+  payment_status: 'pending' | 'paid' | 'cancelled' | 'refunded'
   gcash_reference?: string
-  payment_screenshot?: string
+  payment_screenshot_url?: string
+  order_status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled'
+  estimated_ready_time?: string
+  qr_code?: string
   created_at: string
+  updated_at: string
   order_items: OrderItem[]
+  branch?: {
+    name: string
+    address: string
+    phone: string
+  }
 }
 
 export default function CustomerOrdersPage() {
@@ -45,6 +57,31 @@ export default function CustomerOrdersPage() {
 
   useEffect(() => {
     loadOrders()
+    
+    // Set up real-time subscription for order updates
+    const userEmail = localStorage.getItem('customer_email')
+    if (userEmail) {
+      const subscription = supabase
+        .channel('order-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `customer_email=eq.${userEmail}`
+          },
+          (payload) => {
+            console.log('Order update received:', payload)
+            loadOrders() // Reload orders when any order is updated
+          }
+        )
+        .subscribe()
+
+      return () => {
+        subscription.unsubscribe()
+      }
+    }
   }, [])
 
   const loadOrders = async () => {
@@ -64,6 +101,11 @@ export default function CustomerOrdersPage() {
               name,
               image_url
             )
+          ),
+          branch:branches (
+            name,
+            address,
+            phone
           )
         `)
         .eq('customer_email', userEmail)
@@ -86,16 +128,37 @@ export default function CustomerOrdersPage() {
     switch (status) {
       case 'pending':
         return 'text-yellow-600 bg-yellow-100'
-      case 'preparing':
+      case 'confirmed':
         return 'text-blue-600 bg-blue-100'
+      case 'preparing':
+        return 'text-orange-600 bg-orange-100'
       case 'ready':
         return 'text-green-600 bg-green-100'
-      case 'delivered':
+      case 'completed':
         return 'text-green-600 bg-green-100'
       case 'cancelled':
         return 'text-red-600 bg-red-100'
       default:
         return 'text-gray-600 bg-gray-100'
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Pending Payment'
+      case 'confirmed':
+        return 'Payment Confirmed'
+      case 'preparing':
+        return 'Preparing Your Order'
+      case 'ready':
+        return 'Ready for Pickup'
+      case 'completed':
+        return 'Order Completed'
+      case 'cancelled':
+        return 'Order Cancelled'
+      default:
+        return status
     }
   }
 
@@ -196,9 +259,9 @@ export default function CustomerOrdersPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
-                      {getStatusIcon(order.status)}
-                      <span className="capitalize">{order.status}</span>
+                    <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.order_status)}`}>
+                      {getStatusIcon(order.order_status)}
+                      <span>{getStatusText(order.order_status)}</span>
                     </div>
                     <p className="text-lg font-bold text-gray-900 mt-1">
                       ₱{(order.total_amount || 0).toLocaleString()}
@@ -208,17 +271,18 @@ export default function CustomerOrdersPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Delivery Address</h4>
+                    <h4 className="font-medium text-gray-900 mb-2">Pickup Location</h4>
                     <p className="text-sm text-gray-600 flex items-start space-x-2">
                       <MapPin className="w-4 h-4 mt-0.5 text-gray-400" />
-                      <span>{order.delivery_address}</span>
+                      <span>{order.branch?.name || 'Branch not found'}</span>
                     </p>
+                    <p className="text-xs text-gray-500 ml-6">{order.branch?.address}</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Contact Info</h4>
+                    <h4 className="font-medium text-gray-900 mb-2">Pickup Time</h4>
                     <p className="text-sm text-gray-600 flex items-center space-x-2">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <span>{order.customer_phone}</span>
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span>{formatDate(order.pickup_time)}</span>
                     </p>
                   </div>
                 </div>
@@ -262,9 +326,9 @@ export default function CustomerOrdersPage() {
 
               {/* Order Status */}
               <div className="mb-6">
-                <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(selectedOrder.status)}`}>
-                  {getStatusIcon(selectedOrder.status)}
-                  <span className="capitalize">{selectedOrder.status}</span>
+                <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(selectedOrder.order_status)}`}>
+                  {getStatusIcon(selectedOrder.order_status)}
+                  <span>{getStatusText(selectedOrder.order_status)}</span>
                 </div>
                 <p className="text-sm text-gray-600 mt-2">
                   Placed on {formatDate(selectedOrder.created_at)}
@@ -306,7 +370,7 @@ export default function CustomerOrdersPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal:</span>
-                    <span className="text-gray-900">₱{((selectedOrder.total_amount || 0) + (selectedOrder.promo_discount || 0)).toLocaleString()}</span>
+                    <span className="text-gray-900">₱{(selectedOrder.subtotal || 0).toLocaleString()}</span>
                   </div>
                   {selectedOrder.promo_discount && selectedOrder.promo_discount > 0 && (
                     <div className="flex justify-between text-sm">

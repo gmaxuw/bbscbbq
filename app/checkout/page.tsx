@@ -17,6 +17,8 @@ export default function CheckoutPage() {
   const [isCartLoaded, setIsCartLoaded] = useState(false)
   const [orderNumber, setOrderNumber] = useState('')
   const [qrCodeUrl, setQrCodeUrl] = useState('')
+  const [currentStep, setCurrentStep] = useState('')
+  const [progress, setProgress] = useState(0)
   const [customerInfo, setCustomerInfo] = useState({
     fullName: '',
     email: '',
@@ -120,6 +122,8 @@ export default function CheckoutPage() {
     console.log('🚀 ENHANCED LOGGING IS WORKING - NEW VERSION DEPLOYED!')
     e.preventDefault()
     setIsProcessing(true)
+    setProgress(0)
+    setCurrentStep('Validating order...')
     
     console.log('🚀 FORM SUBMITTED!')
     console.log('📋 Customer info:', customerInfo)
@@ -227,7 +231,30 @@ export default function CheckoutPage() {
         return
       }
 
+      // Validate GCash payment details
+      if (customerInfo.paymentMethod === 'gcash') {
+        console.log('Validating GCash payment...')
+        
+        // Validate GCash reference
+        if (!customerInfo.gcashReference || customerInfo.gcashReference.trim() === '') {
+          console.log('GCash reference validation failed: Empty reference')
+          alert('Please enter your GCash reference number')
+          setIsProcessing(false)
+          return
+        }
+        
+        // Validate payment screenshot
+        if (!customerInfo.paymentScreenshot) {
+          console.log('Payment screenshot validation failed: No screenshot uploaded')
+          alert('Please upload your GCash payment screenshot as proof of payment')
+          setIsProcessing(false)
+          return
+        }
+      }
+
       console.log('All validations passed!')
+      setProgress(20)
+      setCurrentStep('Processing payment...')
 
       const branchId = customerInfo.branchId
       const pickupDateTime = new Date(customerInfo.pickupTime)
@@ -255,64 +282,84 @@ export default function CheckoutPage() {
       // Generate unique reference number
       const referenceNumber = generateReferenceNumber()
 
-      // TEMPORARILY SKIP SCREENSHOT UPLOAD FOR DEBUGGING
-      let screenshotUrl = null
-      console.log('🔧 DEBUGGING: Skipping screenshot upload to isolate the issue')
-      
       // Upload payment screenshot if provided
-      // if (customerInfo.paymentScreenshot) {
-      //   console.log('📸 Uploading payment screenshot...')
-      //   setIsUploading(true)
-      //   try {
-      //     const fileExt = customerInfo.paymentScreenshot.name.split('.').pop()
-      //     const fileName = `payment-${referenceNumber}.${fileExt}`
+      let screenshotUrl = null
+      if (customerInfo.paymentScreenshot) {
+        console.log('📸 Uploading payment screenshot...')
+        setIsUploading(true)
+        setProgress(30)
+        setCurrentStep('Uploading payment proof...')
+        
+        try {
+          // Use the custom filename that was already generated
+          const fileName = customerInfo.paymentScreenshot.name
+          console.log('📸 Uploading file:', fileName, 'Size:', customerInfo.paymentScreenshot.size, 'Type:', customerInfo.paymentScreenshot.type)
           
-      //     const { data: uploadData, error: uploadError } = await supabase.storage
-      //       .from('payment-screenshots')
-      //       .upload(fileName, customerInfo.paymentScreenshot)
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('payment-screenshots')
+            .upload(fileName, customerInfo.paymentScreenshot)
 
-      //     if (uploadError) {
-      //       console.error('❌ Screenshot upload failed:', uploadError)
-      //       throw uploadError
-      //     }
+          if (uploadError) {
+            console.error('❌ Screenshot upload failed:', uploadError)
+            console.error('❌ Upload error details:', {
+              message: uploadError.message,
+              error: uploadError
+            })
+            
+            // Provide specific error messages
+            if (uploadError.message.includes('413')) {
+              throw new Error('File too large. Please use an image smaller than 5MB.')
+            } else if (uploadError.message.includes('415')) {
+              throw new Error('Invalid file type. Please upload a JPEG, PNG, WebP, or GIF image.')
+            } else if (uploadError.message.includes('403')) {
+              throw new Error('Upload permission denied. Please try again or contact support.')
+            } else {
+              throw new Error(`Upload failed: ${uploadError.message}`)
+            }
+          }
 
-      //     // Get public URL
-      //     const { data: urlData } = supabase.storage
-      //       .from('payment-screenshots')
-      //       .getPublicUrl(fileName)
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('payment-screenshots')
+            .getPublicUrl(fileName)
 
-      //     screenshotUrl = urlData.publicUrl
-      //     console.log('✅ Screenshot uploaded successfully:', screenshotUrl)
-      //   } catch (error) {
-      //     console.error('❌ Screenshot upload error:', error)
-      //     alert('Failed to upload payment screenshot. Please try again.')
-      //     setIsProcessing(false)
-      //     setIsUploading(false)
-      //     return
-      //   } finally {
-      //     setIsUploading(false)
-      //   }
-      // }
+          screenshotUrl = urlData.publicUrl
+          console.log('✅ Screenshot uploaded successfully:', screenshotUrl)
+        } catch (error: any) {
+          console.error('❌ Screenshot upload error:', error)
+          alert(`Failed to upload payment screenshot: ${error.message || 'Unknown error'}`)
+          setIsProcessing(false)
+          setIsUploading(false)
+          return
+        } finally {
+          setIsUploading(false)
+        }
+      }
 
       // Calculate total commission from cart items
       const totalCommission = items.reduce((sum, item) => {
         return sum + (item.commission || 0) * item.quantity
       }, 0)
 
+      // Generate order number
+      const orderNumber = `BBQ-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+
       // Prepare order data - FIXED to match database schema exactly
       const orderData = {
+        order_number: orderNumber, // Generate unique order number
         customer_name: customerInfo.fullName.trim(),
         customer_email: customerInfo.email.trim(),
         customer_phone: customerInfo.phone.trim(),
         branch_id: branchId,
         pickup_time: pickupDateTime.toISOString(),
+        subtotal: subtotal, // Required field in database
         total_amount: total,
-        total_commission: totalCommission, // Add total commission
+        total_commission: totalCommission,
+        payment_method: customerInfo.paymentMethod, // Required field in database
         payment_status: customerInfo.paymentMethod === 'gcash' ? 'paid' : 'pending',
         gcash_reference: customerInfo.paymentMethod === 'gcash' ? customerInfo.gcashReference : null,
-        payment_screenshot: screenshotUrl, // Use uploaded screenshot URL
-        order_status: 'pending', // Fixed: database uses 'order_status', not 'status'
-        // Note: payment_method and reference_number are not in the database schema
+        payment_screenshot_url: screenshotUrl, // Fixed: database uses 'payment_screenshot_url', not 'payment_screenshot'
+        order_status: 'pending'
       }
 
       // Debug: Log the order data being sent
@@ -328,6 +375,9 @@ export default function CheckoutPage() {
 
       // Check if online or offline
       if (isOnline()) {
+        setProgress(40)
+        setCurrentStep('Creating order...')
+        
         // Create the order in Supabase
         console.log('🚀 Attempting to create order with data:', orderData)
         
@@ -350,15 +400,18 @@ export default function CheckoutPage() {
         
         console.log('✅ Order created successfully:', data)
         order = data
+        setProgress(60)
+        setCurrentStep('Adding items to order...')
 
         // Create order items - FIXED to match database schema
         const orderItems = items.map(item => ({
           order_id: order.id,
           product_id: item.id,
+          product_name: item.name, // Required field in database
           quantity: item.quantity,
           unit_price: item.price,
-          unit_commission: item.commission || 0, // Add unit commission
-          subtotal: item.price * item.quantity // Fixed: database uses 'subtotal', not 'total_price'
+          unit_commission: item.commission || 0,
+          subtotal: item.price * item.quantity
         }))
 
         console.log('🚀 Attempting to create order items:', orderItems)
@@ -374,6 +427,8 @@ export default function CheckoutPage() {
         }
         
         console.log('✅ Order items created successfully')
+        setProgress(80)
+        setCurrentStep('Generating confirmation...')
 
         // Commission is tracked in products table, not orders table
         // No need to update orders table with commission data
@@ -426,11 +481,17 @@ export default function CheckoutPage() {
       console.log('Order created successfully:', order)
 
       // Generate QR code
+      setProgress(90)
+      setCurrentStep('Finalizing order...')
+      
       const qrCodeUrl = await generateQRCode(referenceNumber)
 
       // Store order details for display
-      setOrderNumber(referenceNumber)
+      setOrderNumber(orderNumber) // Use the generated order number
       setQrCodeUrl(qrCodeUrl)
+      
+      setProgress(100)
+      setCurrentStep('Order completed!')
       
       // Clear cart and show success
       clearCart()
@@ -707,7 +768,8 @@ export default function CheckoutPage() {
                     {/* Payment Screenshot Upload */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Payment Screenshot (Optional for debugging)
+                        Payment Screenshot *
+                        <span className="text-red-500 ml-1">Required for GCash payments</span>
                       </label>
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-lays-orange-gold transition-colors">
                         <input
@@ -717,6 +779,22 @@ export default function CheckoutPage() {
                           onChange={(e) => {
                             const file = e.target.files?.[0]
                             if (file) {
+                              // Validate file type
+                              const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+                              if (!allowedTypes.includes(file.type)) {
+                                alert('Please upload a valid image file (JPEG, PNG, WebP, or GIF)')
+                                e.target.value = '' // Clear the input
+                                return
+                              }
+
+                              // Validate file size (5MB limit)
+                              const maxSize = 5 * 1024 * 1024 // 5MB
+                              if (file.size > maxSize) {
+                                alert('File size must be less than 5MB')
+                                e.target.value = '' // Clear the input
+                                return
+                              }
+
                               // Create a custom filename with user info
                               const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
                               const customerName = customerInfo.fullName.replace(/[^a-zA-Z0-9]/g, '_')
@@ -731,7 +809,7 @@ export default function CheckoutPage() {
                           }}
                           className="hidden"
                           id="payment-screenshot"
-                          required={false}
+                          required={customerInfo.paymentMethod === 'gcash'}
                           style={{ display: 'none' }}
                         />
                         <label htmlFor="payment-screenshot" className="cursor-pointer">
@@ -855,6 +933,22 @@ export default function CheckoutPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Progress Bar */}
+              {isProcessing && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">{currentStep}</span>
+                    <span className="text-sm text-gray-500">{progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-lays-orange-gold h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
 
               {/* Place Order Button */}
               <button

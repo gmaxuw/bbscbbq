@@ -41,20 +41,24 @@ import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Order {
   id: string
+  order_number: string
   customer_name: string
   customer_phone: string
   customer_email?: string
   branch_id: string
   pickup_time: string
+  subtotal: number
   total_amount: number
   total_commission: number
   promo_code?: string
-  promo_discount: number
-  payment_status: 'pending' | 'paid' | 'cancelled'
+  promo_discount?: number
+  payment_status: 'pending' | 'paid' | 'cancelled' | 'refunded'
   payment_method?: string
   gcash_reference?: string
-  payment_screenshot?: string
-  status: string
+  payment_screenshot_url?: string
+  order_status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled'
+  estimated_ready_time?: string
+  qr_code?: string
   created_at: string
   updated_at: string
   branch?: {
@@ -64,8 +68,10 @@ interface Order {
   order_items?: Array<{
     id: string
     product_id: string
+    product_name: string
     quantity: number
     unit_price: number
+    unit_commission: number
     subtotal: number
     product?: {
       name: string
@@ -112,15 +118,13 @@ export default function OrderManagement() {
         return
       }
 
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('role, full_name')
-        .eq('email', user.email)
-        .single()
+      // Check user role from auth.users metadata
+      const userRole = user.user_metadata?.role
+      const userName = user.user_metadata?.full_name || user.email
 
-      console.log('👤 User data:', { userData, error })
+      console.log('👤 User data:', { userRole, userName })
 
-      if (error || !userData || !['admin', 'crew'].includes(userData.role)) {
+      if (!userRole || !['admin', 'crew'].includes(userRole)) {
         console.log('❌ User not authorized, redirecting to login')
         await supabase.auth.signOut()
         router.push('/admin/login')
@@ -128,7 +132,7 @@ export default function OrderManagement() {
       }
 
       console.log('✅ Admin/Crew authenticated successfully')
-      setUser(userData)
+      setUser({ role: userRole, full_name: userName })
     } catch (error) {
       console.error('Auth check failed:', error)
       router.push('/admin/login')
@@ -183,7 +187,7 @@ export default function OrderManagement() {
 
     // Status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(order => order.status === statusFilter)
+      filtered = filtered.filter(order => order.order_status === statusFilter)
     }
 
     // Payment filter
@@ -199,7 +203,7 @@ export default function OrderManagement() {
       const { error } = await supabase
         .from('orders')
         .update({ 
-          status: newStatus,
+          order_status: newStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
@@ -225,6 +229,7 @@ export default function OrderManagement() {
         .from('orders')
         .update({ 
           payment_status: 'paid',
+          order_status: 'confirmed', // Auto-confirm order when payment is verified
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
@@ -234,7 +239,7 @@ export default function OrderManagement() {
       // Update local state
       setOrders(orders.map(order => 
         order.id === orderId 
-          ? { ...order, payment_status: 'paid', updated_at: new Date().toISOString() }
+          ? { ...order, payment_status: 'paid', order_status: 'confirmed', updated_at: new Date().toISOString() }
           : order
       ))
 
@@ -243,6 +248,7 @@ export default function OrderManagement() {
         setSelectedOrder({
           ...selectedOrder,
           payment_status: 'paid',
+          order_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
       }
@@ -405,7 +411,7 @@ export default function OrderManagement() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        #{order.id.slice(-8)}
+                        #{order.order_number || order.id.slice(-8)}
                       </div>
                       <div className="text-sm text-gray-500">
                         {new Date(order.created_at).toLocaleDateString()}
@@ -463,9 +469,9 @@ export default function OrderManagement() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                      {getStatusIcon(order.status)}
-                      <span className="ml-1">{order.status}</span>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.order_status)}`}>
+                      {getStatusIcon(order.order_status)}
+                      <span className="ml-1">{order.order_status}</span>
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -608,12 +614,12 @@ export default function OrderManagement() {
                           </div>
                         )}
                         
-                        {selectedOrder.payment_screenshot && (
+                        {selectedOrder.payment_screenshot_url && (
                           <div>
                             <div className="flex items-center justify-between mb-3">
                               <span className="font-medium text-gray-700">GCash Payment Screenshot:</span>
                               <button
-                                onClick={() => window.open(selectedOrder.payment_screenshot, '_blank')}
+                                onClick={() => window.open(selectedOrder.payment_screenshot_url, '_blank')}
                                 className="text-blue-600 hover:text-blue-800 text-sm underline flex items-center space-x-1"
                               >
                                 <span>Open in New Tab</span>
@@ -624,10 +630,10 @@ export default function OrderManagement() {
                             </div>
                             <div className="bg-white p-4 rounded-lg border-2 border-gray-200 shadow-sm">
                               <img
-                                src={selectedOrder.payment_screenshot}
+                                src={selectedOrder.payment_screenshot_url}
                                 alt="GCash Payment Screenshot"
                                 className="w-full max-w-2xl h-auto rounded-lg cursor-pointer hover:shadow-lg transition-shadow mx-auto block"
-                                onClick={() => window.open(selectedOrder.payment_screenshot, '_blank')}
+                                onClick={() => window.open(selectedOrder.payment_screenshot_url, '_blank')}
                               />
                             </div>
                             <div className="mt-2 text-center">
@@ -693,7 +699,7 @@ export default function OrderManagement() {
                 </div>
                 
                 <div className="flex space-x-2">
-                  {selectedOrder.status === 'pending' && (
+                  {selectedOrder.order_status === 'pending' && (
                     <button
                       onClick={() => updateOrderStatus(selectedOrder.id, 'preparing')}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -701,7 +707,7 @@ export default function OrderManagement() {
                       Start Preparing
                     </button>
                   )}
-                  {selectedOrder.status === 'preparing' && (
+                  {selectedOrder.order_status === 'preparing' && (
                     <button
                       onClick={() => updateOrderStatus(selectedOrder.id, 'ready')}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -709,7 +715,7 @@ export default function OrderManagement() {
                       Mark Ready
                     </button>
                   )}
-                  {selectedOrder.status === 'ready' && (
+                  {selectedOrder.order_status === 'ready' && (
                     <button
                       onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
                       className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
