@@ -101,6 +101,7 @@ export default function AdminLoginPage() {
       }
 
       // Check if user has admin role in admin_users table
+      console.log('🔍 Checking admin_users table for user_id:', data.user.id)
       const { data: adminUser, error: adminError } = await supabase
         .from('admin_users')
         .select('role')
@@ -108,8 +109,11 @@ export default function AdminLoginPage() {
         .eq('is_active', true)
         .single()
 
+      console.log('🔍 Admin user lookup result:', { adminUser, adminError })
+
       if (adminError || !adminUser) {
-        console.log('Access denied - user not found in admin_users table')
+        console.log('❌ Access denied - user not found in admin_users table')
+        console.log('❌ Error details:', adminError)
         setError('Access denied. You are not authorized to access admin features. Please contact support to set up your admin account.')
         // Sign out the user since they're not admin
         await supabase.auth.signOut()
