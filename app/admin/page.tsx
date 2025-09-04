@@ -32,7 +32,8 @@ import {
   Settings,
   Tag
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
+import { adminAuth } from '@/lib/admin-auth'
 import AdminLayout from '@/components/admin/AdminLayout'
 import Link from 'next/link'
 
@@ -57,6 +58,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
     checkAuth()
@@ -65,26 +67,33 @@ export default function AdminDashboard() {
 
   const checkAuth = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      console.log('🔍 Admin dashboard checking auth...')
+      
+      // Use proper Supabase authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        console.log('❌ No Supabase session found, redirecting to login')
         router.push('/admin/login')
         return
       }
 
-      // Verify admin role by email (more reliable)
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('role, full_name')
-        .eq('email', user.email)
+      // Verify admin role using admin_users table
+      const { data: adminUser, error } = await supabase
+        .from('admin_users')
+        .select('role, name, branch_id')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
         .single()
 
-      if (error || userData?.role !== 'admin') {
+      if (error || !adminUser || adminUser.role !== 'admin') {
+        console.log('❌ Invalid admin user or role, redirecting to login')
         await supabase.auth.signOut()
         router.push('/admin/login')
         return
       }
 
-      setUser(userData)
+      console.log('✅ Admin authentication successful:', adminUser.name)
+      setUser(adminUser)
     } catch (error) {
       console.error('Auth check failed:', error)
       router.push('/admin/login')
@@ -134,6 +143,7 @@ export default function AdminDashboard() {
   }
 
   const handleLogout = async () => {
+    console.log('🚪 Admin logging out from dashboard...')
     await supabase.auth.signOut()
     router.push('/admin/login')
   }

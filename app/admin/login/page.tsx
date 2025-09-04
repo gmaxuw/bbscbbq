@@ -2,63 +2,67 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
+import { Shield, LogIn, ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
 import { createClient } from '@/lib/supabase'
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [loginData, setLoginData] = useState({
+    email: '',
+    password: ''
+  })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [isRedirecting, setIsRedirecting] = useState(false)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
   const [isResettingPassword, setIsResettingPassword] = useState(false)
+  const [showRegisterForm, setShowRegisterForm] = useState(false)
+  const [registerData, setRegisterData] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  })
+  const [isRegistering, setIsRegistering] = useState(false)
   
   const router = useRouter()
   const supabase = createClient()
 
-  // Check if user is already logged in as admin
+  // Check for existing session on page load
   useEffect(() => {
-    const checkAdminSession = async () => {
+    const checkExistingSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        
         if (session?.user) {
-          // Check if user is admin - try both tables
-          let adminUser = null
-
-          // Check the admin_users table
-          const { data: adminUserData, error: adminError } = await supabase
+          console.log('✅ Admin session found, checking role for:', session.user.id)
+          
+          // Check if user is admin or crew
+          const { data: adminUser, error } = await supabase
             .from('admin_users')
-            .select('role')
+            .select('role, name')
             .eq('user_id', session.user.id)
             .eq('is_active', true)
             .single()
 
-          if (adminUserData && !adminError) {
-            adminUser = adminUserData
+          if (!error && adminUser) {
+            console.log('🚀 Admin verified, redirecting to dashboard')
+            window.location.href = `${window.location.origin}/admin`
+            return
+          } else {
+            console.log('❌ Admin user not found for:', session.user.id)
           }
-
-          if (adminUser && (adminUser.role === 'admin' || adminUser.role === 'crew')) {
-            setIsRedirecting(true)
-            // Redirect based on role
-            if (adminUser.role === 'admin') {
-              router.push('/admin/orders')
-            } else {
-              router.push('/crew')
-            }
-          }
+        } else {
+          console.log('📝 No active session, showing login form')
         }
       } catch (error) {
-        console.error('Error checking admin session:', error)
+        console.error('Session check error:', error)
       }
     }
-
-    checkAdminSession()
-  }, [supabase, router])
+    
+    checkExistingSession()
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,90 +70,63 @@ export default function AdminLoginPage() {
     setError('')
 
     try {
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
-        setError('Please enter a valid email address')
-        setIsLoading(false)
-        return
-      }
+      console.log('🔐 Admin login attempt for:', loginData.email)
 
-      // Validate password strength
-      if (password.length < 8) {
-        setError('Password must be at least 8 characters long')
-        setIsLoading(false)
-        return
-      }
+      // Clear any existing sessions first
+      await supabase.auth.signOut()
 
       // Sign in with Supabase Auth
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
-        password: password
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginData.email.toLowerCase().trim(),
+        password: loginData.password
       })
 
-      if (authError) {
-        console.error('Auth error:', authError)
+      if (authError || !authData.user) {
+        console.error('❌ Admin auth failed:', authError?.message)
         setError('Invalid email or password')
-        setIsLoading(false)
         return
       }
 
-      if (!data.user) {
-        setError('Login failed. Please try again.')
-        setIsLoading(false)
-        return
-      }
-
-      // Check if user has admin role in admin_users table
-      console.log('🔍 Checking admin_users table for user_id:', data.user.id)
+      // Verify this user is an admin
       const { data: adminUser, error: adminError } = await supabase
         .from('admin_users')
-        .select('role')
-        .eq('user_id', data.user.id)
+        .select('*')
+        .eq('user_id', authData.user.id)
         .eq('is_active', true)
         .single()
 
-      console.log('🔍 Admin user lookup result:', { adminUser, adminError })
-
       if (adminError || !adminUser) {
-        console.log('❌ Access denied - user not found in admin_users table')
-        console.log('❌ Error details:', adminError)
-        setError('Access denied. You are not authorized to access admin features. Please contact support to set up your admin account.')
-        // Sign out the user since they're not admin
+        console.error('❌ Admin user not found')
         await supabase.auth.signOut()
-        setIsLoading(false)
+        setError('This account does not have admin access')
         return
       }
 
-      const userRole = adminUser.role
-      console.log('User role from admin_users table:', userRole)
+      console.log('✅ Admin login successful:', {
+        role: adminUser.role,
+        name: adminUser.name,
+        branch_id: adminUser.branch_id
+      })
 
-      if (userRole !== 'admin' && userRole !== 'crew') {
-        console.log('Access denied - user role:', userRole)
-        setError('Access denied. You are not authorized to access admin features. Please contact support to set up your admin account.')
-        // Sign out the user since they're not admin
-        await supabase.auth.signOut()
-        setIsLoading(false)
-        return
-      }
-
-      // Store admin role in localStorage for quick access
-      localStorage.setItem('admin_role', userRole)
-      localStorage.setItem('admin_user_id', data.user.id)
-
-      // Redirect based on role
-      if (userRole === 'admin') {
-        router.push('/admin/orders')
-      } else if (userRole === 'crew') {
-        router.push('/crew')
+      // Wait for session to fully hydrate, then redirect
+      console.log('⏳ Waiting for session hydration...')
+      
+      // Give Supabase time to sync the session
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Verify session is properly set
+      const { data: { session: newSession } } = await supabase.auth.getSession()
+      if (newSession) {
+        console.log('✅ Session confirmed, redirecting to admin dashboard')
+        window.location.href = `${window.location.origin}/admin`
       } else {
-        setError('Invalid admin role. Please contact support.')
-        await supabase.auth.signOut()
+        console.log('❌ Session not found after login')
+        setError('Session error - please try again')
       }
 
     } catch (error) {
-      console.error('Login error:', error)
-      setError('An unexpected error occurred. Please try again.')
+      console.error('Admin login error:', error)
+      setError('An unexpected error occurred')
     } finally {
       setIsLoading(false)
     }
@@ -157,256 +134,411 @@ export default function AdminLoginPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Admin password reset requested for:', forgotPasswordEmail)
-    
+    setIsResettingPassword(true)
+
     try {
-      setIsResettingPassword(true)
-      setError('')
-      
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(forgotPasswordEmail)) {
-        setError('Please enter a valid email address')
-        setIsResettingPassword(false)
-        return
-      }
-
-      // Check if the email belongs to an admin user by querying the admin_users table
-      const { data: adminUser, error: adminError } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('email', forgotPasswordEmail.toLowerCase().trim())
-        .eq('is_active', true)
-        .single()
-      
-      if (adminError || !adminUser) {
-        setError('No admin account found with this email address')
-        setIsResettingPassword(false)
-        return
-      }
-
-      // Send password reset email using Supabase Auth with proper admin redirect
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `${window.location.origin}/account/reset-password?admin=true&email=${encodeURIComponent(forgotPasswordEmail)}`
+        redirectTo: `${window.location.origin}/admin/reset-password`
       })
-      
+
       if (error) {
-        console.error('Admin password reset error:', error)
         setError('Error sending reset email. Please try again.')
-        setIsResettingPassword(false)
         return
       }
-      
-      alert('Password reset link sent to your email! Check your inbox and follow the instructions.')
+
+      alert('Password reset link sent to your email!')
       setShowForgotPassword(false)
       setForgotPasswordEmail('')
-      
+
     } catch (error) {
-      console.error('Admin password reset error:', error)
-      setError('Error sending reset email. Please try again.')
+      console.error('Password reset error:', error)
+      setError('Error sending reset email')
     } finally {
       setIsResettingPassword(false)
     }
   }
 
-  if (isRedirecting) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <DesignLock pageName="Admin Login" />
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-lays-dark-red border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting...</p>
-        </div>
-      </div>
-    )
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (registerData.password !== registerData.confirmPassword) {
+      setError('Passwords do not match!')
+      return
+    }
+
+    setIsRegistering(true)
+    setError('')
+
+    try {
+      console.log('🆕 ADMIN REGISTRATION ATTEMPT!')
+
+      // Create admin account in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: registerData.email.toLowerCase().trim(),
+        password: registerData.password,
+        options: {
+          data: {
+            full_name: registerData.fullName,
+            role: 'admin'
+          },
+          emailRedirectTo: `${window.location.origin}/admin/login`
+        }
+      })
+
+      if (authError) {
+        console.error('❌ Auth registration error:', authError)
+        setError('Error creating admin account: ' + authError.message)
+        return
+      }
+
+      if (!authData.user) {
+        setError('Account creation failed')
+        return
+      }
+
+      // Create admin_users record
+      const { error: adminError } = await supabase
+        .from('admin_users')
+        .insert([{
+          user_id: authData.user.id,
+          email: registerData.email.toLowerCase().trim(),
+          name: registerData.fullName,
+          role: 'admin',
+          is_active: true
+        }])
+
+      if (adminError) {
+        console.error('❌ Admin user creation error:', adminError)
+        setError('Error creating admin record')
+        return
+      }
+
+      console.log('✅ Admin registration successful!')
+      alert('Admin account created! Please check your email to verify your account, then sign in.')
+      
+      // Reset form and show login
+      setRegisterData({
+        fullName: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+      })
+      setShowRegisterForm(false)
+
+    } catch (error) {
+      console.error('Registration error:', error)
+      setError('An unexpected error occurred')
+    } finally {
+      setIsRegistering(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50">
       <DesignLock pageName="Admin Login" />
       
-      <div className="max-w-md w-full mx-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-lays-dark-red rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-white" />
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="flex items-center space-x-4">
+            <Link 
+              href="/" 
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </Link>
+            <div className="flex items-center space-x-3">
+              <Shield className="w-6 h-6 text-lays-dark-red" />
+              <h1 className="text-2xl font-bold text-gray-900">Admin Sign In</h1>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Login</h1>
-            <p className="text-gray-600">Sign in to access admin features</p>
           </div>
+        </div>
+      </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="w-5 h-5 text-red-600" />
-                <p className="text-red-800 text-sm">{error}</p>
-              </div>
-            </div>
-          )}
+      <div className="max-w-md mx-auto px-4 py-8">
+        {/* Toggle Buttons */}
+        <div className="flex bg-gray-200 rounded-lg p-1 mb-8">
+          <button
+            onClick={() => {
+              setShowRegisterForm(false)
+              setShowForgotPassword(false)
+              setError('')
+            }}
+            className={`flex-1 py-2 px-4 rounded-md font-semibold transition-colors ${
+              !showRegisterForm && !showForgotPassword
+                ? 'bg-white text-lays-dark-red shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Sign In
+          </button>
+          <button
+            onClick={() => {
+              setShowRegisterForm(true)
+              setShowForgotPassword(false)
+              setError('')
+            }}
+            className={`flex-1 py-2 px-4 rounded-md font-semibold transition-colors ${
+              showRegisterForm
+                ? 'bg-white text-lays-dark-red shadow-sm' 
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Create Admin
+          </button>
+        </div>
 
-          {/* Login Form */}
+        {/* Login Form */}
+        {!showForgotPassword && !showRegisterForm ? (
           <form onSubmit={handleLogin} className="space-y-6">
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bbq-input w-full"
-                placeholder="admin@bbqrestaurant.com"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="bbq-input w-full pr-10"
-                  placeholder="Enter your password"
-                  required
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  disabled={isLoading}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <Eye className="w-5 h-5 text-gray-400" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Login Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="bbq-button-primary w-full flex items-center justify-center space-x-2"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Signing In...</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4" />
-                  <span>Sign In</span>
-                </>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <span className="text-sm text-red-700">{error}</span>
+                </div>
               )}
-            </button>
-          </form>
 
-          {/* Forgot Password Link */}
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => setShowForgotPassword(true)}
-              className="text-sm text-gray-600 hover:text-lays-dark-red transition-colors"
-              disabled={isLoading}
-            >
-              Forgot your password?
-            </button>
-          </div>
-
-          {/* Forgot Password Form */}
-          {showForgotPassword && (
-            <div className="mt-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Reset Admin Password</h3>
-              <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-4">
                 <div>
-                  <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Admin Email Address
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Admin Email
                   </label>
                   <input
                     type="email"
-                    id="forgot-email"
-                    value={forgotPasswordEmail}
-                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                    className="bbq-input w-full"
-                    placeholder="admin@bbqrestaurant.com"
                     required
-                    disabled={isResettingPassword}
+                    value={loginData.email}
+                    onChange={(e) => setLoginData({...loginData, email: e.target.value})}
+                    className="bbq-input w-full"
+                    placeholder="Enter your admin email"
+                    disabled={isLoading}
                   />
                 </div>
                 
-                <div className="flex space-x-3">
-                  <button
-                    type="submit"
-                    disabled={isResettingPassword}
-                    className="bbq-button-primary flex-1 flex items-center justify-center space-x-2"
-                  >
-                    {isResettingPassword ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Sending...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-4 h-4" />
-                        <span>Send Reset Link</span>
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForgotPassword(false)
-                      setForgotPasswordEmail('')
-                      setError('')
-                    }}
-                    className="bbq-button-secondary px-4"
-                    disabled={isResettingPassword}
-                  >
-                    Cancel
-                  </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={loginData.password}
+                      onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+                      className="bbq-input w-full pr-10"
+                      placeholder="Enter your password"
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      disabled={isLoading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4 text-gray-400" />
+                      ) : (
+                        <Eye className="w-4 h-4 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </form>
-            </div>
-          )}
-
-          {/* Security Notice */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start space-x-2">
-              <Lock className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-medium text-blue-900">Security Notice</h4>
-                <p className="text-sm text-blue-800 mt-1">
-                  This is a secure admin area. All login attempts are logged and monitored.
-                </p>
               </div>
-            </div>
-          </div>
+              
+              {/* Forgot Password Link */}
+              <div className="text-right mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-lays-dark-red hover:text-lays-bright-red hover:underline transition-colors"
+                  disabled={isLoading}
+                >
+                  Forgot your password?
+                </button>
+              </div>
+              
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="bbq-button-primary w-full mt-6 flex items-center justify-center space-x-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4" />
+                    <span>Sign In</span>
+                  </>
+                )}
+              </button>
 
-          {/* Back to Customer Site */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => router.push('/')}
-              className="text-sm text-gray-600 hover:text-lays-dark-red transition-colors"
-            >
-              ← Back to Customer Site
-            </button>
+              {/* Temporary Debug Button */}
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.auth.signOut()
+                  localStorage.clear()
+                  window.location.reload()
+                }}
+                className="w-full mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                🔧 Clear All Sessions & Reload (Debug)
+              </button>
+            </div>
+          </form>
+        ) : showRegisterForm ? (
+          /* Registration Form */
+          <form onSubmit={handleRegister} className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <span className="text-sm text-red-700">{error}</span>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={registerData.fullName}
+                    onChange={(e) => setRegisterData({...registerData, fullName: e.target.value})}
+                    className="bbq-input w-full"
+                    placeholder="Enter your full name"
+                    disabled={isRegistering}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Admin Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={registerData.email}
+                    onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
+                    className="bbq-input w-full"
+                    placeholder="Enter admin email"
+                    disabled={isRegistering}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={registerData.password}
+                    onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
+                    className="bbq-input w-full"
+                    placeholder="Create a password"
+                    disabled={isRegistering}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={registerData.confirmPassword}
+                    onChange={(e) => setRegisterData({...registerData, confirmPassword: e.target.value})}
+                    className="bbq-input w-full"
+                    placeholder="Confirm your password"
+                    disabled={isRegistering}
+                  />
+                </div>
+              </div>
+              
+              <button
+                type="submit"
+                disabled={isRegistering}
+                className="bbq-button-primary w-full mt-6 flex items-center justify-center space-x-2"
+              >
+                {isRegistering ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Creating Admin...</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-4 h-4" />
+                    <span>Create Admin Account</span>
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-gray-500 text-center mt-4">
+                ⚠️ Temporary: This will be removed once proper admin management is set up
+              </p>
+            </div>
+          </form>
+        ) : (
+          /* Forgot Password Form */
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reset Admin Password</h3>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Admin Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  className="bbq-input w-full"
+                  placeholder="Enter your admin email"
+                  disabled={isResettingPassword}
+                />
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  type="submit"
+                  disabled={isResettingPassword}
+                  className="bbq-button-primary flex-1"
+                >
+                  {isResettingPassword ? 'Sending...' : 'Send Reset Link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(false)}
+                  className="bbq-button-secondary flex-1"
+                  disabled={isResettingPassword}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
+        )}
+
+        {/* Additional Info */}
+        <div className="text-center mt-8">
+          <p className="text-sm text-gray-600">
+            {showRegisterForm ? (
+              <>⚠️ Temporary admin registration - will be removed later</>
+            ) : (
+              <>Admin access only. Need help?{' '}
+                <Link href="/contact" className="text-lays-dark-red hover:underline">
+                  Contact Support
+                </Link>
+              </>
+            )}
+          </p>
         </div>
       </div>
     </div>

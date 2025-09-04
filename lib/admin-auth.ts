@@ -1,210 +1,178 @@
-import { createClient } from '@/lib/supabase'
+/**
+ * 🔐 SEPARATE ADMIN AUTHENTICATION SYSTEM 🛡️
+ * 
+ * This file provides isolated admin authentication that doesn't interfere
+ * with customer authentication. It uses a separate session management system.
+ */
 
-export interface AdminUser {
+import { createClient } from './supabase'
+
+interface AdminUser {
   id: string
-  user_id: string
   email: string
+  name: string
   role: 'admin' | 'crew'
+  branch_id?: string
   is_active: boolean
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
-export interface AuthResult {
-  isAuthenticated: boolean
-  user: AdminUser | null
-  error: string | null
-}
+class AdminAuthManager {
+  private static instance: AdminAuthManager
+  private supabase = createClient()
+  private adminSession: AdminUser | null = null
+  private sessionKey = 'admin_session_data'
 
-/**
- * Check if current user is authenticated as admin or crew
- */
-export async function checkAdminAuth(): Promise<AuthResult> {
-  try {
-    const supabase = createClient()
+  private constructor() {
+    this.loadSessionFromStorage()
+  }
+
+  static getInstance(): AdminAuthManager {
+    if (!AdminAuthManager.instance) {
+      AdminAuthManager.instance = new AdminAuthManager()
+    }
+    return AdminAuthManager.instance
+  }
+
+  private loadSessionFromStorage() {
+    // Only run in browser environment
+    if (typeof window === 'undefined') return
     
-    // Get current session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError || !session) {
-      return {
-        isAuthenticated: false,
-        user: null,
-        error: 'No active session'
+    try {
+      const stored = localStorage.getItem(this.sessionKey)
+      if (stored) {
+        this.adminSession = JSON.parse(stored)
+        console.log('🔐 Admin session loaded from storage:', this.adminSession?.email)
       }
-    }
-
-    // Check if user is admin/crew
-    const { data: adminUser, error: adminError } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .single()
-
-    if (adminError || !adminUser) {
-      return {
-        isAuthenticated: false,
-        user: null,
-        error: 'User is not authorized as admin or crew'
-      }
-    }
-
-    if (!adminUser.is_active) {
-      return {
-        isAuthenticated: false,
-        user: null,
-        error: 'Admin account is deactivated'
-      }
-    }
-
-    return {
-      isAuthenticated: true,
-      user: adminUser,
-      error: null
-    }
-
-  } catch (error) {
-    console.error('Admin auth check error:', error)
-    return {
-      isAuthenticated: false,
-      user: null,
-      error: 'Authentication check failed'
+    } catch (error) {
+      console.error('Failed to load admin session:', error)
+      this.clearSession()
     }
   }
-}
 
-/**
- * Check if current user has admin role
- */
-export async function isAdmin(): Promise<boolean> {
-  const result = await checkAdminAuth()
-  return result.isAuthenticated && result.user?.role === 'admin'
-}
-
-/**
- * Check if current user has crew role (or admin)
- */
-export async function isCrew(): Promise<boolean> {
-  const result = await checkAdminAuth()
-  return result.isAuthenticated && (result.user?.role === 'crew' || result.user?.role === 'admin')
-}
-
-/**
- * Get current admin user info
- */
-export async function getCurrentAdminUser(): Promise<AdminUser | null> {
-  const result = await checkAdminAuth()
-  return result.user
-}
-
-/**
- * Sign out admin user
- */
-export async function signOutAdmin(): Promise<void> {
-  try {
-    const supabase = createClient()
+  private saveSessionToStorage(adminUser: AdminUser) {
+    // Only run in browser environment
+    if (typeof window === 'undefined') return
     
-    // Clear localStorage
+    try {
+      localStorage.setItem(this.sessionKey, JSON.stringify(adminUser))
+      this.adminSession = adminUser
+      console.log('💾 Admin session saved to storage:', adminUser.email)
+    } catch (error) {
+      console.error('Failed to save admin session:', error)
+    }
+  }
+
+  private clearSession() {
+    // Only run in browser environment
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('admin_role')
-      localStorage.removeItem('admin_user_id')
+      localStorage.removeItem(this.sessionKey)
     }
-    
-    // Sign out from Supabase
-    await supabase.auth.signOut()
-  } catch (error) {
-    console.error('Sign out error:', error)
+    this.adminSession = null
+    console.log('🧹 Admin session cleared')
   }
-}
 
-/**
- * Create a new admin user (admin only)
- */
-export async function createAdminUser(
-  email: string, 
-  password: string, 
-  role: 'admin' | 'crew'
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = createClient()
-    
-    // Check if current user is admin
-    const isCurrentUserAdmin = await isAdmin()
-    if (!isCurrentUserAdmin) {
-      return { success: false, error: 'Only admins can create new admin users' }
-    }
+  async signIn(email: string, password: string): Promise<{ success: boolean; error?: string; user?: AdminUser }> {
+    try {
+      console.log('🔐 Admin sign in attempt for:', email)
 
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: email.toLowerCase().trim(),
-      password: password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/admin/login`
+      // First, verify this is an admin user
+      const { data: adminUser, error: adminError } = await this.supabase
+        .from('admin_users')
+        .select('*')
+        .eq('email', email.toLowerCase().trim())
+        .eq('is_active', true)
+        .single()
+
+      if (adminError || !adminUser) {
+        console.log('❌ Admin user not found:', email)
+        return { success: false, error: 'Invalid admin credentials' }
       }
-    })
 
-    if (authError || !authData.user) {
-      return { success: false, error: authError?.message || 'Failed to create user' }
-    }
-
-    // Get current admin user ID
-    const currentAdmin = await getCurrentAdminUser()
-    if (!currentAdmin) {
-      return { success: false, error: 'Current admin user not found' }
-    }
-
-    // Create admin user record
-    const { error: adminError } = await supabase
-      .from('admin_users')
-      .insert({
-        user_id: authData.user.id,
+      // Create a separate Supabase client for admin auth
+      const adminSupabase = createClient()
+      
+      // Sign in with Supabase Auth
+      const { data: authData, error: authError } = await adminSupabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
-        role: role,
-        is_active: true,
-        created_by: currentAdmin.user_id
+        password: password
       })
 
-    if (adminError) {
-      return { success: false, error: adminError.message }
+      if (authError || !authData.user) {
+        console.log('❌ Admin auth failed:', authError?.message)
+        return { success: false, error: 'Invalid email or password' }
+      }
+
+      // Verify the auth user matches the admin user
+      if (authData.user.id !== adminUser.user_id) {
+        console.log('❌ User ID mismatch')
+        await adminSupabase.auth.signOut()
+        return { success: false, error: 'Authentication mismatch' }
+      }
+
+      // Save admin session
+      const adminSessionData: AdminUser = {
+        id: adminUser.user_id,
+        email: adminUser.email,
+        name: adminUser.name,
+        role: adminUser.role,
+        branch_id: adminUser.branch_id,
+        is_active: adminUser.is_active
+      }
+
+      this.saveSessionToStorage(adminSessionData)
+      console.log('✅ Admin sign in successful:', adminUser.email)
+
+      return { success: true, user: adminSessionData }
+
+    } catch (error) {
+      console.error('Admin sign in error:', error)
+      return { success: false, error: 'An unexpected error occurred' }
     }
+  }
 
-    return { success: true }
+  async signOut(): Promise<void> {
+    try {
+      console.log('🚪 Admin sign out')
+      
+      // Sign out from Supabase
+      await this.supabase.auth.signOut()
+      
+      // Clear admin session
+      this.clearSession()
+      
+      console.log('✅ Admin sign out successful')
+    } catch (error) {
+      console.error('Admin sign out error:', error)
+      // Clear session anyway
+      this.clearSession()
+    }
+  }
 
-  } catch (error) {
-    console.error('Create admin user error:', error)
-    return { success: false, error: 'Failed to create admin user' }
+  getCurrentUser(): AdminUser | null {
+    return this.adminSession
+  }
+
+  isSignedIn(): boolean {
+    return this.adminSession !== null && this.adminSession.is_active
+  }
+
+  hasRole(role: 'admin' | 'crew'): boolean {
+    return this.isSignedIn() && this.adminSession?.role === role
+  }
+
+  isAdmin(): boolean {
+    return this.hasRole('admin')
+  }
+
+  isCrew(): boolean {
+    return this.hasRole('crew')
   }
 }
 
-/**
- * Update admin user status (admin only)
- */
-export async function updateAdminUserStatus(
-  userId: string, 
-  isActive: boolean
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = createClient()
-    
-    // Check if current user is admin
-    const isCurrentUserAdmin = await isAdmin()
-    if (!isCurrentUserAdmin) {
-      return { success: false, error: 'Only admins can update admin users' }
-    }
+// Export singleton instance
+export const adminAuth = AdminAuthManager.getInstance()
 
-    const { error } = await supabase
-      .from('admin_users')
-      .update({ is_active: isActive, updated_at: new Date().toISOString() })
-      .eq('user_id', userId)
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    return { success: true }
-
-  } catch (error) {
-    console.error('Update admin user error:', error)
-    return { success: false, error: 'Failed to update admin user' }
-  }
-}
+// Export types
+export type { AdminUser }

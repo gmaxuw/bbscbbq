@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Users, Plus, Shield, UserCheck, UserX, Mail, Calendar } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
 import { createClient } from '@/lib/supabase'
-import { checkAdminAuth, createAdminUser, updateAdminUserStatus, AdminUser } from '@/lib/admin-auth'
+import { adminAuth, AdminUser } from '@/lib/admin-auth'
 
 export default function AdminUsersPage() {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
@@ -28,8 +28,8 @@ export default function AdminUsersPage() {
   // Check admin authentication
   useEffect(() => {
     const checkAuth = async () => {
-      const authResult = await checkAdminAuth()
-      if (!authResult.isAuthenticated || authResult.user?.role !== 'admin') {
+      // Check if admin is signed in
+      if (!adminAuth.isAdmin()) {
         router.push('/admin/login')
         return
       }
@@ -91,16 +91,25 @@ export default function AdminUsersPage() {
         return
       }
 
-      // Create admin user
-      const result = await createAdminUser(newUser.email, newUser.password, newUser.role)
+      // Create admin user directly in database
+      const { data, error } = await supabase
+        .from('admin_users')
+        .insert({
+          email: newUser.email.toLowerCase().trim(),
+          name: newUser.email.split('@')[0], // Use email prefix as name
+          role: newUser.role,
+          is_active: true
+        })
+        .select()
+        .single()
       
-      if (result.success) {
+      if (error) {
+        setError('Failed to create admin user: ' + error.message)
+      } else {
         setSuccess('Admin user created successfully!')
         setNewUser({ email: '', password: '', confirmPassword: '', role: 'crew' })
         setShowCreateForm(false)
         fetchAdminUsers()
-      } else {
-        setError(result.error || 'Failed to create admin user')
       }
     } catch (error) {
       console.error('Create user error:', error)
@@ -112,13 +121,16 @@ export default function AdminUsersPage() {
 
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      const result = await updateAdminUserStatus(userId, !currentStatus)
+      const { error } = await supabase
+        .from('admin_users')
+        .update({ is_active: !currentStatus })
+        .eq('id', userId)
       
-      if (result.success) {
+      if (error) {
+        setError('Failed to update user status: ' + error.message)
+      } else {
         setSuccess(`User ${!currentStatus ? 'activated' : 'deactivated'} successfully!`)
         fetchAdminUsers()
-      } else {
-        setError(result.error || 'Failed to update user status')
       }
     } catch (error) {
       console.error('Toggle user status error:', error)
@@ -316,7 +328,7 @@ export default function AdminUsersPage() {
                         <div className="flex items-center space-x-4 text-sm text-gray-500">
                           <div className="flex items-center space-x-1">
                             <Calendar className="w-4 h-4" />
-                            <span>Created {formatDate(user.created_at)}</span>
+                            <span>Created {user.created_at ? formatDate(user.created_at) : 'Unknown'}</span>
                           </div>
                         </div>
                       </div>
@@ -324,7 +336,7 @@ export default function AdminUsersPage() {
                     
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleToggleUserStatus(user.user_id, user.is_active)}
+                        onClick={() => handleToggleUserStatus(user.id, user.is_active)}
                         className={`px-3 py-1 rounded text-sm font-medium ${
                           user.is_active 
                             ? 'bg-red-100 text-red-800 hover:bg-red-200' 
