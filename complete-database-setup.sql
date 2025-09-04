@@ -142,6 +142,17 @@ CREATE TABLE IF NOT EXISTS promo_codes (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- USER CARTS TABLE (Cart Synchronization Across Devices)
+CREATE TABLE IF NOT EXISTS user_carts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, product_id)
+);
+
 -- SALES REPORTS TABLE (Commission Analytics)
 CREATE TABLE IF NOT EXISTS sales_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -223,6 +234,7 @@ DROP TRIGGER IF EXISTS trigger_set_order_number ON orders;
 DROP TRIGGER IF EXISTS update_products_updated_at ON products;
 DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
 DROP TRIGGER IF EXISTS hero_settings_updated_at ON hero_settings;
+DROP TRIGGER IF EXISTS update_user_carts_updated_at ON user_carts;
 
 -- Trigger to auto-generate order numbers
 CREATE TRIGGER trigger_set_order_number
@@ -239,6 +251,11 @@ CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders
 
 CREATE TRIGGER hero_settings_updated_at
   BEFORE UPDATE ON hero_settings
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_carts_updated_at
+  BEFORE UPDATE ON user_carts
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
@@ -261,6 +278,8 @@ CREATE INDEX IF NOT EXISTS idx_sales_reports_branch_id ON sales_reports(branch_i
 CREATE INDEX IF NOT EXISTS idx_sales_reports_date_range ON sales_reports(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_system_logs_log_type ON system_logs(log_type);
 CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_user_carts_user_id ON user_carts(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_carts_product_id ON user_carts(product_id);
 
 -- ========================================
 -- 6. ENABLE ROW LEVEL SECURITY
@@ -272,6 +291,7 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE promo_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_carts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_logs ENABLE ROW LEVEL SECURITY;
 
@@ -301,6 +321,10 @@ DROP POLICY IF EXISTS "Admin full access products" ON products;
 DROP POLICY IF EXISTS "Public product access" ON products;
 DROP POLICY IF EXISTS "Admin full access promo_codes" ON promo_codes;
 DROP POLICY IF EXISTS "Public promo code access" ON promo_codes;
+DROP POLICY IF EXISTS "Users can view their own cart" ON user_carts;
+DROP POLICY IF EXISTS "Users can insert their own cart items" ON user_carts;
+DROP POLICY IF EXISTS "Users can update their own cart items" ON user_carts;
+DROP POLICY IF EXISTS "Users can delete their own cart items" ON user_carts;
 DROP POLICY IF EXISTS "Admin full access sales_reports" ON sales_reports;
 DROP POLICY IF EXISTS "Admin full access system_logs" ON system_logs;
 
@@ -323,6 +347,19 @@ FOR SELECT USING (true);
 -- Public access for promo codes
 CREATE POLICY "Public promo code access" ON promo_codes 
 FOR SELECT USING (is_active = true);
+
+-- User cart policies (users can only access their own cart)
+CREATE POLICY "Users can view their own cart" ON user_carts
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own cart items" ON user_carts
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own cart items" ON user_carts
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own cart items" ON user_carts
+  FOR DELETE USING (auth.uid() = user_id);
 
 -- Orders policies - simplified to avoid conflicts
 CREATE POLICY "Allow order insertion" ON orders
