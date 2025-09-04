@@ -41,6 +41,22 @@ export default function ResetPasswordPage() {
       searchParams: Object.fromEntries(searchParams.entries())
     })
     
+    // Check for error parameters in the URL (like otp_expired)
+    const errorParam = urlParams.get('error')
+    const errorCode = urlParams.get('error_code')
+    const errorDescription = urlParams.get('error_description')
+    
+    if (errorParam) {
+      if (errorCode === 'otp_expired') {
+        setError('This password reset link has expired. Please request a new password reset.')
+      } else if (errorCode === 'access_denied') {
+        setError('Access denied. Please request a new password reset.')
+      } else {
+        setError(`Password reset error: ${errorDescription || errorParam}. Please request a new password reset.`)
+      }
+      return
+    }
+
     // For password reset, we need either access_token + refresh_token OR type=recovery
     // If neither is present, show error
     if ((!accessToken || !refreshToken) && type !== 'recovery') {

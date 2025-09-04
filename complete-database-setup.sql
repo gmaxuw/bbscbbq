@@ -382,7 +382,17 @@ INSERT INTO promo_codes (code, discount_type, discount_value, minimum_order, max
 ON CONFLICT (code) DO NOTHING;
 
 -- ========================================
--- 9. CREATE STORAGE BUCKETS
+-- 9. SETUP ADMIN USER
+-- ========================================
+
+-- IMPORTANT: Add admin role to your account
+-- Run this SQL command in Supabase SQL Editor after running this file:
+-- UPDATE auth.users 
+-- SET raw_user_meta_data = raw_user_meta_data || '{"role": "admin"}'::jsonb 
+-- WHERE email = 'gabu.sacro@gmail.com';
+
+-- ========================================
+-- 10. CREATE STORAGE BUCKETS
 -- ========================================
 
 -- Create payment screenshots bucket

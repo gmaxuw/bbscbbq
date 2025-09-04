@@ -33,7 +33,6 @@ export default function CheckoutPage() {
     name: string;
     address: string;
     phone: string;
-    manager_name: string;
   }>>([])
   const { items, getTotalPrice, clearCart } = useCart()
   const router = useRouter()
@@ -54,7 +53,7 @@ export default function CheckoutPage() {
       try {
         const { data, error } = await supabase
           .from('branches')
-          .select('id, name, address, phone, manager_name')
+          .select('id, name, address, phone')
           .eq('is_active', true)
           .order('created_at', { ascending: true })
 
