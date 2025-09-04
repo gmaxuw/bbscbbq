@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Plus, Shield, UserCheck, UserX, Mail, Calendar } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
-import { createClient } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 import { adminAuth, AdminUser } from '@/lib/admin-auth'
 
 export default function AdminUsersPage() {
@@ -23,7 +23,7 @@ export default function AdminUsersPage() {
   })
 
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClientComponentClient()
 
   // Check admin authentication
   useEffect(() => {

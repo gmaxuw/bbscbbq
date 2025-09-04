@@ -1,7 +1,8 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { createClient } from './supabase'
+import { createClientComponentClient } from './supabase'
+import { inventoryManager } from './inventory-manager'
 
 interface CartItem {
   id: string
@@ -22,6 +23,7 @@ interface CartContextType {
   getTotalItems: () => number
   getTotalPrice: () => number
   syncCartWithDatabase: () => Promise<void>
+  checkout: (customerData: { name: string; phone: string; branch_id?: string }) => Promise<{ success: boolean; order_id?: string; conflicts?: string[] }>
   isSyncing: boolean
 }
 
@@ -30,7 +32,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isSyncing, setIsSyncing] = useState(false)
-  const supabase = createClient()
+  const supabase = createClientComponentClient()
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -236,6 +238,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return items.reduce((total, item) => total + (item.price * item.quantity), 0)
   }
 
+  const checkout = async (customerData: { name: string; phone: string; branch_id?: string }) => {
+    if (items.length === 0) {
+      return { success: false, conflicts: ['Cart is empty'] }
+    }
+
+    try {
+      // Convert cart items to order items format
+      const orderItems = items.map(item => ({
+        product_id: item.id,
+        product_name: item.name,
+        quantity: item.quantity,
+        unit_price: item.price,
+        unit_commission: item.commission || 0,
+        subtotal: item.price * item.quantity
+      }))
+
+      // Process order through inventory manager
+      const result = await inventoryManager.processOrder({
+        items: orderItems,
+        customer_name: customerData.name,
+        customer_phone: customerData.phone,
+        branch_id: customerData.branch_id
+      })
+
+      if (result.success) {
+        // Clear cart on successful order
+        clearCart()
+      }
+
+      return result
+    } catch (error) {
+      console.error('Checkout failed:', error)
+      return { success: false, conflicts: ['Checkout failed. Please try again.'] }
+    }
+  }
+
   return (
     <CartContext.Provider
       value={{
@@ -247,6 +285,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         getTotalItems,
         getTotalPrice,
         syncCartWithDatabase,
+        checkout,
         isSyncing,
       }}
     >

@@ -19,7 +19,6 @@ import { useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, 
   ShoppingBag, 
-  Package, 
   Users, 
   Building2, 
   BarChart3, 
@@ -31,6 +30,7 @@ import {
   Bell,
   User
 } from 'lucide-react'
+import { createClientComponentClient } from '@/lib/supabase'
 
 interface AdminNavigationProps {
   currentPage?: string
@@ -41,13 +41,23 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const router = useRouter()
+  const supabase = createClientComponentClient()
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
 
   const handleLogout = async () => {
-    // TODO: Implement logout functionality
-    console.log('Logging out...')
-    router.push('/admin/login')
+    try {
+      console.log('🚪 Admin logging out from navigation...')
+      await supabase.auth.signOut()
+      // Clear any local storage
+      localStorage.clear()
+      // Redirect to login
+      router.push('/admin/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Force redirect even if logout fails
+      router.push('/admin/login')
+    }
   }
 
   const navigationItems = [
@@ -62,12 +72,6 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
       href: '/admin/orders',
       icon: ShoppingBag,
       description: 'Manage orders and payments'
-    },
-    {
-      name: 'Products',
-      href: '/admin/products',
-      icon: Package,
-      description: 'Manage menu items'
     },
     {
       name: 'Crew',
@@ -182,19 +186,13 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
                     >
                       Profile Settings
                     </Link>
-                    <Link
-                      href="/admin/settings"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    <button
+                      onClick={handleLogout}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      <hr className="my-1" />
-                      <button
-                        onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <LogOut className="inline w-4 h-4 mr-2" />
-                        Sign Out
-                      </button>
-                    </Link>
+                      <LogOut className="inline w-4 h-4 mr-2" />
+                      Sign Out
+                    </button>
                   </div>
                 )}
               </div>

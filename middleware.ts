@@ -22,16 +22,38 @@ export async function middleware(req: NextRequest) {
 
   if (isProtectedRoute) {
     try {
-      // TEMPORARY: Disable middleware protection to fix redirect loop
-      // Let the individual pages handle authentication
-      console.log('⚠️ Middleware: Temporarily disabled - letting page handle auth')
+      // Get the current session using the middleware client
+      const { data: { session } } = await supabase.auth.getSession()
       
-      // TODO: Re-enable once we figure out the correct cookie names
-      // const accessToken = req.cookies.get('sb-access-token')
-      // const refreshToken = req.cookies.get('sb-refresh-token')
+      if (!session) {
+        console.log('🚫 Middleware: No session found, redirecting to login')
+        const redirectUrl = new URL('/admin/login', req.url)
+        redirectUrl.searchParams.set('redirect', req.nextUrl.pathname)
+        return NextResponse.redirect(redirectUrl)
+      }
+
+      // Verify the user has admin/crew role
+      const { data: adminUser, error } = await supabase
+        .from('admin_users')
+        .select('role, is_active')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .single()
+
+      if (error || !adminUser) {
+        console.log('🚫 Middleware: User not found in admin_users table')
+        const redirectUrl = new URL('/admin/login', req.url)
+        redirectUrl.searchParams.set('error', 'unauthorized')
+        return NextResponse.redirect(redirectUrl)
+      }
+
+      console.log('✅ Middleware: User authenticated and authorized:', adminUser.role)
       
     } catch (error) {
       console.error('Middleware error:', error)
+      const redirectUrl = new URL('/admin/login', req.url)
+      redirectUrl.searchParams.set('error', 'server_error')
+      return NextResponse.redirect(redirectUrl)
     }
   }
 

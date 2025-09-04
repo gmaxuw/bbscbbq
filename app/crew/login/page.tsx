@@ -32,7 +32,9 @@ export default function CrewLogin() {
   const router = useRouter()
 
   useEffect(() => {
-    // Check online status
+    // Check online status - only on client side
+    if (typeof window === 'undefined') return
+    
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
     

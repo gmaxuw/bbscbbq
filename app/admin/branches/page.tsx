@@ -34,7 +34,7 @@ import {
   Globe,
   Star
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Branch {
@@ -77,6 +77,7 @@ export default function BranchManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     checkAuth()
@@ -92,19 +93,22 @@ export default function BranchManagement() {
       }
 
       // Verify admin role by email (more reliable)
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('role, full_name')
-        .eq('email', user.email)
+      // Check if user is admin using admin_users table
+      const { data: adminUser, error } = await supabase
+        .from('admin_users')
+        .select('role, name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .single()
 
-      if (error || userData?.role !== 'admin') {
+      if (error || !adminUser || adminUser.role !== 'admin') {
+        console.log('❌ User not found in admin_users or not admin role')
         await supabase.auth.signOut()
         router.push('/admin/login')
         return
       }
 
-      setUser(userData)
+      setUser({ role: adminUser.role, full_name: adminUser.name })
     } catch (error) {
       console.error('Auth check failed:', error)
       router.push('/admin/login')
@@ -123,22 +127,26 @@ export default function BranchManagement() {
 
       if (branchError) throw branchError
 
-      // Load crew count for each branch
+      // Load crew count for each branch from admin_users table
       const { data: crewData, error: crewError } = await supabase
-        .from('users')
+        .from('admin_users')
         .select('branch_id')
         .eq('role', 'crew')
         .eq('is_active', true)
 
-      if (crewError) throw crewError
+      if (crewError) {
+        console.log('No crew data available yet:', crewError)
+      }
 
-      // Load order count and revenue for each branch
+      // Load order count and revenue for each branch (simplified for now)
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('branch_id, total_amount')
         .eq('order_status', 'completed')
 
-      if (orderError) throw crewError
+      if (orderError) {
+        console.log('No order data available yet:', orderError)
+      }
 
       // Process branch data with counts
       const branchesWithStats = branchData?.map(branch => {
@@ -157,15 +165,25 @@ export default function BranchManagement() {
 
       setBranches(branchesWithStats)
 
-      // Load all crew members for assignment
+      // Load all crew members for assignment from admin_users table
       const { data: allCrewData, error: allCrewError } = await supabase
-        .from('users')
-        .select('id, full_name, email, is_active')
+        .from('admin_users')
+        .select('user_id, name, email, is_active')
         .eq('role', 'crew')
-        .order('full_name')
+        .order('name')
 
-      if (allCrewError) throw allCrewError
-      setCrewMembers(allCrewData || [])
+      if (allCrewError) {
+        console.log('No crew members available yet:', allCrewError)
+        setCrewMembers([])
+      } else {
+        const crewMembers = allCrewData?.map(crew => ({
+          id: crew.user_id,
+          full_name: crew.name,
+          email: crew.email,
+          is_active: crew.is_active
+        })) || []
+        setCrewMembers(crewMembers)
+      }
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {

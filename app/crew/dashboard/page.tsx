@@ -96,6 +96,9 @@ export default function CrewDashboard() {
   }, [orders, statusFilter])
 
   const setupOnlineStatus = () => {
+    // Only setup on client side
+    if (typeof window === 'undefined') return
+    
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
     

@@ -124,14 +124,17 @@ export async function syncOfflineOrders(supabase: any): Promise<void> {
 
 // Listen for online/offline events
 export function setupOfflineListener(supabase: any): void {
-  window.addEventListener('online', () => {
-    console.log('Connection restored, syncing offline orders...')
-    syncOfflineOrders(supabase)
-  })
+  // Only setup listeners on client side
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => {
+      console.log('Connection restored, syncing offline orders...')
+      syncOfflineOrders(supabase)
+    })
 
-  window.addEventListener('offline', () => {
-    console.log('Connection lost, orders will be stored offline')
-  })
+    window.addEventListener('offline', () => {
+      console.log('Connection lost, orders will be stored offline')
+    })
+  }
 }
 
 // Get offline orders count

@@ -36,7 +36,7 @@ import {
   CreditCard,
   Image as ImageIcon
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Order {
@@ -90,6 +90,7 @@ export default function OrderManagement() {
   const [paymentFilter, setPaymentFilter] = useState('all')
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     checkAuth()

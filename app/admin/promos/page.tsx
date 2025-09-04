@@ -35,7 +35,7 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface PromoCode {
@@ -89,6 +89,7 @@ export default function PromoCodeManagement() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     checkAuth()
@@ -104,19 +105,22 @@ export default function PromoCodeManagement() {
       }
 
       // Verify admin role by email (more reliable)
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('role, full_name')
-        .eq('email', user.email)
+      // Check if user is admin using admin_users table
+      const { data: adminUser, error } = await supabase
+        .from('admin_users')
+        .select('role, name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .single()
 
-      if (error || userData?.role !== 'admin') {
+      if (error || !adminUser || adminUser.role !== 'admin') {
+        console.log('❌ User not found in admin_users or not admin role')
         await supabase.auth.signOut()
         router.push('/admin/login')
         return
       }
 
-      setUser(userData)
+      setUser({ role: adminUser.role, full_name: adminUser.name })
     } catch (error) {
       console.error('Auth check failed:', error)
       router.push('/admin/login')

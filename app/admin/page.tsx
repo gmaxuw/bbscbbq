@@ -32,7 +32,7 @@ import {
   Settings,
   Tag
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 import { adminAuth } from '@/lib/admin-auth'
 import AdminLayout from '@/components/admin/AdminLayout'
 import Link from 'next/link'
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     checkAuth()
@@ -254,32 +254,11 @@ export default function AdminDashboard() {
             color="bg-lays-dark-red"
           />
           <QuickActionCard
-            title="Products"
-            description="Add, edit, or disable menu items"
-            icon={Package}
-            href="/admin/products"
+            title="Settings"
+            description="Configure all system settings"
+            icon={Settings}
+            href="/admin/settings"
             color="bg-lays-bright-red"
-          />
-          <QuickActionCard
-            title="Crew Management"
-            description="Monitor attendance and assignments"
-            icon={Users}
-            href="/admin/crew"
-            color="bg-lays-orange-gold"
-          />
-          <QuickActionCard
-            title="Branch Management"
-            description="Manage all branch locations"
-            icon={MapPin}
-            href="/admin/branches"
-            color="bg-lays-brown-gold"
-          />
-          <QuickActionCard
-            title="Promo Codes"
-            description="Manage discounts and offers"
-            icon={Tag}
-            href="/admin/promos"
-            color="bg-lays-orange-gold"
           />
           <QuickActionCard
             title="Analytics"

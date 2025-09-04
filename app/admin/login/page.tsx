@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Shield, LogIn, ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
-import { createClient } from '@/lib/supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 
 export default function AdminLoginPage() {
   const [loginData, setLoginData] = useState({
@@ -28,7 +28,7 @@ export default function AdminLoginPage() {
   const [isRegistering, setIsRegistering] = useState(false)
   
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClientComponentClient()
 
   // Check for existing session on page load
   useEffect(() => {

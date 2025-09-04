@@ -14,6 +14,7 @@
  */
 
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createClientComponentClient as createSupabaseClientComponent } from '@supabase/auth-helpers-nextjs'
 
 // Environment variables for Supabase configuration
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -67,6 +68,9 @@ export const supabase = hasValidEnvVars
 
 // Export createClient function for new pages
 export const createClient = () => supabase
+
+// Export cookie-based client for components (handles cookies automatically)
+export const createClientComponentClient = createSupabaseClientComponent
 
 // Database table names for type safety
 export const TABLES = {
