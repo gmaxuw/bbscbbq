@@ -30,7 +30,7 @@ import {
   Bell,
   User
 } from 'lucide-react'
-import { createClientComponentClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 
 interface AdminNavigationProps {
   currentPage?: string
@@ -41,7 +41,7 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
 
@@ -72,12 +72,6 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
       href: '/admin/orders',
       icon: ShoppingBag,
       description: 'Manage orders and payments'
-    },
-    {
-      name: 'Crew',
-      href: '/admin/crew',
-      icon: Users,
-      description: 'Manage staff and attendance'
     },
     {
       name: 'Branches',

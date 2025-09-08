@@ -40,7 +40,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="shortcut icon" href="/favicon.svg" />
       </head>
-      <body className="font-bbq-body bg-white text-gray-900 antialiased">
+      <body className="font-bbq-body bg-white text-gray-900 antialiased" suppressHydrationWarning={true}>
         <DesignLock pageName="Global Layout" />
         <CartProvider>
           {children}

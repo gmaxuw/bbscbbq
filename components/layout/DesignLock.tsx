@@ -105,6 +105,7 @@ export default function DesignLock({ pageName, allowedComponents = [] }: DesignL
       
       // Borders
       'border', 'border-0', 'border-2', 'border-4', 'border-8',
+      'border-b', 'border-b-2', 'border-t', 'border-t-2', 'border-l', 'border-l-2', 'border-r', 'border-r-2',
       'border-gray-100', 'border-gray-200', 'border-gray-300', 'border-gray-400',
       'border-white', 'border-transparent',
       'rounded', 'rounded-sm', 'rounded-md', 'rounded-lg', 'rounded-xl', 'rounded-2xl', 'rounded-full',

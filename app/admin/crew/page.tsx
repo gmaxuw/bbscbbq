@@ -31,7 +31,7 @@ import {
   UserPlus,
   LogOut
 } from 'lucide-react'
-import { createClientComponentClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface CrewMember {
@@ -82,7 +82,7 @@ export default function CrewManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   useEffect(() => {
     checkAuth()

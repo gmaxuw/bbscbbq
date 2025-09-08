@@ -35,7 +35,7 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react'
-import { createClientComponentClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface PromoCode {
@@ -89,7 +89,7 @@ export default function PromoCodeManagement() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   useEffect(() => {
     checkAuth()

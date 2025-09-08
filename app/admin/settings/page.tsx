@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Save, Eye, RefreshCw, Image, Type, Settings, Star, MapPin, Clock, ShoppingCart, ArrowLeft, Plus, Edit, Trash2, Search, Users, Phone, Mail, EyeOff, DollarSign, User, ImageIcon, X, Upload, Package, DollarSign as DollarSignIcon, TrendingUp, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { Save, Eye, RefreshCw, Image, Type, Settings, Star, MapPin, Clock, ShoppingCart, ArrowLeft, Plus, Edit, Trash2, Search, Users, Phone, Mail, EyeOff, DollarSign, User, ImageIcon, X, Upload, Package, DollarSign as DollarSignIcon, TrendingUp, CheckCircle, XCircle, AlertTriangle, Calendar, FileText } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeroSettings {
@@ -60,11 +61,13 @@ interface ProductImage {
 }
 
 export default function AdminSettingsPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [settings, setSettings] = useState<HeroSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-  const [activeTab, setActiveTab] = useState<'general' | 'profile' | 'branches' | 'crew' | 'products' | 'promos' | 'images' | 'features' | 'preview'>('general')
+  const [activeTab, setActiveTab] = useState<'products' | 'branches' | 'crew' | 'profile' | 'general' | 'promos'>('products')
   
   // Branch Management State
   const [branches, setBranches] = useState<any[]>([])
@@ -101,7 +104,210 @@ export default function AdminSettingsPage() {
     is_available: true
   })
 
+  // Crew Management State
+  const [crewMembers, setCrewMembers] = useState<any[]>([])
+  const [filteredCrewMembers, setFilteredCrewMembers] = useState<any[]>([])
+  const [crewSearchTerm, setCrewSearchTerm] = useState('')
+  const [crewStatusFilter, setCrewStatusFilter] = useState('all')
+  const [showAddCrewForm, setShowAddCrewForm] = useState(false)
+  const [editingCrew, setEditingCrew] = useState<any>(null)
+  const [crewFormData, setCrewFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    branch_id: '',
+    role: 'crew'
+  })
+
   // Branch Management Functions
+  const loadBranches = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('branches')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setBranches(data || [])
+    } catch (error) {
+      console.error('Failed to load branches:', error)
+    }
+  }
+
+  const loadProducts = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setProducts(data || [])
+    } catch (error) {
+      console.error('Failed to load products:', error)
+    }
+  }
+
+  // Crew Management Functions
+  const loadCrewMembers = async () => {
+    try {
+      const supabase = createClient()
+      
+      // Load crew members from admin_users table
+      const { data: crewUsers, error: crewError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('role', 'crew')
+        .order('created_at', { ascending: false })
+
+      if (crewError) throw crewError
+
+      const crewWithBranchNames = await Promise.all(
+        (crewUsers || []).map(async (crewUser) => {
+          let branchName = 'No Branch Assigned'
+          let attendance_today = null
+          
+          if (crewUser.branch_id) {
+            const { data: branchData } = await supabase
+              .from('branches')
+              .select('name')
+              .eq('id', crewUser.branch_id)
+              .single()
+            branchName = branchData?.name || 'Unknown Branch'
+          }
+
+
+          return {
+            id: crewUser.id, // admin_users.id for deletion
+            user_id: crewUser.user_id, // auth user_id
+            email: crewUser.email,
+            full_name: crewUser.name,
+            role: crewUser.role,
+            branch_id: crewUser.branch_id,
+            branch_name: branchName,
+            is_active: crewUser.is_active,
+            created_at: crewUser.created_at
+          }
+        })
+      )
+
+      setCrewMembers(crewWithBranchNames)
+    } catch (error) {
+      console.error('Failed to load crew members:', error)
+    }
+  }
+
+  const filterCrewMembers = () => {
+    let filtered = crewMembers
+
+    if (crewSearchTerm) {
+      filtered = filtered.filter(crew =>
+        crew.full_name && crew.full_name.toLowerCase().includes(crewSearchTerm.toLowerCase()) ||
+        crew.email && crew.email.toLowerCase().includes(crewSearchTerm.toLowerCase())
+      )
+    }
+
+    if (crewStatusFilter !== 'all') {
+      if (crewStatusFilter === 'active') {
+        filtered = filtered.filter(crew => crew.is_active)
+      } else if (crewStatusFilter === 'inactive') {
+        filtered = filtered.filter(crew => !crew.is_active)
+      } else if (crewStatusFilter === 'on_duty') {
+        filtered = filtered.filter(crew => crew.is_active && crew.attendance_today)
+      }
+    }
+
+    setFilteredCrewMembers(filtered)
+  }
+
+  const openEditCrew = (crew: any) => {
+    setEditingCrew(crew)
+    setCrewFormData({
+      name: crew.full_name || '',
+      email: crew.email || '',
+      password: '',
+      branch_id: crew.branch_id || '',
+      role: crew.role || 'crew'
+    })
+    loadBranches() // Ensure branches are loaded before opening form
+    setShowAddCrewForm(true)
+  }
+
+  const toggleCrewStatus = async (crewId: string, currentStatus: boolean) => {
+    try {
+      const supabase = createClient()
+      
+      // Validate crewId is a valid UUID
+      if (!crewId || crewId === 'null' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(crewId)) {
+        console.error('Invalid crew ID:', crewId)
+        setMessage('Invalid crew member ID. Please try again.')
+        return
+      }
+      
+      const { error } = await supabase
+        .from('admin_users')
+        .update({
+          is_active: !currentStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', crewId) // Use the admin_users.id
+
+      if (error) {
+        console.error('Error toggling crew status:', error)
+        setMessage(`Failed to update crew status: ${error.message}`)
+        return
+      }
+      
+      setMessage(`Crew member ${!currentStatus ? 'activated' : 'deactivated'} successfully!`)
+      setTimeout(() => setMessage(''), 3000)
+      await loadCrewMembers()
+    } catch (error) {
+      console.error('Failed to toggle crew status:', error)
+      setMessage('Failed to update crew status. Please try again.')
+    }
+  }
+
+  const deleteCrewMember = async (crewId: string, crewEmail: string) => {
+    if (!confirm(`Are you sure you want to delete this crew member? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      
+      // Validate crewId is a valid UUID
+      if (!crewId || crewId === 'null' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(crewId)) {
+        console.error('Invalid crew ID:', crewId)
+        setMessage('Invalid crew member ID. Please try again.')
+        return
+      }
+      
+      // Delete from admin_users table using the correct UUID
+      const { error: deleteError } = await supabase
+        .from('admin_users')
+        .delete()
+        .eq('id', crewId)
+
+      if (deleteError) {
+        console.error('Error deleting crew from admin_users:', deleteError)
+        setMessage(`Failed to delete crew member: ${deleteError.message}`)
+        return
+      }
+
+      setMessage('Crew member deleted successfully!')
+      setTimeout(() => setMessage(''), 5000)
+      
+      // Reload crew members
+      await loadCrewMembers()
+    } catch (error) {
+      console.error('Failed to delete crew member:', error)
+      setMessage('Failed to delete crew member. Please try again.')
+    }
+  }
+
+
   const filterBranches = () => {
     let filtered = branches
 
@@ -120,12 +326,25 @@ export default function AdminSettingsPage() {
   }
 
   useEffect(() => {
+    // Get tab from URL parameter on initial load
+    const tab = searchParams.get('tab') as 'products' | 'branches' | 'crew' | 'profile' | 'general'
+    if (tab && ['products', 'branches', 'crew', 'profile', 'general'].includes(tab)) {
+      setActiveTab(tab)
+    }
+    
     fetchSettings()
+  }, [searchParams])
+
+  useEffect(() => {
     if (activeTab === 'branches') {
       loadBranches()
     }
     if (activeTab === 'products') {
       loadProducts()
+    }
+    if (activeTab === 'crew') {
+      loadCrewMembers()
+      loadBranches() // Load branches for crew assignment dropdown
     }
   }, [activeTab])
 
@@ -159,6 +378,10 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     filterProducts()
   }, [products, productSearchTerm, productStatusFilter])
+
+  useEffect(() => {
+    filterCrewMembers()
+  }, [crewMembers, crewSearchTerm, crewStatusFilter])
 
   const fetchSettings = async () => {
     try {
@@ -267,21 +490,6 @@ export default function AdminSettingsPage() {
   }
 
   // Branch Management Functions
-  const loadBranches = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('branches')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setBranches(data || [])
-    } catch (error) {
-      console.error('Failed to load branches:', error)
-    }
-  }
-
   const openEditBranch = (branch: any) => {
     setEditingBranch(branch)
     setBranchFormData({
@@ -314,21 +522,6 @@ export default function AdminSettingsPage() {
   }
 
   // Product Management Functions
-  const loadProducts = async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setProducts(data || [])
-    } catch (error) {
-      console.error('Failed to load products:', error)
-    }
-  }
-
   const openEditProduct = (product: Product) => {
     setEditingProduct(product)
     setProductFormData({
@@ -449,6 +642,129 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const handleCrewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setMessage('')
+    
+    try {
+      const supabase = createClient()
+      
+      // Validate form data
+      if (!crewFormData.name.trim()) {
+        setMessage('Crew member name is required')
+        setSaving(false)
+        return
+      }
+      
+      if (!crewFormData.email.trim()) {
+        setMessage('Email is required')
+        setSaving(false)
+        return
+      }
+      
+      if (!crewFormData.branch_id) {
+        setMessage('Branch assignment is required')
+        setSaving(false)
+        return
+      }
+
+      console.log('Creating crew member with data:', {
+        name: crewFormData.name.trim(),
+        email: crewFormData.email.trim(),
+        branch_id: crewFormData.branch_id,
+        role: 'crew'
+      })
+
+      if (editingCrew) {
+        // Update existing crew member
+        const { error } = await supabase
+          .from('admin_users')
+          .update({
+            name: crewFormData.name.trim(),
+            email: crewFormData.email.trim(),
+            branch_id: crewFormData.branch_id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', editingCrew.id)
+
+        if (error) throw error
+        setMessage('Crew member updated successfully!')
+        await loadCrewMembers()
+      } else {
+        // Create new crew member
+        // Create auth user first
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: crewFormData.email.trim(),
+          password: crewFormData.password || 'temp123456', // Default password
+        })
+
+        if (authError) {
+          console.error('Auth error:', authError)
+          if (authError.message.includes('already registered')) {
+            setMessage('This email is already registered. Please use a different email.')
+          } else {
+            setMessage('Failed to create crew account. Please try again.')
+          }
+          setSaving(false)
+          return
+        }
+
+        if (authData.user) {
+          // Create admin_users record
+          const { error: adminError } = await supabase
+            .from('admin_users')
+            .insert([{
+              user_id: authData.user.id,
+              email: crewFormData.email.trim(),
+              name: crewFormData.name.trim(),
+              role: 'crew',
+              branch_id: crewFormData.branch_id,
+              is_active: true // Active immediately
+            }])
+
+          if (adminError) throw adminError
+          setMessage('Crew member created successfully! They can login immediately.')
+          await loadCrewMembers()
+        }
+      }
+
+      // Close modal and reset form
+      setShowAddCrewForm(false)
+      setEditingCrew(null)
+      setCrewFormData({
+        name: '',
+        email: '',
+        password: '',
+        branch_id: '',
+        role: 'crew'
+      })
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setMessage(''), 3000)
+
+    } catch (error: any) {
+      console.error('Failed to save crew member:', error)
+      
+      // Provide more specific error messages
+      if (error?.message?.includes('duplicate key')) {
+        setMessage('Error: A crew member with this email already exists.')
+      } else if (error?.message?.includes('invalid email')) {
+        setMessage('Error: Please enter a valid email address.')
+      } else if (error?.message?.includes('foreign key')) {
+        setMessage('Error: Selected branch is invalid. Please refresh and try again.')
+      } else if (error?.code === '23505') {
+        setMessage('Error: A crew member with this email already exists.')
+      } else {
+        setMessage(`Error saving crew member: ${error?.message || 'Please try again.'}`)
+      }
+      
+      setTimeout(() => setMessage(''), 5000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -511,21 +827,25 @@ export default function AdminSettingsPage() {
         <div className="mb-8">
           <nav className="flex space-x-8">
                     {[
-          { id: 'general', label: 'General Settings', icon: Settings },
-          { id: 'profile', label: 'Profile Settings', icon: User },
-          { id: 'branches', label: 'Branch Management', icon: MapPin },
-          { id: 'crew', label: 'Crew Management', icon: Star },
           { id: 'products', label: 'Product Management', icon: ShoppingCart },
-          { id: 'promos', label: 'Promo Management', icon: Type },
-          { id: 'images', label: 'Images', icon: Image },
-          { id: 'features', label: 'Features', icon: Star },
-          { id: 'preview', label: 'Preview', icon: Eye }
+          { id: 'branches', label: 'Branch Management', icon: MapPin },
+          { id: 'crew', label: 'Crew Management', icon: Users },
+          { id: 'profile', label: 'Profile Settings', icon: User },
+          { id: 'general', label: 'General Settings', icon: Settings },
+          { id: 'promos', label: 'Promo Management', icon: Star }
         ].map((tab) => {
               const Icon = tab.icon
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as 'general' | 'profile' | 'branches' | 'crew' | 'products' | 'promos' | 'images' | 'features' | 'preview')}
+                  onClick={() => {
+                    const newTab = tab.id as 'products' | 'branches' | 'crew' | 'profile' | 'general' | 'promos'
+                    setActiveTab(newTab)
+                    // Update URL without page reload
+                    const url = new URL(window.location.href)
+                    url.searchParams.set('tab', newTab)
+                    window.history.replaceState({}, '', url.toString())
+                  }}
                   className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === tab.id
                       ? 'border-lays-dark-red text-lays-dark-red'
@@ -604,181 +924,154 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Images Tab */}
-        {activeTab === 'images' && (
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Hero Images</h2>
-            <div className="space-y-6">
-              {[
-                { key: 'image_1_url', label: 'Image 1 URL', placeholder: 'https://images.unsplash.com/...' },
-                { key: 'image_2_url', label: 'Image 2 URL', placeholder: 'https://images.unsplash.com/...' },
-                { key: 'image_3_url', label: 'Image 3 URL', placeholder: 'https://images.unsplash.com/...' }
-              ].map((image) => (
-                <div key={image.key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {image.label}
-                  </label>
-                                     <input
-                     type="url"
-                     value={(settings[image.key as keyof HeroSettings] as string) || ''}
-                     onChange={(e) => handleInputChange(image.key as keyof HeroSettings, e.target.value)}
-                     placeholder={image.placeholder}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
-                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Leave empty to use default fallback images
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Features Tab */}
-        {activeTab === 'features' && (
-          <div className="space-y-6">
-            {/* Button Settings */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                <ShoppingCart className="w-5 h-5 mr-2" />
-                Button Settings
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Button Text
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.button_text}
-                    onChange={(e) => handleInputChange('button_text', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Button Link
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.button_link}
-                    onChange={(e) => handleInputChange('button_link', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Feature Items */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                <Star className="w-5 h-5 mr-2" />
-                Feature Items
-              </h2>
-              <div className="flex items-center mb-4">
-                <input
-                  type="checkbox"
-                  checked={settings.show_features}
-                  onChange={(e) => handleInputChange('show_features', e.target.checked)}
-                  className="h-4 w-4 text-lays-dark-red focus:ring-lays-dark-red border-gray-300 rounded"
-                />
-                <label className="ml-2 text-sm text-gray-700">Show feature items</label>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Hero Images Section */}
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Hero Images</h3>
+              <div className="space-y-6">
                 {[
-                  { key: 'feature_1_text', label: 'Feature 1', icon: Clock },
-                  { key: 'feature_2_text', label: 'Feature 2', icon: MapPin },
-                  { key: 'feature_3_text', label: 'Feature 3', icon: Star }
-                ].map((feature) => {
-                  const Icon = feature.icon
-                  return (
-                    <div key={feature.key}>
-                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                        <Icon className="w-4 h-4 mr-2" />
-                        {feature.label}
-                      </label>
-                      <input
-                        type="text"
-                        value={settings[feature.key as keyof HeroSettings] as string}
-                        onChange={(e) => handleInputChange(feature.key as keyof HeroSettings, e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Trust Indicators */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Trust Indicators</h2>
-              <div className="flex items-center mb-4">
-                <input
-                  type="checkbox"
-                  checked={settings.show_trust_indicators}
-                  onChange={(e) => handleInputChange('show_trust_indicators', e.target.checked)}
-                  className="h-4 w-4 text-lays-dark-red focus:ring-lays-dark-red border-gray-300 rounded"
-                />
-                <label className="ml-2 text-sm text-gray-700">Show trust indicators</label>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                  { numberKey: 'trust_item_1_number', labelKey: 'trust_item_1_label', label: 'Item 1' },
-                  { numberKey: 'trust_item_2_number', labelKey: 'trust_item_2_label', label: 'Item 2' },
-                  { numberKey: 'trust_item_3_number', labelKey: 'trust_item_3_label', label: 'Item 3' }
-                ].map((item) => (
-                  <div key={item.numberKey} className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {item.label}
+                  { key: 'image_1_url', label: 'Image 1 URL', placeholder: 'https://images.unsplash.com/...' },
+                  { key: 'image_2_url', label: 'Image 2 URL', placeholder: 'https://images.unsplash.com/...' },
+                  { key: 'image_3_url', label: 'Image 3 URL', placeholder: 'https://images.unsplash.com/...' }
+                ].map((image) => (
+                  <div key={image.key}>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {image.label}
                     </label>
                     <input
-                      type="text"
-                      value={settings[item.numberKey as keyof HeroSettings] as string}
-                      onChange={(e) => handleInputChange(item.numberKey as keyof HeroSettings, e.target.value)}
-                      placeholder="Number/Value"
+                      type="url"
+                      value={(settings[image.key as keyof HeroSettings] as string) || ''}
+                      onChange={(e) => handleInputChange(image.key as keyof HeroSettings, e.target.value)}
+                      placeholder={image.placeholder}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
                     />
-                    <input
-                      type="text"
-                      value={settings[item.labelKey as keyof HeroSettings] as string}
-                      onChange={(e) => handleInputChange(item.labelKey as keyof HeroSettings, e.target.value)}
-                      placeholder="Label"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
-                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave empty to use default fallback images
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        )}
+            
+            {/* Features Section */}
+            <div className="mt-8 space-y-6">
+              {/* Button Settings */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  Button Settings
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Button Text
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.button_text}
+                      onChange={(e) => handleInputChange('button_text', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Button Link
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.button_link}
+                      onChange={(e) => handleInputChange('button_link', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
+                    />
+                  </div>
+                </div>
+              </div>
 
-        {/* Preview Tab */}
-        {activeTab === 'preview' && (
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Preview</h2>
-            <div className="bg-gray-100 rounded-lg p-4">
-              <div className="text-center text-gray-600">
-                <Eye className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-lg font-medium mb-2">Hero Section Preview</p>
-                <p className="text-sm">
-                  Title: <span className="font-semibold">{settings.title}</span>
-                </p>
-                <p className="text-sm">
-                  Subtitle: <span className="font-semibold">{settings.subtitle}</span>
-                </p>
-                <p className="text-sm">
-                  Button: <span className="font-semibold">{settings.button_text}</span>
-                </p>
-                <p className="text-xs text-gray-500 mt-4">
-                  Full preview will be available after saving changes
-                </p>
+              {/* Feature Items */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Star className="w-5 h-5 mr-2" />
+                  Feature Items
+                </h3>
+                <div className="flex items-center mb-4">
+                  <input
+                    type="checkbox"
+                    checked={settings.show_features}
+                    onChange={(e) => handleInputChange('show_features', e.target.checked)}
+                    className="h-4 w-4 text-lays-dark-red focus:ring-lays-dark-red border-gray-300 rounded"
+                  />
+                  <label className="ml-2 text-sm text-gray-700">Show feature items</label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {[
+                    { key: 'feature_1_text', label: 'Feature 1', icon: Clock },
+                    { key: 'feature_2_text', label: 'Feature 2', icon: MapPin },
+                    { key: 'feature_3_text', label: 'Feature 3', icon: Star }
+                  ].map((feature) => {
+                    const Icon = feature.icon
+                    return (
+                      <div key={feature.key}>
+                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                          <Icon className="w-4 h-4 mr-2" />
+                          {feature.label}
+                        </label>
+                        <input
+                          type="text"
+                          value={settings[feature.key as keyof HeroSettings] as string}
+                          onChange={(e) => handleInputChange(feature.key as keyof HeroSettings, e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Trust Indicators */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Trust Indicators</h3>
+                <div className="flex items-center mb-4">
+                  <input
+                    type="checkbox"
+                    checked={settings.show_trust_indicators}
+                    onChange={(e) => handleInputChange('show_trust_indicators', e.target.checked)}
+                    className="h-4 w-4 text-lays-dark-red focus:ring-lays-dark-red border-gray-300 rounded"
+                  />
+                  <label className="ml-2 text-sm text-gray-700">Show trust indicators</label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {[
+                    { numberKey: 'trust_item_1_number', labelKey: 'trust_item_1_label', label: 'Item 1' },
+                    { numberKey: 'trust_item_2_number', labelKey: 'trust_item_2_label', label: 'Item 2' },
+                    { numberKey: 'trust_item_3_number', labelKey: 'trust_item_3_label', label: 'Item 3' }
+                  ].map((item) => (
+                    <div key={item.numberKey} className="space-y-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {item.label}
+                      </label>
+                      <input
+                        type="text"
+                        value={settings[item.numberKey as keyof HeroSettings] as string}
+                        onChange={(e) => handleInputChange(item.numberKey as keyof HeroSettings, e.target.value)}
+                        placeholder="Number/Value"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
+                      />
+                      <input
+                        type="text"
+                        value={settings[item.labelKey as keyof HeroSettings] as string}
+                        onChange={(e) => handleInputChange(item.labelKey as keyof HeroSettings, e.target.value)}
+                        placeholder="Label"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         )}
+
+
 
         {/* Profile Settings Tab */}
         {activeTab === 'profile' && (
@@ -1003,13 +1296,193 @@ export default function AdminSettingsPage() {
         {/* Crew Management Tab */}
         {activeTab === 'crew' && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Crew Management</h2>
-            <div className="text-center py-12">
-              <Star className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Crew Management</h3>
-              <p className="text-gray-500 mb-4">Manage your staff members and crew</p>
-              <p className="text-sm text-gray-400">This section will be implemented soon</p>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Crew Management</h2>
+              <button
+                onClick={() => {
+                  loadBranches() // Ensure branches are loaded before opening form
+                  setShowAddCrewForm(true)
+                }}
+                className="px-4 py-2 bg-lays-orange-gold text-white rounded-lg hover:bg-lays-dark-red transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Crew Member</span>
+              </button>
             </div>
+
+            {/* Crew Count Summary */}
+            <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Users className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-blue-600">Total Crew</p>
+                    <p className="text-2xl font-bold text-blue-900">{crewMembers.length}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <CheckCircle className="w-8 h-8 text-green-600" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-green-600">Active</p>
+                    <p className="text-2xl font-bold text-green-900">
+                      {crewMembers.filter(c => c.is_active).length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Clock className="w-8 h-8 text-yellow-600" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-yellow-600">On Duty Today</p>
+                    <p className="text-2xl font-bold text-yellow-900">
+                      {crewMembers.filter(c => c.is_active && c.attendance_today).length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <MapPin className="w-8 h-8 text-purple-600" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-purple-600">Branches</p>
+                    <p className="text-2xl font-bold text-purple-900">
+                      {new Set(crewMembers.map(c => c.branch_id).filter(Boolean)).size}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Search and Filter */}
+            <div className="mb-6 flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search crew members..."
+                  value={crewSearchTerm}
+                  onChange={(e) => setCrewSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent w-full"
+                />
+              </div>
+              <select
+                value={crewStatusFilter}
+                onChange={(e) => setCrewStatusFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+              >
+                <option value="all">All Crew</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+                <option value="on_duty">On Duty Today</option>
+              </select>
+            </div>
+
+            {/* Crew Members List */}
+            <div className="space-y-4">
+              {filteredCrewMembers.map((crew) => (
+                <div key={crew.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">{crew.full_name}</h3>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          crew.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {crew.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <Mail className="w-4 h-4" />
+                          <span>{crew.email}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="w-4 h-4" />
+                          <span>{crew.branch_name}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <User className="w-4 h-4" />
+                          <span className="capitalize">{crew.role}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <User className="w-4 h-4" />
+                          <span className="text-green-600">
+                            Active Account
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-6 mt-3 text-sm text-gray-500">
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>Joined: {new Date(crew.created_at).toLocaleDateString()}</span>
+                        </div>
+                        {crew.attendance_today && crew.attendance_today.total_hours && (
+                          <div className="flex items-center space-x-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{crew.attendance_today.total_hours}h worked</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-2 ml-4">
+                      <button
+                        onClick={() => openEditCrew(crew)}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                      >
+                        <Edit className="w-4 h-4" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => toggleCrewStatus(crew.id, crew.is_active)}
+                        className={`px-3 py-2 rounded-lg transition-colors flex items-center space-x-1 ${
+                          crew.is_active
+                            ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                            : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
+                      >
+                        {crew.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        <span>{crew.is_active ? 'Deactivate' : 'Activate'}</span>
+                      </button>
+                      <button
+                        onClick={() => deleteCrewMember(crew.id, crew.email)}
+                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-1"
+                        title="Delete crew member permanently"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {filteredCrewMembers.length === 0 && (
+              <div className="text-center py-12">
+                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No crew members found</h3>
+                <p className="text-gray-500">Add your first crew member to get started</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -1427,6 +1900,151 @@ export default function AdminSettingsPage() {
                     className="px-4 py-2 bg-lays-orange-gold text-white rounded-lg hover:bg-lays-dark-red transition-colors"
                   >
                     {editingProduct ? 'Update Product' : 'Add Product'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Crew Add/Edit Modal */}
+      {showAddCrewForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {editingCrew ? 'Edit Crew Member' : 'Add New Crew Member'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowAddCrewForm(false)
+                    setEditingCrew(null)
+                    setCrewFormData({
+                      name: '',
+                      email: '',
+                      password: '',
+                      branch_id: '',
+                      role: 'crew'
+                    })
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCrewSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={crewFormData.name}
+                      onChange={(e) => setCrewFormData({...crewFormData, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={crewFormData.email}
+                      onChange={(e) => setCrewFormData({...crewFormData, email: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  {!editingCrew && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        value={crewFormData.password}
+                        onChange={(e) => setCrewFormData({...crewFormData, password: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        placeholder="Leave empty for default password"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Default password: temp123456 (crew can change after first login)
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Branch Assignment *
+                    </label>
+                    <select
+                      value={crewFormData.branch_id}
+                      onChange={(e) => setCrewFormData({...crewFormData, branch_id: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                      required
+                      disabled={branches.length === 0}
+                    >
+                      <option value="">
+                        {branches.length === 0 ? 'Loading branches...' : 'Select a branch'}
+                      </option>
+                      {branches.filter(branch => branch.is_active).map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                    {branches.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Loading available branches...
+                      </p>
+                    )}
+                    {branches.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Only active branches are shown
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddCrewForm(false)
+                      setEditingCrew(null)
+                      setCrewFormData({
+                        name: '',
+                        email: '',
+                        password: '',
+                        branch_id: '',
+                        role: 'crew'
+                      })
+                    }}
+                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={branches.length === 0 || saving}
+                    className="px-4 py-2 bg-lays-orange-gold text-white rounded-lg hover:bg-lays-dark-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin inline mr-2" />
+                        {editingCrew ? 'Updating...' : 'Adding...'}
+                      </>
+                    ) : (
+                      editingCrew ? 'Update Crew Member' : 'Add Crew Member'
+                    )}
                   </button>
                 </div>
               </form>

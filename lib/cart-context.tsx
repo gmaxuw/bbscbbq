@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { createClientComponentClient } from './supabase'
+import { createClient } from './supabase'
 import { inventoryManager } from './inventory-manager'
 
 interface CartItem {
@@ -32,33 +32,35 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isSyncing, setIsSyncing] = useState(false)
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   // Load cart from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedCart = localStorage.getItem('bbq-cart')
-      console.log('🛒 Loading cart from localStorage:', savedCart)
       if (savedCart) {
         try {
           const parsedCart = JSON.parse(savedCart)
-          console.log('🛒 Parsed cart:', parsedCart)
           setItems(parsedCart)
         } catch (error) {
           console.error('Failed to load cart from localStorage:', error)
         }
-      } else {
-        console.log('🛒 No saved cart found in localStorage')
       }
     }
   }, [])
 
-  // Sync cart with database when user logs in
+  // Sync cart with database when user logs in (skip on admin pages)
   useEffect(() => {
     const syncCart = async () => {
+      // Skip cart sync on admin pages
+      if (typeof window !== 'undefined' && 
+          (window.location.pathname.startsWith('/admin') || 
+           window.location.pathname.startsWith('/crew'))) {
+        return
+      }
+      
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        console.log('🛒 User logged in, syncing cart with database')
         await syncCartWithDatabase()
       }
     }
@@ -69,13 +71,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Save cart to localStorage whenever items change
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      console.log('🛒 Saving cart to localStorage:', items)
       localStorage.setItem('bbq-cart', JSON.stringify(items))
     }
   }, [items])
 
   // Sync cart with database
   const syncCartWithDatabase = async () => {
+    // Skip cart sync on admin pages
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+      console.log('🛒 Admin page detected, skipping cart sync')
+      return
+    }
+    
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       console.log('🛒 No user logged in, skipping database sync')
@@ -139,6 +146,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Upload local cart to database
   const uploadCartToDatabase = async (cartItems: CartItem[]) => {
+    // Skip cart sync on admin pages
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+      console.log('🛒 Admin page detected, skipping cart upload')
+      return
+    }
+    
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 

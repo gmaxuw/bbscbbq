@@ -36,14 +36,7 @@ export default function AccountPage() {
     favoriteItems: [] // This will be calculated from actual orders
   }
 
-  // Debug logging to see what's happening
-  console.log('Account Page Debug:', {
-    userName,
-    userEmail,
-    userPhone,
-    registerData,
-    userData
-  })
+  // Debug logging removed to prevent infinite re-rendering
 
   // Check for existing customer session on page load
   useEffect(() => {
@@ -52,11 +45,7 @@ export default function AccountPage() {
       const customerName = localStorage.getItem('customer_name')
       const customerPhone = localStorage.getItem('customer_phone')
       
-      console.log('localStorage Debug:', {
-        customerEmail,
-        customerName,
-        customerPhone
-      })
+      // localStorage data loaded successfully
       
       if (customerEmail) {
         setUserEmail(customerEmail)
@@ -64,11 +53,7 @@ export default function AccountPage() {
         setUserPhone(customerPhone || '')
         setIsLoggedIn(true)
         
-        console.log('Setting user data:', {
-          email: customerEmail,
-          name: customerName,
-          phone: customerPhone
-        })
+        // User data set from localStorage
       }
     }
   }, [])

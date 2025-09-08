@@ -150,12 +150,12 @@ export default function OrderConfirmationPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
           <h3 className="text-lg font-semibold text-blue-900 mb-2">Payment Information</h3>
           <p className="text-blue-800 mb-2">
-            Payment will be collected upon pickup. Please bring exact change or prepare your preferred payment method.
+            Payment verification in progress. Your order will be confirmed once payment is verified by our admin team.
           </p>
           <div className="text-sm text-blue-700">
-            <p>• Cash payments are accepted</p>
-            <p>• GCash payments are welcome</p>
-            <p>• Credit/Debit cards are accepted</p>
+            <p>• GCash payments with reference verification</p>
+            <p>• Bank Transfer with reference verification</p>
+            <p>• Manual verification process for all payments</p>
           </div>
         </div>
 

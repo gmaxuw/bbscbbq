@@ -88,9 +88,11 @@ export default function CustomerOrdersPage() {
     try {
       setIsLoading(true)
       
-      // Get current user's email from localStorage or session
+      // Get current user's email and phone from localStorage or session
       const userEmail = localStorage.getItem('customer_email') || 'demo@example.com'
+      const userPhone = localStorage.getItem('customer_phone') || ''
       
+      // Query orders by either email or phone number
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -108,7 +110,7 @@ export default function CustomerOrdersPage() {
             phone
           )
         `)
-        .eq('customer_email', userEmail)
+        .or(`customer_email.eq.${userEmail},customer_phone.eq.${userPhone}`)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -166,17 +168,84 @@ export default function CustomerOrdersPage() {
     switch (status) {
       case 'pending':
         return <Clock className="w-4 h-4" />
+      case 'confirmed':
+        return <CheckCircle className="w-4 h-4" />
       case 'preparing':
         return <Package className="w-4 h-4" />
       case 'ready':
         return <CheckCircle className="w-4 h-4" />
-      case 'delivered':
+      case 'completed':
         return <CheckCircle className="w-4 h-4" />
       case 'cancelled':
         return <XCircle className="w-4 h-4" />
       default:
         return <Clock className="w-4 h-4" />
     }
+  }
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'text-yellow-600 bg-yellow-100'
+      case 'paid':
+        return 'text-green-600 bg-green-100'
+      case 'cancelled':
+        return 'text-red-600 bg-red-100'
+      case 'refunded':
+        return 'text-gray-600 bg-gray-100'
+      default:
+        return 'text-gray-600 bg-gray-100'
+    }
+  }
+
+  const getPaymentStatusText = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Payment Pending'
+      case 'paid':
+        return 'Payment Verified'
+      case 'cancelled':
+        return 'Payment Cancelled'
+      case 'refunded':
+        return 'Payment Refunded'
+      default:
+        return status
+    }
+  }
+
+  const getPaymentStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Clock className="w-4 h-4" />
+      case 'paid':
+        return <CheckCircle className="w-4 h-4" />
+      case 'cancelled':
+        return <XCircle className="w-4 h-4" />
+      case 'refunded':
+        return <XCircle className="w-4 h-4" />
+      default:
+        return <Clock className="w-4 h-4" />
+    }
+  }
+
+  const getOrderProgressSteps = (order: Order) => {
+    const steps = [
+      { label: 'Order Placed', completed: true, current: false },
+      { label: 'Payment Verified', completed: order.payment_status === 'paid', current: order.payment_status === 'pending' },
+      { label: 'Preparing', completed: order.order_status === 'preparing' || order.order_status === 'ready' || order.order_status === 'completed', current: order.order_status === 'preparing' },
+      { label: 'Ready for Pickup', completed: order.order_status === 'ready' || order.order_status === 'completed', current: order.order_status === 'ready' },
+      { label: 'Completed', completed: order.order_status === 'completed', current: false }
+    ]
+
+    // If order is cancelled, show cancelled status
+    if (order.order_status === 'cancelled' || order.payment_status === 'cancelled') {
+      return [
+        { label: 'Order Placed', completed: true, current: false },
+        { label: 'Cancelled', completed: true, current: true }
+      ]
+    }
+
+    return steps
   }
 
   const formatDate = (dateString: string) => {
@@ -259,11 +328,20 @@ export default function CustomerOrdersPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.order_status)}`}>
-                      {getStatusIcon(order.order_status)}
-                      <span>{getStatusText(order.order_status)}</span>
+                    <div className="space-y-2">
+                      {/* Payment Status */}
+                      <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusColor(order.payment_status)}`}>
+                        {getPaymentStatusIcon(order.payment_status)}
+                        <span>{getPaymentStatusText(order.payment_status)}</span>
+                      </div>
+                      
+                      {/* Order Status */}
+                      <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.order_status)}`}>
+                        {getStatusIcon(order.order_status)}
+                        <span>{getStatusText(order.order_status)}</span>
+                      </div>
                     </div>
-                    <p className="text-lg font-bold text-gray-900 mt-1">
+                    <p className="text-lg font-bold text-gray-900 mt-2">
                       ₱{(order.total_amount || 0).toLocaleString()}
                     </p>
                   </div>
@@ -284,6 +362,38 @@ export default function CustomerOrdersPage() {
                       <Clock className="w-4 h-4 text-gray-400" />
                       <span>{formatDate(order.pickup_time)}</span>
                     </p>
+                  </div>
+                </div>
+
+                {/* Order Progress */}
+                <div className="mb-4">
+                  <h4 className="font-medium text-gray-900 mb-3">Order Progress</h4>
+                  <div className="flex items-center space-x-4">
+                    {getOrderProgressSteps(order).map((step, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                          step.completed 
+                            ? 'bg-green-500 text-white' 
+                            : step.current 
+                            ? 'bg-lays-orange-gold text-white' 
+                            : 'bg-gray-200 text-gray-500'
+                        }`}>
+                          {step.completed ? <CheckCircle className="w-4 h-4" /> : index + 1}
+                        </div>
+                        <span className={`text-sm ${
+                          step.completed || step.current 
+                            ? 'text-gray-900 font-medium' 
+                            : 'text-gray-500'
+                        }`}>
+                          {step.label}
+                        </span>
+                        {index < getOrderProgressSteps(order).length - 1 && (
+                          <div className={`w-8 h-0.5 ${
+                            step.completed ? 'bg-green-500' : 'bg-gray-200'
+                          }`} />
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -386,14 +496,51 @@ export default function CustomerOrdersPage() {
               </div>
 
               {/* Payment Info */}
-              {selectedOrder.payment_method === 'gcash' && (
+              {(selectedOrder.payment_method === 'gcash' || selectedOrder.payment_method === 'bank_transfer') && (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-2">GCash Payment</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">{selectedOrder.payment_method === 'gcash' ? 'GCash' : 'Bank Transfer'} Payment</h4>
                   {selectedOrder.gcash_reference && (
                     <p className="text-sm text-gray-600">
                       Reference: {selectedOrder.gcash_reference}
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* QR Code for Pickup */}
+              {selectedOrder.payment_status === 'paid' && selectedOrder.qr_code && (
+                <div className="mt-6 p-6 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-center">
+                    <h4 className="text-lg font-semibold text-green-900 mb-2">Pickup QR Code</h4>
+                    <p className="text-sm text-green-700 mb-4">
+                      Show this QR code when picking up your order
+                    </p>
+                    <div className="bg-white p-4 rounded-lg inline-block">
+                      <img 
+                        src={selectedOrder.qr_code} 
+                        alt="Pickup QR Code"
+                        className="w-48 h-48 mx-auto"
+                      />
+                    </div>
+                    <p className="text-xs text-green-600 mt-2">
+                      Order #{selectedOrder.order_number}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Pending Message */}
+              {selectedOrder.payment_status === 'pending' && (
+                <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-5 h-5 text-yellow-600" />
+                    <div>
+                      <h4 className="font-medium text-yellow-900">Payment Verification Pending</h4>
+                      <p className="text-sm text-yellow-700">
+                        Your payment is being verified by our admin team. You'll receive a QR code once verified.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

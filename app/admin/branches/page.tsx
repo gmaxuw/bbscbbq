@@ -34,7 +34,7 @@ import {
   Globe,
   Star
 } from 'lucide-react'
-import { createClientComponentClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Branch {
@@ -77,7 +77,7 @@ export default function BranchManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   useEffect(() => {
     checkAuth()

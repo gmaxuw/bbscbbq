@@ -32,7 +32,7 @@ import {
   Settings,
   Tag
 } from 'lucide-react'
-import { createClientComponentClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { adminAuth } from '@/lib/admin-auth'
 import AdminLayout from '@/components/admin/AdminLayout'
 import Link from 'next/link'
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   useEffect(() => {
     checkAuth()

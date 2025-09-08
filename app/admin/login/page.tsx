@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Shield, LogIn, ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
-import { createClientComponentClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 
 export default function AdminLoginPage() {
   const [loginData, setLoginData] = useState({
@@ -26,15 +26,26 @@ export default function AdminLoginPage() {
     confirmPassword: ''
   })
   const [isRegistering, setIsRegistering] = useState(false)
+  const [isRateLimited, setIsRateLimited] = useState(false)
   
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   // Check for existing session on page load
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        // If there's a session error (like rate limiting), skip auth check to prevent loops
+        if (sessionError && sessionError.code === 'over_request_rate_limit') {
+          console.log('⚠️ Admin session check: Rate limited, skipping auth check')
+          setIsRateLimited(true)
+          // Reset rate limit after 5 minutes
+          setTimeout(() => setIsRateLimited(false), 300000)
+          return
+        }
+        
         if (session?.user) {
           console.log('✅ Admin session found, checking role for:', session.user.id)
           
@@ -58,6 +69,7 @@ export default function AdminLoginPage() {
         }
       } catch (error) {
         console.error('Session check error:', error)
+        // Don't set rate limited on general errors
       }
     }
     
@@ -66,6 +78,13 @@ export default function AdminLoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Check if rate limited
+    if (isRateLimited) {
+      setError('Too many login attempts. Please wait 5 minutes before trying again.')
+      return
+    }
+    
     setIsLoading(true)
     setError('')
 
@@ -83,6 +102,16 @@ export default function AdminLoginPage() {
 
       if (authError || !authData.user) {
         console.error('❌ Admin auth failed:', authError?.message)
+        
+        // Handle rate limiting specifically
+        if (authError?.message.includes('Request rate limit reached') || authError?.message.includes('too many requests')) {
+          setIsRateLimited(true)
+          setError('Too many requests. Please wait 5 minutes before trying again.')
+          // Reset rate limit after 5 minutes
+          setTimeout(() => setIsRateLimited(false), 300000)
+          return
+        }
+        
         setError('Invalid email or password')
         return
       }
@@ -181,7 +210,7 @@ export default function AdminLoginPage() {
             full_name: registerData.fullName,
             role: 'admin'
           },
-          emailRedirectTo: `${window.location.origin}/admin/login`
+          emailRedirectTo: `${window.location.origin}/admin`
         }
       })
 
@@ -359,13 +388,18 @@ export default function AdminLoginPage() {
               
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isRateLimited}
                 className="bbq-button-primary w-full mt-6 flex items-center justify-center space-x-2"
               >
                 {isLoading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Signing In...</span>
+                  </>
+                ) : isRateLimited ? (
+                  <>
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Rate Limited - Wait 5 min</span>
                   </>
                 ) : (
                   <>

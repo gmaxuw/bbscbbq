@@ -40,6 +40,9 @@ interface Product {
   commission: number
   category: string
   is_active: boolean
+  stock_quantity: number
+  min_stock_level: number
+  is_out_of_stock: boolean
   image_url?: string
 }
 
@@ -74,6 +77,9 @@ export default function FeaturedMenu() {
             commission,
             category,
             is_active,
+            stock_quantity,
+            min_stock_level,
+            is_out_of_stock,
             created_at,
             image_url
           `)
@@ -118,7 +124,7 @@ export default function FeaturedMenu() {
     try {
       setIsLoadingMore(true)
       const nextPage = currentPage + 1
-      const { data, error } = await supabase
+              const { data, error } = await supabase
         .from('products')
         .select(`
           id,
@@ -128,6 +134,9 @@ export default function FeaturedMenu() {
           commission,
           category,
           is_active,
+          stock_quantity,
+          min_stock_level,
+          is_out_of_stock,
           created_at,
           image_url
         `)
@@ -204,6 +213,31 @@ export default function FeaturedMenu() {
     return 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=300&fit=crop&crop=center'
   }
 
+  // Get availability status for food business
+  const getAvailabilityStatus = (product: Product) => {
+    if (product.is_out_of_stock || product.stock_quantity === 0) {
+      return {
+        text: 'Sold Out',
+        color: 'bg-red-100 text-red-800',
+        icon: '❌'
+      }
+    }
+    
+    if (product.stock_quantity <= (product.min_stock_level || 5)) {
+      return {
+        text: 'Limited Portions',
+        color: 'bg-yellow-100 text-yellow-800',
+        icon: '⚠️'
+      }
+    }
+    
+    return {
+      text: 'Fresh Today',
+      color: 'bg-green-100 text-green-800',
+      icon: '✅'
+    }
+  }
+
   return (
     <section className="bbq-section bg-gradient-to-b from-gray-50 to-white">
       <div className="bbq-container">
@@ -266,6 +300,12 @@ export default function FeaturedMenu() {
                 <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm text-lays-dark-red font-bold text-lg px-3 py-2 rounded-lg">
                   ₱{item.price.toFixed(2)}
                 </div>
+
+                {/* Availability Badge */}
+                <div className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1 ${getAvailabilityStatus(item).color}`}>
+                  <span>{getAvailabilityStatus(item).icon}</span>
+                  <span>{getAvailabilityStatus(item).text}</span>
+                </div>
               </div>
 
               <div className="p-6">
@@ -300,7 +340,8 @@ export default function FeaturedMenu() {
                         e.stopPropagation()
                         updateQuantity(item.id, -1)
                       }}
-                      className="w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full flex items-center justify-center transition-colors duration-200"
+                      disabled={!quantities[item.id] || quantities[item.id] === 0 || item.is_out_of_stock || item.stock_quantity === 0}
+                      className="w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full flex items-center justify-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
@@ -314,7 +355,8 @@ export default function FeaturedMenu() {
                         e.stopPropagation()
                         updateQuantity(item.id, 1)
                       }}
-                      className="w-8 h-8 bg-lays-dark-red hover:bg-lays-bright-red text-white rounded-full flex items-center justify-center transition-colors duration-200"
+                      disabled={item.is_out_of_stock || item.stock_quantity === 0}
+                      className="w-8 h-8 bg-lays-dark-red hover:bg-lays-bright-red text-white rounded-full flex items-center justify-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -334,16 +376,22 @@ export default function FeaturedMenu() {
                     e.stopPropagation()
                     addToCart(item.id)
                   }}
-                  disabled={!quantities[item.id] || quantities[item.id] === 0}
+                  disabled={!quantities[item.id] || quantities[item.id] === 0 || item.is_out_of_stock || item.stock_quantity === 0}
                   className={`w-full font-semibold py-3 rounded-lg transition-all duration-300 transform ${
-                    addedItems[item.id]
+                    item.is_out_of_stock || item.stock_quantity === 0
+                      ? 'bg-red-200 text-red-600 cursor-not-allowed'
+                      : addedItems[item.id]
                       ? 'bg-green-500 text-white cursor-default'
                       : quantities[item.id] && quantities[item.id] > 0
                       ? 'bg-lays-dark-red hover:bg-lays-bright-red text-white hover:scale-105'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
                 >
-                  {addedItems[item.id] ? (
+                  {item.is_out_of_stock || item.stock_quantity === 0 ? (
+                    <span className="flex items-center justify-center">
+                      ❌ Sold Out
+                    </span>
+                  ) : addedItems[item.id] ? (
                     <span className="flex items-center justify-center">
                       <ShoppingCart className="w-5 h-5 mr-2" />
                       Added to Cart!

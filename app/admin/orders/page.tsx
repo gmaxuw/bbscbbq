@@ -36,7 +36,7 @@ import {
   CreditCard,
   Image as ImageIcon
 } from 'lucide-react'
-import { createClientComponentClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Order {
@@ -90,7 +90,7 @@ export default function OrderManagement() {
   const [paymentFilter, setPaymentFilter] = useState('all')
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   useEffect(() => {
     checkAuth()
@@ -268,7 +268,7 @@ export default function OrderManagement() {
         })
       }
 
-      console.log(`✅ GCash payment verified for order ${orderId}`)
+      console.log(`✅ Payment verified for order ${orderId}`)
     } catch (error) {
       console.error('❌ Failed to verify payment:', error)
       alert('Failed to verify payment. Please try again.')
@@ -304,6 +304,38 @@ export default function OrderManagement() {
       case 'ready': return <CheckCircle className="w-4 h-4" />
       case 'completed': return <CheckCircle className="w-4 h-4" />
       case 'cancelled': return <XCircle className="w-4 h-4" />
+      default: return <Clock className="w-4 h-4" />
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Pending'
+      case 'confirmed': return 'Confirmed'
+      case 'preparing': return 'Preparing'
+      case 'ready': return 'Ready'
+      case 'completed': return 'Completed'
+      case 'cancelled': return 'Cancelled'
+      default: return status
+    }
+  }
+
+  const getPaymentStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Payment Pending'
+      case 'paid': return 'Payment Verified'
+      case 'cancelled': return 'Payment Cancelled'
+      case 'refunded': return 'Payment Refunded'
+      default: return status
+    }
+  }
+
+  const getPaymentStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending': return <Clock className="w-4 h-4" />
+      case 'paid': return <CheckCircle className="w-4 h-4" />
+      case 'cancelled': return <XCircle className="w-4 h-4" />
+      case 'refunded': return <XCircle className="w-4 h-4" />
       default: return <Clock className="w-4 h-4" />
     }
   }
@@ -474,7 +506,7 @@ export default function OrderManagement() {
                         {order.payment_status}
                       </span>
                       <div className="text-xs text-gray-500">
-                        {order.payment_method === 'gcash' ? 'GCash' : order.payment_method}
+                        {order.payment_method === 'gcash' ? 'GCash' : order.payment_method === 'bank_transfer' ? 'Bank Transfer' : order.payment_method}
                       </div>
                       {order.gcash_reference && (
                         <div className="text-xs text-gray-500 font-mono">
@@ -490,26 +522,77 @@ export default function OrderManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                    <div className="flex flex-col space-y-2">
+                      {/* View Details Button */}
                       <button
                         onClick={() => {
                           setSelectedOrder(order)
                           setShowOrderModal(true)
                         }}
-                        className="text-lays-orange-gold hover:text-lays-dark-red"
-                        title="View Order Details"
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-lays-orange-gold bg-orange-50 hover:bg-orange-100 rounded-md transition-colors"
+                        title="View order details"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3 h-3 mr-1" />
+                        View Details
                       </button>
-                      {order.payment_status === 'pending' && (
-                        <button
-                          onClick={() => verifyPayment(order.id)}
-                          className="text-green-600 hover:text-green-800"
-                          title="Verify Payment"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col space-y-1">
+                        {order.payment_status === 'pending' && (
+                          <button
+                            onClick={() => verifyPayment(order.id)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                            title="Verify payment after checking reference number and screenshot"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Verify Payment
+                          </button>
+                        )}
+                        
+                        {order.payment_status === 'paid' && order.order_status === 'pending' && (
+                          <button
+                            onClick={() => updateOrderStatus(order.id, 'confirmed')}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                            title="Confirm order and start preparation"
+                          >
+                            <Clock className="w-3 h-3 mr-1" />
+                            Start Prep
+                          </button>
+                        )}
+                        
+                        {order.order_status === 'confirmed' && (
+                          <button
+                            onClick={() => updateOrderStatus(order.id, 'preparing')}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded transition-colors"
+                            title="Mark as preparing"
+                          >
+                            <Clock className="w-3 h-3 mr-1" />
+                            Cooking
+                          </button>
+                        )}
+                        
+                        {order.order_status === 'preparing' && (
+                          <button
+                            onClick={() => updateOrderStatus(order.id, 'ready')}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                            title="Mark as ready for pickup"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Ready
+                          </button>
+                        )}
+                        
+                        {order.order_status === 'ready' && (
+                          <button
+                            onClick={() => updateOrderStatus(order.id, 'completed')}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                            title="Mark as completed"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Complete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -534,9 +617,21 @@ export default function OrderManagement() {
             <div className="mt-3">
               {/* Modal Header */}
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Order Details - #{selectedOrder.id.slice(-8)}
-                </h3>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Order Details - #{selectedOrder.order_number || selectedOrder.id.slice(-8)}
+                  </h3>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusColor(selectedOrder.payment_status)}`}>
+                      {getPaymentStatusIcon(selectedOrder.payment_status)}
+                      <span className="ml-1">{getPaymentStatusText(selectedOrder.payment_status)}</span>
+                    </div>
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedOrder.order_status)}`}>
+                      {getStatusIcon(selectedOrder.order_status)}
+                      <span className="ml-1">{getStatusText(selectedOrder.order_status)}</span>
+                    </div>
+                  </div>
+                </div>
                 <button
                   onClick={() => setShowOrderModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -608,15 +703,15 @@ export default function OrderManagement() {
                     ))}
                   </div>
 
-                  {/* GCash Payment Details */}
-                  {selectedOrder.payment_method === 'gcash' && (
+                  {/* Payment Details */}
+                  {(selectedOrder.payment_method === 'gcash' || selectedOrder.payment_method === 'bank_transfer') && (
                     <div className="space-y-4">
-                      <h4 className="text-md font-semibold text-gray-900">GCash Payment Details</h4>
+                      <h4 className="text-md font-semibold text-gray-900">{selectedOrder.payment_method === 'gcash' ? 'GCash' : 'Bank Transfer'} Payment Details</h4>
                       <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                         {selectedOrder.gcash_reference && (
                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <div className="flex items-center space-x-2 mb-2">
-                              <span className="font-medium text-blue-800">GCash Reference Number:</span>
+                              <span className="font-medium text-blue-800">Payment Reference Number:</span>
                             </div>
                             <div className="bg-white border-2 border-blue-300 rounded-lg p-3">
                               <span className="font-mono text-2xl font-bold text-blue-900 tracking-wider">
@@ -632,7 +727,7 @@ export default function OrderManagement() {
                         {selectedOrder.payment_screenshot_url && (
                           <div>
                             <div className="flex items-center justify-between mb-3">
-                              <span className="font-medium text-gray-700">GCash Payment Screenshot:</span>
+                              <span className="font-medium text-gray-700">Payment Screenshot:</span>
                               <button
                                 onClick={() => window.open(selectedOrder.payment_screenshot_url, '_blank')}
                                 className="text-blue-600 hover:text-blue-800 text-sm underline flex items-center space-x-1"
@@ -646,7 +741,7 @@ export default function OrderManagement() {
                             <div className="bg-white p-4 rounded-lg border-2 border-gray-200 shadow-sm">
                               <img
                                 src={selectedOrder.payment_screenshot_url}
-                                alt="GCash Payment Screenshot"
+                                alt="Payment Screenshot"
                                 className="w-full max-w-2xl h-auto rounded-lg cursor-pointer hover:shadow-lg transition-shadow mx-auto block"
                                 onClick={() => window.open(selectedOrder.payment_screenshot_url, '_blank')}
                               />
@@ -693,51 +788,98 @@ export default function OrderManagement() {
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-6 flex justify-between">
-                <div className="flex space-x-2">
-                  {selectedOrder.payment_status === 'pending' && (
-                    <button
-                      onClick={() => verifyPayment(selectedOrder.id)}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                      title="Verify GCash payment after checking reference number and screenshot"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Verify GCash Payment</span>
-                    </button>
-                  )}
-                  {selectedOrder.payment_status === 'paid' && (
-                    <div className="flex items-center space-x-2 text-green-600">
-                      <CheckCircle className="w-5 h-5" />
-                      <span className="font-medium">Payment Verified</span>
-                    </div>
-                  )}
+              <div className="mt-6 bg-gray-50 rounded-lg p-4">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">Order Actions</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Payment Actions */}
+                  <div className="space-y-2">
+                    <h5 className="text-sm font-medium text-gray-700">Payment Status</h5>
+                    {selectedOrder.payment_status === 'pending' && (
+                      <button
+                        onClick={() => verifyPayment(selectedOrder.id)}
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                        title="Verify payment after checking reference number and screenshot"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Verify Payment</span>
+                      </button>
+                    )}
+                    {selectedOrder.payment_status === 'paid' && (
+                      <div className="w-full px-4 py-2 bg-green-100 text-green-800 rounded-lg flex items-center justify-center space-x-2">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="font-medium">Payment Verified</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Order Status Actions */}
+                  <div className="space-y-2">
+                    <h5 className="text-sm font-medium text-gray-700">Order Status</h5>
+                    {selectedOrder.payment_status === 'paid' && selectedOrder.order_status === 'pending' && (
+                      <button
+                        onClick={() => updateOrderStatus(selectedOrder.id, 'confirmed')}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <Clock className="w-4 h-4" />
+                        <span>Start Preparation</span>
+                      </button>
+                    )}
+                    {selectedOrder.order_status === 'confirmed' && (
+                      <button
+                        onClick={() => updateOrderStatus(selectedOrder.id, 'preparing')}
+                        className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <Clock className="w-4 h-4" />
+                        <span>Mark as Cooking</span>
+                      </button>
+                    )}
+                    {selectedOrder.order_status === 'preparing' && (
+                      <button
+                        onClick={() => updateOrderStatus(selectedOrder.id, 'ready')}
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Mark Ready for Pickup</span>
+                      </button>
+                    )}
+                    {selectedOrder.order_status === 'ready' && (
+                      <button
+                        onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
+                        className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Complete Order</span>
+                      </button>
+                    )}
+                    {(selectedOrder.order_status === 'completed' || selectedOrder.order_status === 'cancelled') && (
+                      <div className="w-full px-4 py-2 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center space-x-2">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="font-medium">
+                          {selectedOrder.order_status === 'completed' ? 'Order Completed' : 'Order Cancelled'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
-                <div className="flex space-x-2">
-                  {selectedOrder.order_status === 'pending' && (
-                    <button
-                      onClick={() => updateOrderStatus(selectedOrder.id, 'preparing')}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Start Preparing
-                    </button>
-                  )}
-                  {selectedOrder.order_status === 'preparing' && (
-                    <button
-                      onClick={() => updateOrderStatus(selectedOrder.id, 'ready')}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      Mark Ready
-                    </button>
-                  )}
-                  {selectedOrder.order_status === 'ready' && (
-                    <button
-                      onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      Complete Order
-                    </button>
-                  )}
+                {/* Status Summary */}
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Next Step:</strong> {
+                      selectedOrder.payment_status === 'pending' 
+                        ? 'Verify payment first, then start preparation'
+                        : selectedOrder.order_status === 'pending'
+                        ? 'Start preparation process'
+                        : selectedOrder.order_status === 'confirmed'
+                        ? 'Mark as cooking when you start preparing the food'
+                        : selectedOrder.order_status === 'preparing'
+                        ? 'Mark as ready when order is complete'
+                        : selectedOrder.order_status === 'ready'
+                        ? 'Mark as completed when customer picks up'
+                        : 'Order is complete'
+                    }
+                  </p>
                 </div>
               </div>
             </div>

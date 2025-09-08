@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS orders (
   total_commission DECIMAL(10,2) NOT NULL CHECK (total_commission >= 0),
   
   -- Payment
-  payment_method VARCHAR(20) DEFAULT 'gcash' CHECK (payment_method IN ('gcash', 'cash', 'card')),
+  payment_method VARCHAR(20) DEFAULT 'gcash' CHECK (payment_method IN ('gcash', 'bank_transfer')),
   payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'cancelled', 'refunded')),
   gcash_reference VARCHAR(100),
   payment_screenshot_url VARCHAR(255),

@@ -113,6 +113,10 @@ class InventoryManager {
     customer_name: string
     customer_phone: string
     branch_id?: string
+    pickup_time?: string
+    payment_method?: string
+    payment_reference?: string
+    payment_screenshot?: File | null
   }): Promise<{ success: boolean; order_id?: string; conflicts?: string[] }> {
     try {
       if (this.isOnline) {
@@ -134,6 +138,10 @@ class InventoryManager {
     customer_name: string
     customer_phone: string
     branch_id?: string
+    pickup_time?: string
+    payment_method?: string
+    payment_reference?: string
+    payment_screenshot?: File | null
   }): Promise<{ success: boolean; order_id?: string; conflicts?: string[] }> {
     const supabase = createClient()
     
@@ -174,11 +182,14 @@ class InventoryManager {
         customer_name: orderData.customer_name,
         customer_phone: orderData.customer_phone,
         branch_id: orderData.branch_id,
+        pickup_time: orderData.pickup_time || new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
         subtotal: total_amount,
         total_amount: total_amount,
         total_commission: total_commission,
         order_status: 'pending',
-        payment_status: 'pending'
+        payment_status: 'pending',
+        payment_method: orderData.payment_method || 'gcash',
+        gcash_reference: orderData.payment_reference
       }])
       .select()
       .single()
