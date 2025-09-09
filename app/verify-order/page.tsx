@@ -78,7 +78,7 @@ export default function VerifyOrderPage() {
             address
           )
         `)
-        .eq('reference_number', referenceNumber.toUpperCase())
+        .eq('order_number', referenceNumber.toUpperCase())
         .single()
 
       if (error) {
