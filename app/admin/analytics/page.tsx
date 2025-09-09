@@ -495,75 +495,75 @@ export default function AdminAnalytics() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-green-500/10 rounded-lg">
+              <div className="p-2 bg-green-500/10 rounded-lg flex-shrink-0">
                 <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(totalRevenue)}</p>
+              <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Revenue</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalRevenue)}</p>
               </div>
             </div>
           </div>
 
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
+              <div className="p-2 bg-blue-500/10 rounded-lg flex-shrink-0">
                 <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Total Orders</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{totalOrders}</p>
+              <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Orders</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{totalOrders}</p>
               </div>
             </div>
           </div>
 
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
+              <div className="p-2 bg-purple-500/10 rounded-lg flex-shrink-0">
                 <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Total Commission</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(totalCommission)}</p>
+              <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Commission</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalCommission)}</p>
               </div>
             </div>
           </div>
 
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-emerald-500/10 rounded-lg">
+              <div className="p-2 bg-emerald-500/10 rounded-lg flex-shrink-0">
                 <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Net Profit</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(netProfit)}</p>
+              <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Net Profit</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(netProfit)}</p>
               </div>
             </div>
           </div>
 
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-orange-500/10 rounded-lg">
+              <div className="p-2 bg-orange-500/10 rounded-lg flex-shrink-0">
                 <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Net Revenue</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(netRevenue)}</p>
+              <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Net Revenue</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(netRevenue)}</p>
               </div>
             </div>
           </div>
 
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-red-500/10 rounded-lg">
+              <div className="p-2 bg-red-500/10 rounded-lg flex-shrink-0">
                 <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
               </div>
-              <div className="ml-3 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Discounts</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(totalDiscounts)}</p>
+              <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Discounts</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalDiscounts)}</p>
               </div>
             </div>
           </div>
