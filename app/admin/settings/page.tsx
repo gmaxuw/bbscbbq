@@ -2115,7 +2115,7 @@ export default function AdminSettingsPage() {
                       <div className="w-full h-full relative">
                         {/* Primary Image */}
                         <img
-                          src={product.product_images.find(img => img.is_primary)?.image_url || product.product_images[0]?.image_url}
+                          src={product.product_images.find((img: any) => img.is_primary)?.image_url || product.product_images[0]?.image_url}
                           alt={product.name}
                           className="w-full h-full object-cover"
                         />
