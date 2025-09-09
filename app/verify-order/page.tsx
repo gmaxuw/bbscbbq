@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, XCircle, Clock, Package, ChefHat } from 'lucide-react'
+import Navigation from '@/components/layout/Navigation'
 import DesignLock from '@/components/layout/DesignLock'
 import { createClient } from '@/lib/supabase'
 import { validateReferenceNumber } from '@/lib/qr-generator'
@@ -183,11 +184,14 @@ export default function VerifyOrderPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50">
         <DesignLock pageName="Order Verification" />
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-lays-dark-red border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Verifying order...</p>
+        <Navigation />
+        <div className="flex items-center justify-center pt-20">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-lays-dark-red border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Verifying order...</p>
+          </div>
         </div>
       </div>
     )
@@ -195,19 +199,22 @@ export default function VerifyOrderPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50">
         <DesignLock pageName="Order Verification" />
-        <div className="max-w-md mx-auto px-4 text-center">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-            <XCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Order Not Found</h1>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <button
-              onClick={() => window.history.back()}
-              className="bbq-button-primary"
-            >
-              Go Back
-            </button>
+        <Navigation />
+        <div className="flex items-center justify-center pt-20">
+          <div className="max-w-md mx-auto px-4 text-center">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+              <XCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+              <h1 className="text-2xl font-bold text-gray-900 mb-4">Order Not Found</h1>
+              <p className="text-gray-600 mb-6">{error}</p>
+              <button
+                onClick={() => window.history.back()}
+                className="bbq-button-primary"
+              >
+                Go Back
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -238,8 +245,9 @@ export default function VerifyOrderPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <DesignLock pageName="Order Verification" />
+      <Navigation />
       
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto px-4 py-8 pt-20">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           {/* Header */}
           <div className="text-center mb-6">

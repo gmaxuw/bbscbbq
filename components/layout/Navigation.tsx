@@ -48,7 +48,7 @@ export default function Navigation() {
   }, [])
 
   return (
-    <nav className={`fixed top-4 left-4 right-4 sm:left-8 sm:right-8 lg:left-32 lg:right-32 z-50 transition-all duration-300 ${
+    <nav className={`fixed top-4 left-4 right-4 sm:left-8 sm:right-8 lg:left-32 lg:right-32 z-[9999] transition-all duration-300 ${
       isScrolled 
         ? 'bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-white/20' 
         : 'bg-transparent'
@@ -104,6 +104,18 @@ export default function Navigation() {
             >
               <User className="w-5 h-5" />
             </Link>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={toggleMenu}
+              className={`lg:hidden p-2 rounded-full transition-all duration-300 hover:scale-110 ${
+                isScrolled 
+                  ? 'bg-lays-orange-gold/10 hover:bg-lays-orange-gold/20 text-lays-dark-red' 
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
 
@@ -111,7 +123,27 @@ export default function Navigation() {
         {isMenuOpen && (
           <div className="lg:hidden border-t border-gray-100 bg-white/95 backdrop-blur-sm animate-fade-in rounded-b-2xl">
             <div className="px-6 py-6 space-y-4">
-              {/* Mobile menu content removed - Order Now button moved to Hero */}
+              <Link 
+                href="/" 
+                className="block text-gray-900 hover:text-lays-dark-red transition-colors font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Home
+              </Link>
+              <Link 
+                href="/orders" 
+                className="block text-gray-900 hover:text-lays-dark-red transition-colors font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                My Orders
+              </Link>
+              <Link 
+                href="/account" 
+                className="block text-gray-900 hover:text-lays-dark-red transition-colors font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                My Account
+              </Link>
             </div>
           </div>
         )}
