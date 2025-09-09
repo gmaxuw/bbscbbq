@@ -107,6 +107,10 @@ export default function AdminSettingsPage() {
     is_available: true
   })
 
+  // Platform Fee Management State
+  const [platformFee, setPlatformFee] = useState(20) // Default ₱20
+  const [isUpdatingPlatformFee, setIsUpdatingPlatformFee] = useState(false)
+
   // Crew Management State
   const [crewMembers, setCrewMembers] = useState<any[]>([])
   const [filteredCrewMembers, setFilteredCrewMembers] = useState<any[]>([])
@@ -843,6 +847,29 @@ export default function AdminSettingsPage() {
     }).format(amount)
   }
 
+  // Load platform fee from Supabase
+  const loadPlatformFee = async () => {
+    try {
+      const supabase = createClient()
+      
+      // Load platform fee from database
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'platform_fee')
+        .single()
+
+      if (error) throw error
+      
+      if (data) {
+        setPlatformFee(parseFloat(data.setting_value) || 20)
+      }
+    } catch (error) {
+      console.error('Failed to load platform fee:', error)
+      setPlatformFee(20) // Default fallback
+    }
+  }
+
   const refreshPendingOrders = () => {
     loadPendingOrders()
   }
@@ -858,6 +885,7 @@ export default function AdminSettingsPage() {
     // Load all data on component mount
     loadProducts()
     loadBranches()
+    loadPlatformFee()
   }, [searchParams])
 
   useEffect(() => {
@@ -974,31 +1002,6 @@ export default function AdminSettingsPage() {
     setSettings({ ...settings, [field]: value })
   }
 
-  const resetToDefaults = () => {
-    if (!settings) return
-    
-    setSettings({
-      ...settings,
-      title: 'Surigao City',
-      subtitle: 'BBQ Stalls',
-      description: 'Experience the authentic taste of slow-smoked BBQ perfection. Every bite tells a story of tradition, passion, and fire.',
-      badge_text: '#1 BBQ Restaurant in Surigao',
-      button_text: 'ORDER NOW',
-      button_link: '/cart',
-      show_badge: true,
-      show_features: true,
-      show_trust_indicators: true,
-      feature_1_text: '2+ Hours Advance Order',
-      feature_2_text: '4 Convenient Locations',
-      feature_3_text: 'Premium Quality',
-      trust_item_1_number: '15+',
-      trust_item_1_label: 'Menu Items',
-      trust_item_2_number: '4',
-      trust_item_2_label: 'Branch Locations',
-      trust_item_3_number: '100%',
-      trust_item_3_label: 'Fresh & Local'
-    })
-  }
 
   if (loading) {
     return (
@@ -1055,6 +1058,36 @@ export default function AdminSettingsPage() {
       await loadProducts()
     } catch (error) {
       console.error('Failed to toggle product status:', error)
+    }
+  }
+
+  // Platform Fee Management Functions
+  const handlePlatformFeeUpdate = async () => {
+    if (platformFee < 0) {
+      setMessage('Platform fee cannot be negative')
+      return
+    }
+
+    setIsUpdatingPlatformFee(true)
+    try {
+      const supabase = createClient()
+      
+      // Update platform fee in database
+      const { error } = await supabase
+        .from('platform_settings')
+        .update({ 
+          setting_value: platformFee.toString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('setting_key', 'platform_fee')
+
+      if (error) throw error
+      setMessage(`Platform fee updated to ₱${platformFee}`)
+    } catch (error) {
+      console.error('Failed to update platform fee:', error)
+      setMessage('Failed to update platform fee')
+    } finally {
+      setIsUpdatingPlatformFee(false)
     }
   }
 
@@ -1278,39 +1311,33 @@ export default function AdminSettingsPage() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-4 sm:py-0 sm:h-16 space-y-4 sm:space-y-0">
             <div className="flex items-center space-x-4">
-              <Settings className="w-8 h-8 text-lays-dark-red" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Hero Section Settings</h1>
-                <p className="text-sm text-gray-500">Configure your homepage hero section content</p>
+              <Settings className="w-6 h-6 sm:w-8 sm:h-8 text-lays-dark-red flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Hero Section Settings</h1>
+                <p className="text-xs sm:text-sm text-gray-500 truncate">Configure your homepage hero section content</p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
               <Link
                 href="/admin"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-lays-dark-red flex items-center space-x-2"
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-lays-dark-red flex items-center justify-center space-x-2"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Dashboard</span>
+                <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="truncate">Back to Dashboard</span>
               </Link>
-              <button
-                onClick={resetToDefaults}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-lays-dark-red"
-              >
-                Reset to Defaults
-              </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-6 py-2 text-sm font-medium text-white bg-lays-dark-red rounded-lg hover:bg-lays-bright-red focus:outline-none focus:ring-2 focus:ring-lays-dark-red disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                className="px-4 sm:px-6 py-2 text-xs sm:text-sm font-medium text-white bg-lays-dark-red rounded-lg hover:bg-lays-bright-red focus:outline-none focus:ring-2 focus:ring-lays-dark-red disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {saving ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
                 ) : (
-                  <Save className="w-4 h-4" />
+                  <Save className="w-3 h-3 sm:w-4 sm:h-4" />
                 )}
-                <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                <span className="truncate">{saving ? 'Saving...' : 'Save Changes'}</span>
               </button>
             </div>
           </div>
@@ -1332,8 +1359,8 @@ export default function AdminSettingsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tabs */}
-        <div className="mb-8">
-          <nav className="flex space-x-8">
+        <div className="mb-6 sm:mb-8">
+          <nav className="flex space-x-4 sm:space-x-8 overflow-x-auto">
                     {[
           { id: 'products', label: 'Product Management', icon: ShoppingCart },
           { id: 'branches', label: 'Branch Management', icon: MapPin },
@@ -1354,7 +1381,7 @@ export default function AdminSettingsPage() {
                     url.searchParams.set('tab', newTab)
                     window.history.replaceState({}, '', url.toString())
                   }}
-                  className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === tab.id
                       ? 'border-lays-dark-red text-lays-dark-red'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -2334,6 +2361,96 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
+            {/* Commission Summary */}
+            <div className="mb-6 bg-gradient-to-r from-lays-orange-gold to-lays-dark-red rounded-lg p-6 text-white">
+              <h3 className="text-lg font-semibold mb-4">Commission Overview</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm opacity-90">Total Commission per Product</p>
+                      <p className="text-2xl font-bold">
+                        ₱{products.reduce((sum, p) => sum + (p.commission || 0), 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <span className="text-xl">💰</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm opacity-90">Avg Commission per Product</p>
+                      <p className="text-2xl font-bold">
+                        ₱{products.length > 0 ? (products.reduce((sum, p) => sum + (p.commission || 0), 0) / products.length).toFixed(2) : '0.00'}
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <span className="text-xl">📊</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm opacity-90">Products with Commission</p>
+                      <p className="text-2xl font-bold">
+                        {products.filter(p => (p.commission || 0) > 0).length}/{products.length}
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <span className="text-xl">📈</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Platform Fee Management */}
+            <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Fee Management</h3>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Platform Fee (₱)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={platformFee}
+                    onChange={(e) => setPlatformFee(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                    placeholder="20"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This fee is visible to customers and added to all orders. Commission is hidden and calculated separately.
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <button
+                    onClick={handlePlatformFeeUpdate}
+                    disabled={isUpdatingPlatformFee}
+                    className="px-4 py-2 bg-lays-orange-gold text-white rounded-lg hover:bg-lays-dark-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {isUpdatingPlatformFee ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Updating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Update Fee</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Search and Filter */}
             <div className="mb-6 flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
@@ -2591,7 +2708,7 @@ export default function AdminSettingsPage() {
                       placeholder="0.00"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Enter commission amount in pesos (e.g., 3.00 for ₱3.00)
+                      Enter commission amount in pesos (e.g., 3.00 for ₱3.00). This fee is automatically added to the product price but hidden from customers.
                     </p>
                   </div>
 

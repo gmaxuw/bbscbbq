@@ -77,6 +77,18 @@ export default function AdminDashboard() {
     loadDashboardStats()
     loadRecentActivity()
     loadNotificationCount()
+    
+    // Set up data refresh (notifications handled globally)
+    const refreshInterval = setInterval(() => {
+      loadDashboardStats()
+      loadRecentActivity()
+      loadNotificationCount()
+    }, 30000) // Refresh every 30 seconds
+    
+    // Cleanup on unmount
+    return () => {
+      clearInterval(refreshInterval)
+    }
   }, [])
 
   const checkAuth = async () => {
@@ -288,6 +300,20 @@ export default function AdminDashboard() {
     }
   }
 
+  // Test notification function (using global context)
+  const testNotification = () => {
+    console.log('🧪 Testing global notification system...')
+    // This will be handled by the global notification context
+    if (typeof window !== 'undefined') {
+      (window as any).testGlobalNotification?.()
+    }
+  }
+
+  // Add test button to window for debugging
+  if (typeof window !== 'undefined') {
+    (window as any).testNotification = testNotification
+  }
+
   const handleLogout = async () => {
     console.log('🚪 Admin logging out from dashboard...')
     await supabase.auth.signOut()
@@ -332,24 +358,24 @@ export default function AdminDashboard() {
   }
 
   const StatCard = ({ title, value, icon: Icon, color, description }: any) => (
-    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center hover:shadow-xl transition-shadow duration-300">
-      <div className={`w-12 h-12 ${color} rounded-full flex items-center justify-center mx-auto mb-4`}>
-        <Icon className="w-6 h-6 text-white" />
+    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200 text-center hover:shadow-xl transition-shadow duration-300">
+      <div className={`w-10 h-10 sm:w-12 sm:h-12 ${color} rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4`}>
+        <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
       </div>
-      <h3 className="text-2xl font-bold text-gray-900 mb-2">{value}</h3>
-      <p className="text-gray-600 font-medium mb-1">{title}</p>
-      {description && <p className="text-sm text-gray-500">{description}</p>}
+      <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-1 sm:mb-2 truncate">{value}</h3>
+      <p className="text-sm sm:text-base text-gray-600 font-medium mb-1 truncate">{title}</p>
+      {description && <p className="text-xs sm:text-sm text-gray-500 truncate">{description}</p>}
     </div>
   )
 
   const QuickActionCard = ({ title, description, icon: Icon, href, color }: any) => (
     <Link href={href}>
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer">
-        <div className={`w-16 h-16 ${color} rounded-full flex items-center justify-center mx-auto mb-4`}>
-          <Icon className="w-8 h-8 text-white" />
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200 text-center hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer">
+        <div className={`w-12 h-12 sm:w-16 sm:h-16 ${color} rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4`}>
+          <Icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-        <p className="text-gray-600 text-sm">{description}</p>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 truncate">{title}</h3>
+        <p className="text-gray-600 text-xs sm:text-sm truncate">{description}</p>
       </div>
     </Link>
   )
@@ -381,7 +407,7 @@ export default function AdminDashboard() {
     >
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 mb-8">
         <StatCard
           title="Total Orders"
           value={stats.totalOrders}
@@ -428,8 +454,8 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <QuickActionCard
             title="Manage Orders"
             description="View and update order statuses"
@@ -456,12 +482,12 @@ export default function AdminDashboard() {
 
       {/* Recent Activity */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Recent Activity</h2>
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
           {recentActivity.length > 0 ? (
             <div className="space-y-4">
               {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div key={activity.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors gap-2 sm:gap-0">
                   <div className="flex items-center space-x-3">
                     <div className={`w-3 h-3 ${getActivityColor(activity.type)} rounded-full`}></div>
                     <span className="text-gray-700">{activity.message}</span>

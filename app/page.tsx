@@ -26,7 +26,6 @@
 import Navigation from '@/components/layout/Navigation'
 import HeroSection from '@/components/home/HeroSection'
 import FeaturedMenu from '@/components/home/FeaturedMenu'
-import BranchLocations from '@/components/home/BranchLocations'
 import Footer from '@/components/layout/Footer'
 
 export default function Home() {
@@ -35,7 +34,6 @@ export default function Home() {
       <Navigation />
       <HeroSection />
       <FeaturedMenu />
-      <BranchLocations />
       <Footer />
     </main>
   )

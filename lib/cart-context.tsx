@@ -22,6 +22,9 @@ interface CartContextType {
   clearCart: () => void
   getTotalItems: () => number
   getTotalPrice: () => number
+  getItemTotalPrice: (item: CartItem) => number
+  getPlatformFee: () => number
+  getTotalPriceWithPlatformFee: () => number
   syncCartWithDatabase: () => Promise<void>
   checkout: (customerData: { name: string; phone: string; branch_id?: string; pickup_time?: string; payment_method?: string; payment_reference?: string; payment_screenshot_url?: string; user_id?: string }) => Promise<{ success: boolean; order_id?: string; conflicts?: string[] }>
   isSyncing: boolean
@@ -32,6 +35,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isSyncing, setIsSyncing] = useState(false)
+  const [platformFee, setPlatformFee] = useState(20) // Default ₱20
   const supabase = createClient()
 
   // Load cart from localStorage on mount
@@ -49,9 +53,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Sync cart with database when user logs in (skip on admin pages)
+  // Load platform fee and sync cart with database when user logs in (skip on admin pages)
   useEffect(() => {
     const syncCart = async () => {
+      // Load platform fee first
+      await loadPlatformFee()
+      
       // Skip cart sync on admin pages
       if (typeof window !== 'undefined' && 
           (window.location.pathname.startsWith('/admin') || 
@@ -251,7 +258,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const getTotalPrice = () => {
-    return items.reduce((total, item) => total + (item.price * item.quantity), 0)
+    return items.reduce((total, item) => {
+      const itemPrice = item.price + (item.commission || 0) // Add commission to price
+      return total + (itemPrice * item.quantity)
+    }, 0)
+  }
+
+  // Helper function to get item price including commission
+  const getItemTotalPrice = (item: CartItem) => {
+    return (item.price + (item.commission || 0)) * item.quantity
+  }
+
+  // Load platform fee from Supabase
+  const loadPlatformFee = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'platform_fee')
+        .single()
+
+      if (error) throw error
+      
+      if (data) {
+        setPlatformFee(parseFloat(data.setting_value) || 20)
+      }
+    } catch (error) {
+      console.error('Failed to load platform fee:', error)
+      setPlatformFee(20) // Default fallback
+    }
+  }
+
+  // Helper function to get platform fee
+  const getPlatformFee = () => {
+    return platformFee
+  }
+
+  // Helper function to get total price including platform fee
+  const getTotalPriceWithPlatformFee = () => {
+    return getTotalPrice() + platformFee
   }
 
   const checkout = async (customerData: { 
@@ -276,7 +321,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         quantity: item.quantity,
         unit_price: item.price,
         unit_commission: item.commission || 0,
-        subtotal: item.price * item.quantity
+        subtotal: (item.price + (item.commission || 0)) * item.quantity // Include commission in subtotal
       }))
 
       // Process order through inventory manager
@@ -314,6 +359,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         getTotalItems,
         getTotalPrice,
+        getItemTotalPrice,
+        getPlatformFee,
+        getTotalPriceWithPlatformFee,
         syncCartWithDatabase,
         checkout,
         isSyncing,

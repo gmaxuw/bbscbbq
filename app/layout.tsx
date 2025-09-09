@@ -4,6 +4,7 @@ import './globals.css'
 import DesignLock from '@/components/layout/DesignLock'
 import { CartProvider } from '@/lib/cart-context'
 import { FavoritesProvider } from '@/lib/favorites-context'
+import { NotificationProvider } from '@/lib/notification-context'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -45,7 +46,9 @@ export default function RootLayout({
         <DesignLock pageName="Global Layout" />
         <CartProvider>
           <FavoritesProvider>
-            {children}
+            <NotificationProvider>
+              {children}
+            </NotificationProvider>
           </FavoritesProvider>
         </CartProvider>
       </body>

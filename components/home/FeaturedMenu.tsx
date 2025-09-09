@@ -313,7 +313,7 @@ export default function FeaturedMenu() {
                 )}
 
                 <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm text-lays-dark-red font-bold text-lg px-3 py-2 rounded-lg">
-                  ₱{item.price.toFixed(2)}
+                  ₱{(item.price + (item.commission || 0)).toFixed(2)}
                 </div>
 
                 {/* Availability Badge */}
@@ -380,7 +380,7 @@ export default function FeaturedMenu() {
                   <div className="text-right">
                     <div className="text-sm text-gray-500">Total</div>
                     <div className="text-lg font-bold text-lays-dark-red">
-                      ₱{((quantities[item.id] || 0) * item.price).toLocaleString()}
+                      ₱{((quantities[item.id] || 0) * (item.price + (item.commission || 0))).toLocaleString()}
                     </div>
                   </div>
                 </div>

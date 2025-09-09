@@ -22,7 +22,6 @@ import {
   Users, 
   Building2, 
   BarChart3, 
-  Tag, 
   Settings,
   LogOut,
   Menu,
@@ -79,12 +78,6 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
       href: '/admin/analytics',
       icon: BarChart3,
       description: 'Sales reports and insights'
-    },
-    {
-      name: 'Promos',
-      href: '/admin/promos',
-      icon: Tag,
-      description: 'Manage discount codes'
     },
     {
       name: 'Settings',

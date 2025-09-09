@@ -110,20 +110,13 @@ export default function CrewDashboard() {
     if (crewMember && crewMember.branch_id) {
       console.log('Crew member loaded, setting up orders and realtime')
       loadOrders()
-      const subscription = setupRealtimeSubscription()
-      
-      // Set up periodic refresh as fallback (every 30 seconds)
+      // Simple data refresh (notifications handled globally)
       const refreshInterval = setInterval(() => {
-        console.log('🔄 Periodic refresh triggered')
         loadOrders()
-      }, 30000)
+      }, 30000) // Refresh every 30 seconds
       
       return () => {
         clearInterval(refreshInterval)
-        if (subscription) {
-          console.log('🧹 Cleaning up realtime subscription')
-          subscription.unsubscribe()
-        }
       }
     }
   }, [crewMember])
@@ -568,6 +561,14 @@ export default function CrewDashboard() {
           },
           (payload) => {
             console.log('🔄 Order change detected:', payload.eventType, payload.new, payload.old)
+            
+            // Show instant notification for new orders
+            console.log('Crew order change:', payload)
+            console.log('Event type:', payload.eventType)
+            if (payload.eventType === 'INSERT' && payload.new) {
+              showNewOrderNotification(payload.new)
+            }
+            
             // Reload orders immediately on any change
             loadOrders()
           }
@@ -598,6 +599,35 @@ export default function CrewDashboard() {
     } catch (error) {
       console.error('Failed to setup realtime subscription:', error)
     }
+  }
+
+  // Show instant new order notification for crew
+  const showNewOrderNotification = (order: any) => {
+    // Create a custom notification element
+    const notification = document.createElement('div')
+    notification.className = 'fixed top-4 right-4 bg-lays-orange-gold text-white p-4 rounded-lg shadow-lg z-50 max-w-sm animate-pulse'
+    notification.innerHTML = `
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+          <span class="text-lg">🍖</span>
+        </div>
+        <div>
+          <div class="font-bold text-sm">New Order!</div>
+          <div class="text-xs opacity-90">${order.customer_name} - ₱${order.total_amount}</div>
+          <div class="text-xs opacity-75">Order #${order.order_number}</div>
+          <div class="text-xs opacity-75">Pickup: ${order.pickup_time}</div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(notification)
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification)
+      }
+    }, 5000)
   }
 
   const handleRefresh = async () => {
@@ -921,8 +951,8 @@ export default function CrewDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bbq-card p-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            <div className="bbq-card p-4 sm:p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-lays-orange-gold/10 rounded-lg">
                   <ShoppingCart className="w-6 h-6 text-lays-orange-gold" />
@@ -934,7 +964,7 @@ export default function CrewDashboard() {
               </div>
             </div>
 
-            <div className="bbq-card p-6">
+            <div className="bbq-card p-4 sm:p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-blue-500/10 rounded-lg">
                   <Clock className="w-6 h-6 text-blue-500" />
@@ -948,7 +978,7 @@ export default function CrewDashboard() {
               </div>
             </div>
 
-            <div className="bbq-card p-6">
+            <div className="bbq-card p-4 sm:p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-lays-orange-gold/10 rounded-lg">
                   <RefreshCw className="w-6 h-6 text-lays-orange-gold" />
@@ -962,7 +992,7 @@ export default function CrewDashboard() {
               </div>
             </div>
 
-            <div className="bbq-card p-6">
+            <div className="bbq-card p-4 sm:p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-green-500/10 rounded-lg">
                   <CheckCircle className="w-6 h-6 text-green-500" />
@@ -1016,7 +1046,7 @@ export default function CrewDashboard() {
           </div>
 
           {/* Search and Filter */}
-          <div className="bbq-card p-6 mb-6">
+          <div className="bbq-card p-4 sm:p-6 mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <div className="relative">
@@ -1104,7 +1134,7 @@ export default function CrewDashboard() {
                 </div>
               ) : (
                 filteredOrders.map((order) => (
-                  <div key={order.id} id={`order-${order.id}`} className="bbq-card p-6">
+                  <div key={order.id} id={`order-${order.id}`} className="bbq-card p-4 sm:p-6">
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     {/* Order Info */}
                     <div className="flex-1">
@@ -1306,7 +1336,7 @@ export default function CrewDashboard() {
               </div>
             ) : (
               orderHistory.map((order) => (
-                <div key={order.id} className="bbq-card p-6">
+                <div key={order.id} className="bbq-card p-4 sm:p-6">
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     {/* Order Info */}
                     <div className="flex-1">

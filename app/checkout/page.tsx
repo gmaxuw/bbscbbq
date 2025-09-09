@@ -17,7 +17,7 @@ interface Branch {
 }
 
 export default function CheckoutPage() {
-  const { items, getTotalPrice, checkout, clearCart } = useCart()
+  const { items, getTotalPrice, getItemTotalPrice, getPlatformFee, getTotalPriceWithPlatformFee, checkout, clearCart } = useCart()
   const router = useRouter()
   const [isProcessing, setIsProcessing] = useState(false)
   const [customerData, setCustomerData] = useState({
@@ -389,9 +389,9 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           {/* Order Summary */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
             
             <div className="space-y-4">
@@ -410,25 +410,32 @@ export default function CheckoutPage() {
                     <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-gray-900">₱{(item.price * item.quantity).toFixed(2)}</p>
-                    {item.commission && (
-                      <p className="text-xs text-gray-500">Commission: ₱{(item.commission * item.quantity).toFixed(2)}</p>
-                    )}
+                    <p className="font-medium text-gray-900">₱{getItemTotalPrice(item).toFixed(2)}</p>
                   </div>
                 </div>
               ))}
             </div>
 
             <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="flex justify-between text-lg font-semibold text-gray-900">
-                <span>Total</span>
-                <span>₱{getTotalPrice().toFixed(2)}</span>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Items ({items.length})</span>
+                  <span>₱{getTotalPrice().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Platform Fee</span>
+                  <span>₱{getPlatformFee().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-semibold text-gray-900 pt-2 border-t border-gray-200">
+                  <span>Total</span>
+                  <span>₱{getTotalPriceWithPlatformFee().toFixed(2)}</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Checkout Form */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Information</h2>
             
             {errors.length > 0 && (
@@ -473,7 +480,7 @@ export default function CheckoutPage() {
                   )}
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       <User className="w-4 h-4 inline mr-2" />
@@ -527,7 +534,7 @@ export default function CheckoutPage() {
                     <h3 className="text-lg font-medium text-gray-900">Pickup Person</h3>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <User className="w-4 h-4 inline mr-2" />
@@ -597,7 +604,7 @@ export default function CheckoutPage() {
                   <h3 className="text-lg font-medium text-gray-900">Pickup Schedule</h3>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Pickup Date *
@@ -655,7 +662,7 @@ export default function CheckoutPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Payment Method *
                     </label>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <label className="flex items-center space-x-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
                         <input
                           type="radio"

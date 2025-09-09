@@ -8,7 +8,7 @@ import { useCart } from '@/lib/cart-context'
 import DesignLock from '@/components/layout/DesignLock'
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, getTotalItems, getTotalPrice, clearCart } = useCart()
+  const { items, updateQuantity, removeItem, getTotalItems, getTotalPrice, getItemTotalPrice, getPlatformFee, getTotalPriceWithPlatformFee, clearCart } = useCart()
   const [isProcessing, setIsProcessing] = useState(false)
   const router = useRouter()
 
@@ -121,7 +121,7 @@ export default function CartPage() {
                     </h3>
                     <p className="text-sm text-gray-500">{item.category}</p>
                     <p className="text-lg font-bold text-lays-dark-red">
-                      ₱{item.price.toFixed(2)}
+                      ₱{(item.price + (item.commission || 0)).toFixed(2)}
                     </p>
                   </div>
 
@@ -158,9 +158,9 @@ export default function CartPage() {
                 {/* Item Total */}
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Item Total</span>
+                    <span className="text-gray-900 font-medium">Item Total</span>
                     <span className="text-lg font-bold text-lays-dark-red">
-                      ₱{(item.price * item.quantity).toFixed(2)}
+                      ₱{getItemTotalPrice(item).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -178,16 +178,20 @@ export default function CartPage() {
                   <span>Items ({getTotalItems()})</span>
                   <span>₱{getTotalPrice().toFixed(2)}</span>
                 </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Platform Fee</span>
+                  <span>₱{getPlatformFee().toFixed(2)}</span>
+                </div>
                 
                 <div className="flex justify-between text-gray-600">
                   <span>VAT (12%)</span>
-                  <span>₱{(getTotalPrice() * 0.12).toFixed(2)}</span>
+                  <span>₱{(getTotalPriceWithPlatformFee() * 0.12).toFixed(2)}</span>
                 </div>
                 
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between text-xl font-bold text-gray-900">
                     <span>Total</span>
-                    <span>₱{(getTotalPrice() * 1.12).toFixed(2)}</span>
+                    <span>₱{(getTotalPriceWithPlatformFee() * 1.12).toFixed(2)}</span>
                   </div>
                 </div>
               </div>

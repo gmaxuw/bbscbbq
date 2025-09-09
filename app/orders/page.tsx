@@ -63,29 +63,13 @@ export default function CustomerOrdersPage() {
   useEffect(() => {
     loadOrders()
     
-    // Set up real-time subscription for order updates
-    const userEmail = localStorage.getItem('customer_email')
-    if (userEmail) {
-      const subscription = supabase
-        .channel('order-updates')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'orders',
-            filter: `customer_email=eq.${userEmail}`
-          },
-          (payload) => {
-            console.log('Order update received:', payload)
-            loadOrders() // Reload orders when any order is updated
-          }
-        )
-        .subscribe()
+    // Simple data refresh (notifications handled globally)
+    const refreshInterval = setInterval(() => {
+      loadOrders()
+    }, 30000) // Refresh every 30 seconds
 
-      return () => {
-        subscription.unsubscribe()
-      }
+    return () => {
+      clearInterval(refreshInterval)
     }
   }, [])
 
@@ -129,6 +113,44 @@ export default function CustomerOrdersPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show instant order status notification
+  const showOrderStatusNotification = (order: any) => {
+    const statusMessages = {
+      'confirmed': 'Order Confirmed! 🎉',
+      'preparing': 'Order is being prepared! 👨‍🍳',
+      'ready': 'Order is ready for pickup! 🍽️',
+      'completed': 'Order completed! ✅',
+      'cancelled': 'Order cancelled ❌'
+    }
+
+    const statusMessage = statusMessages[order.order_status as keyof typeof statusMessages] || 'Order updated!'
+    
+    // Create a custom notification element
+    const notification = document.createElement('div')
+    notification.className = 'fixed top-4 right-4 bg-lays-orange-gold text-white p-4 rounded-lg shadow-lg z-50 max-w-sm animate-pulse'
+    notification.innerHTML = `
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+          <span class="text-lg">📱</span>
+        </div>
+        <div>
+          <div class="font-bold text-sm">${statusMessage}</div>
+          <div class="text-xs opacity-90">Order #${order.order_number}</div>
+          <div class="text-xs opacity-75">${order.branch?.name || 'BBQ Stalls'}</div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(notification)
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification)
+      }
+    }, 5000)
   }
 
   const getStatusColor = (status: string) => {
@@ -363,7 +385,7 @@ export default function CustomerOrdersPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Pickup Location</h4>
                     <p className="text-sm text-gray-600 flex items-start space-x-2">
@@ -468,7 +490,7 @@ export default function CustomerOrdersPage() {
                     <Clock className="w-5 h-5 text-lays-dark-red" />
                     <span>Order Timeline</span>
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                     <div className="text-center p-3 bg-white rounded-lg border">
                       <div className="text-gray-600 mb-1">Order Placed</div>
                       <div className="font-medium text-gray-900">{formatDate(selectedOrder.created_at)}</div>
@@ -500,7 +522,7 @@ export default function CustomerOrdersPage() {
                   {selectedOrder.ready_at && selectedOrder.actual_pickup_time && (
                     <div className="mt-4 p-3 bg-white rounded-lg border">
                       <h5 className="font-medium text-gray-900 mb-2">Your Pickup Details</h5>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                         <div className="flex justify-between">
                           <span className="text-gray-600">Food was ready at:</span>
                           <span className="font-medium text-green-600">{formatDate(selectedOrder.ready_at)}</span>
