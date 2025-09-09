@@ -615,78 +615,162 @@ export default function CrewManagement() {
       )}
 
       {/* Crew Members List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="space-y-4 mb-8">
         {filteredCrew.map((member) => (
-          <div key={member.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-lg transition-shadow duration-200">
-            <div className="space-y-3">
-              <div className="flex justify-between items-start">
-                <h3 className="font-semibold text-gray-900 text-lg">{member.full_name}</h3>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  member.is_active 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {member.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">{member.email}</p>
-                <div className="flex items-center space-x-2">
-                  <MapPin className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-700">{member.branch_name}</span>
-                </div>
-                <p className="text-xs text-gray-500">Joined: {formatDate(member.created_at)}</p>
-              </div>
-
-              {/* Actions */}
-              <div className="space-y-2 pt-3 border-t border-gray-200">
-                {/* First row - Edit and Status */}
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleEdit(member)}
-                    className="flex-1 px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200"
-                  >
-                    <Edit className="w-4 h-4 mr-2 inline" />
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => toggleMemberStatus(member.id, member.is_active)}
-                    className={`flex-1 px-3 py-2 text-sm rounded transition-colors duration-200 ${
-                      member.is_active 
-                        ? 'bg-gray-600 text-white hover:bg-gray-700' 
-                        : 'bg-lays-dark-red text-white hover:bg-red-800'
-                    }`}
-                  >
-                    {member.is_active ? 'Disable' : 'Enable'}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(member.id, member.full_name)}
-                    className="px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200 text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-4 h-4 inline" />
-                  </button>
-                </div>
-                
-                {/* Second row - Create Auth User button (only if no user_id) */}
-                {!member.user_id && (
-                  <button
-                    onClick={() => createAuthUser(member)}
-                    className="w-full px-3 py-2 bg-lays-orange-gold text-white text-sm rounded hover:bg-orange-600 transition-colors duration-200"
-                  >
-                    <UserPlus className="w-4 h-4 mr-2 inline" />
-                    Create Login Credentials
-                  </button>
-                )}
-                
-                {/* Show status if auth user exists */}
-                {member.user_id && (
-                  <div className="text-center">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      ✓ Login credentials active
-                    </span>
+          <div key={member.id} className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-lg transition-shadow duration-200">
+            {/* Mobile Card Layout */}
+            <div className="block lg:hidden">
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg">{member.full_name}</h3>
+                    <p className="text-sm text-gray-600">{member.email}</p>
                   </div>
-                )}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    member.is_active 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {member.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+
+                {/* Branch and Date Info */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">{member.branch_name || 'Unassigned'}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">Joined: {formatDate(member.created_at)}</p>
+                </div>
+
+                {/* Actions - Mobile Layout */}
+                <div className="space-y-3 pt-3 border-t border-gray-200">
+                  {/* Primary Actions */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleEdit(member)}
+                      className="px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center"
+                    >
+                      <Edit className="w-4 h-4 mr-1" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => toggleMemberStatus(member.id, member.is_active)}
+                      className={`px-3 py-2 text-sm rounded transition-colors duration-200 flex items-center justify-center ${
+                        member.is_active 
+                          ? 'bg-gray-600 text-white hover:bg-gray-700' 
+                          : 'bg-lays-dark-red text-white hover:bg-red-800'
+                      }`}
+                    >
+                      {member.is_active ? 'Disable' : 'Enable'}
+                    </button>
+                  </div>
+
+                  {/* Secondary Actions */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleDelete(member.id, member.full_name)}
+                      className="px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors duration-200 flex items-center justify-center"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Delete
+                    </button>
+                    
+                    {/* Create Auth User button (only if no user_id) */}
+                    {!member.user_id ? (
+                      <button
+                        onClick={() => createAuthUser(member)}
+                        className="px-3 py-2 bg-lays-orange-gold text-white text-sm rounded hover:bg-orange-600 transition-colors duration-200 flex items-center justify-center"
+                      >
+                        <UserPlus className="w-4 h-4 mr-1" />
+                        Create Login
+                      </button>
+                    ) : (
+                      <div className="flex items-center justify-center">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          ✓ Login Active
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Card Layout */}
+            <div className="hidden lg:block">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <h3 className="font-semibold text-gray-900 text-lg">{member.full_name}</h3>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    member.is_active 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {member.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">{member.email}</p>
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-700">{member.branch_name || 'Unassigned'}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">Joined: {formatDate(member.created_at)}</p>
+                </div>
+
+                {/* Actions - Desktop Layout */}
+                <div className="space-y-2 pt-3 border-t border-gray-200">
+                  {/* First row - Edit and Status */}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleEdit(member)}
+                      className="flex-1 px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      <Edit className="w-4 h-4 mr-2 inline" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => toggleMemberStatus(member.id, member.is_active)}
+                      className={`flex-1 px-3 py-2 text-sm rounded transition-colors duration-200 ${
+                        member.is_active 
+                          ? 'bg-gray-600 text-white hover:bg-gray-700' 
+                          : 'bg-lays-dark-red text-white hover:bg-red-800'
+                      }`}
+                    >
+                      {member.is_active ? 'Disable' : 'Enable'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(member.id, member.full_name)}
+                      className="px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors duration-200"
+                    >
+                      <Trash2 className="w-4 h-4 inline" />
+                    </button>
+                  </div>
+                  
+                  {/* Second row - Create Auth User button (only if no user_id) */}
+                  {!member.user_id && (
+                    <button
+                      onClick={() => createAuthUser(member)}
+                      className="w-full px-3 py-2 bg-lays-orange-gold text-white text-sm rounded hover:bg-orange-600 transition-colors duration-200"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2 inline" />
+                      Create Login Credentials
+                    </button>
+                  )}
+                  
+                  {/* Show status if auth user exists */}
+                  {member.user_id && (
+                    <div className="text-center">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        ✓ Login credentials active
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

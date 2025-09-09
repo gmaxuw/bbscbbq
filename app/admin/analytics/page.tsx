@@ -174,10 +174,10 @@ export default function AdminAnalytics() {
     try {
       setIsLoading(true)
       
-      // Get real daily data from database - use date range from filters
+      // Get real daily data from database - HISTORICAL ACCURACY
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, total_amount, total_commission, subtotal, promo_discount, order_status')
+        .select('created_at, total_amount, total_commission, subtotal, promo_discount, platform_fee, order_status')
         .eq('order_status', 'completed')
         .gte('created_at', dateRange.start)
         .lte('created_at', dateRange.end)
@@ -185,13 +185,14 @@ export default function AdminAnalytics() {
 
       if (error) throw error
 
-      // Group orders by date
+      // Group orders by date - HISTORICAL DATA
       const dailyData: { [key: string]: { 
         orders: number, 
         revenue: number, 
         subtotal: number, 
         discount: number, 
-        commission: number 
+        commission: number,
+        platform_fees: number
       } } = {}
       
       orders?.forEach(order => {
@@ -202,14 +203,16 @@ export default function AdminAnalytics() {
             revenue: 0, 
             subtotal: 0, 
             discount: 0, 
-            commission: 0 
+            commission: 0,
+            platform_fees: 0
           }
         }
         dailyData[date].orders += 1
-        dailyData[date].revenue += parseFloat(order.total_amount || '0')
-        dailyData[date].subtotal += parseFloat(order.subtotal || '0')
-        dailyData[date].discount += parseFloat(order.promo_discount || '0')
-        dailyData[date].commission += parseFloat(order.total_commission || '0')
+        dailyData[date].revenue += parseFloat(order.total_amount || '0') // Historical gross revenue
+        dailyData[date].subtotal += parseFloat(order.subtotal || '0') // Historical vendor payments
+        dailyData[date].discount += parseFloat(order.promo_discount || '0') // Historical discounts
+        dailyData[date].commission += parseFloat(order.total_commission || '0') // Historical commission
+        dailyData[date].platform_fees += parseFloat(order.platform_fee || '0') // Historical platform fees
       })
 
       // Convert to array format for the selected date range
@@ -225,7 +228,8 @@ export default function AdminAnalytics() {
           revenue: 0, 
           subtotal: 0, 
           discount: 0, 
-          commission: 0 
+          commission: 0,
+          platform_fees: 0
         }
         dailyReports.push({
           order_date: dateStr,
@@ -234,8 +238,8 @@ export default function AdminAnalytics() {
           total_subtotal: data.subtotal,
           total_discount: data.discount,
           total_commission: data.commission,
-          total_platform_fees: data.orders * 10, // Platform fee per order
-          net_profit: data.commission + (data.orders * 10), // Commission + Platform Fee
+          total_platform_fees: data.platform_fees, // HISTORICAL platform fees
+          net_profit: data.commission + data.platform_fees, // HISTORICAL Commission + Platform Fee
           average_order_value: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
           orders_by_status: {}
         })
@@ -251,7 +255,7 @@ export default function AdminAnalytics() {
 
   const loadBranchReport = async () => {
     try {
-      // Get real branch data from database
+      // Get real branch data from database - HISTORICAL ACCURACY
       const { data: orders, error } = await supabase
         .from('orders')
         .select(`
@@ -260,6 +264,7 @@ export default function AdminAnalytics() {
           total_commission,
           subtotal,
           promo_discount,
+          platform_fee,
           order_status,
           branches!inner(name)
         `)
@@ -269,14 +274,15 @@ export default function AdminAnalytics() {
 
       if (error) throw error
 
-      // Group orders by branch
+      // Group orders by branch - HISTORICAL DATA
       const branchData: { [key: string]: { 
         name: string, 
         orders: number, 
         revenue: number, 
         subtotal: number, 
         discount: number, 
-        commission: number 
+        commission: number,
+        platform_fees: number
       } } = {}
       
       orders?.forEach(order => {
@@ -290,17 +296,19 @@ export default function AdminAnalytics() {
             revenue: 0, 
             subtotal: 0, 
             discount: 0, 
-            commission: 0 
+            commission: 0,
+            platform_fees: 0
           }
         }
         branchData[branchId].orders += 1
-        branchData[branchId].revenue += parseFloat(order.total_amount || '0')
-        branchData[branchId].subtotal += parseFloat(order.subtotal || '0')
-        branchData[branchId].discount += parseFloat(order.promo_discount || '0')
-        branchData[branchId].commission += parseFloat(order.total_commission || '0')
+        branchData[branchId].revenue += parseFloat(order.total_amount || '0') // Historical gross revenue
+        branchData[branchId].subtotal += parseFloat(order.subtotal || '0') // Historical vendor payments
+        branchData[branchId].discount += parseFloat(order.promo_discount || '0') // Historical discounts
+        branchData[branchId].commission += parseFloat(order.total_commission || '0') // Historical commission
+        branchData[branchId].platform_fees += parseFloat(order.platform_fee || '0') // Historical platform fees
       })
 
-      // Convert to array format
+      // Convert to array format - HISTORICAL ACCURACY
       const branchReports: BranchReport[] = Object.entries(branchData).map(([branchId, data]) => ({
         branch_id: branchId,
         branch_name: data.name,
@@ -309,7 +317,7 @@ export default function AdminAnalytics() {
         total_subtotal: data.subtotal,
         total_discount: data.discount,
         total_commission: data.commission,
-        net_profit: data.commission, // Commission is our profit
+        net_profit: data.commission + data.platform_fees, // HISTORICAL Commission + Platform Fee
         average_order_value: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
         completion_rate: 100
       }))
@@ -374,19 +382,10 @@ export default function AdminAnalytics() {
     }
   }
 
-  // Load comprehensive financial analytics
+  // Load comprehensive financial analytics - HISTORICAL ACCURACY
   const loadFinancialAnalytics = async () => {
     try {
-      // Get platform fee from settings
-      const { data: platformSettings } = await supabase
-        .from('platform_settings')
-        .select('setting_value')
-        .eq('setting_key', 'platform_fee')
-        .single()
-
-      const platformFee = parseFloat(platformSettings?.setting_value || '10')
-
-      // Get all completed orders in date range
+      // Get all completed orders in date range - USE STORED VALUES ONLY
       const { data: orders, error } = await supabase
         .from('orders')
         .select('total_amount, total_commission, subtotal, promo_discount, platform_fee, created_at')
@@ -396,41 +395,34 @@ export default function AdminAnalytics() {
 
       if (error) throw error
 
-      // Calculate financial metrics - BULLETPROOF REVENUE TRACKING
+      // Calculate financial metrics - HISTORICAL ACCURACY (uses stored values per order)
       const grossRevenue = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0
       const totalCommission = orders?.reduce((sum, order) => sum + parseFloat(order.total_commission || '0'), 0) || 0
       const totalPlatformFees = orders?.reduce((sum, order) => sum + parseFloat(order.platform_fee || '0'), 0) || 0
       const vendorPayments = orders?.reduce((sum, order) => sum + parseFloat(order.subtotal || '0'), 0) || 0
-      const netRevenue = totalCommission + totalPlatformFees // OUR ACTUAL REVENUE
+      const netRevenue = totalCommission + totalPlatformFees // OUR ACTUAL REVENUE (historical)
       const totalOrders = orders?.length || 0
       const averageOrderValue = totalOrders > 0 ? grossRevenue / totalOrders : 0
 
       setFinancialAnalytics({
-        total_revenue: netRevenue, // Changed to show OUR revenue, not customer payments
-        total_commission: totalCommission,
-        total_platform_fees: totalPlatformFees,
-        net_profit: netRevenue, // Same as total_revenue now
-        average_order_value: averageOrderValue,
+        total_revenue: netRevenue, // Historical revenue (commission + platform fee per order)
+        total_commission: totalCommission, // Historical commission per order
+        total_platform_fees: totalPlatformFees, // Historical platform fees per order
+        net_profit: netRevenue, // Same as total_revenue (historical)
+        average_order_value: averageOrderValue, // Historical average
         total_orders: totalOrders,
-        gross_revenue: grossRevenue, // Add gross revenue for reference
-        vendor_payments: vendorPayments // Add vendor payments for reference
+        gross_revenue: grossRevenue, // Historical gross revenue
+        vendor_payments: vendorPayments // Historical vendor payments
       })
     } catch (error) {
       console.error('Failed to load financial analytics:', error)
     }
   }
 
-  // Load month-over-month comparison data
+  // Load month-over-month comparison data - HISTORICAL ACCURACY
   const loadTimeSeriesData = async () => {
     try {
-      // Get platform fee from settings
-      const { data: platformSettings } = await supabase
-        .from('platform_settings')
-        .select('setting_value')
-        .eq('setting_key', 'platform_fee')
-        .single()
-
-      const platformFee = parseFloat(platformSettings?.setting_value || '10')
+      // NO MORE current settings - use historical data only
 
       // Get current month and last month data
       const currentDate = new Date()
@@ -472,9 +464,9 @@ export default function AdminAnalytics() {
           currentMonthData[dayKey] = { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
         }
         
-        currentMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') + parseFloat(order.platform_fee || '0') // OUR ACTUAL REVENUE
-        currentMonthData[dayKey].commission += parseFloat(order.total_commission || '0')
-        currentMonthData[dayKey].platform_fees += parseFloat(order.platform_fee || '0')
+        currentMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') + parseFloat(order.platform_fee || '0') // HISTORICAL REVENUE
+        currentMonthData[dayKey].commission += parseFloat(order.total_commission || '0') // HISTORICAL COMMISSION
+        currentMonthData[dayKey].platform_fees += parseFloat(order.platform_fee || '0') // HISTORICAL PLATFORM FEE
         currentMonthData[dayKey].orders += 1
       })
 
@@ -487,9 +479,9 @@ export default function AdminAnalytics() {
           lastMonthData[dayKey] = { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
         }
         
-        lastMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') + parseFloat(order.platform_fee || '0') // OUR ACTUAL REVENUE
-        lastMonthData[dayKey].commission += parseFloat(order.total_commission || '0')
-        lastMonthData[dayKey].platform_fees += parseFloat(order.platform_fee || '0')
+        lastMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') + parseFloat(order.platform_fee || '0') // HISTORICAL REVENUE
+        lastMonthData[dayKey].commission += parseFloat(order.total_commission || '0') // HISTORICAL COMMISSION
+        lastMonthData[dayKey].platform_fees += parseFloat(order.platform_fee || '0') // HISTORICAL PLATFORM FEE
         lastMonthData[dayKey].orders += 1
       })
 
@@ -1031,31 +1023,31 @@ export default function AdminAnalytics() {
 
           {/* Desktop Table Layout */}
           <div className="hidden lg:block">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Order</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {branchReports.map((report) => (
-                    <tr key={report.branch_id}>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {report.branch_name}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {report.total_orders}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(report.total_revenue)}
-                      </td>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Order</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {branchReports.map((report) => (
+                  <tr key={report.branch_id}>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {report.branch_name}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {report.total_orders}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(report.total_revenue)}
+                    </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatCurrency(report.total_commission)}
                       </td>
@@ -1064,18 +1056,18 @@ export default function AdminAnalytics() {
                           {formatCurrency(report.net_profit)}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(report.average_order_value)}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          100%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(report.average_order_value)}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        100%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             </div>
           </div>
         </div>
@@ -1176,86 +1168,86 @@ export default function AdminAnalytics() {
 
           {/* Desktop Table Layout */}
           <div className="hidden lg:block">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {orderHistory.map((order) => (
-                    <tr key={order.order_id}>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                        {order.order_number}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
-                          <div className="text-xs sm:text-sm text-gray-500">{order.customer_phone}</div>
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col space-y-1">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
-                            order.order_status === 'completed' ? 'bg-green-500' :
-                            order.order_status === 'preparing' ? 'bg-orange-500' :
-                            order.order_status === 'ready' ? 'bg-blue-500' :
-                            'bg-gray-500'
-                          }`}>
-                            {order.order_status}
-                          </span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
-                            order.payment_status === 'paid' ? 'bg-green-500' :
-                            order.payment_status === 'pending' ? 'bg-orange-500' :
-                            'bg-red-500'
-                          }`}>
-                            {order.payment_status}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div>
-                          <div className="font-medium">{formatCurrency(order.total_amount)}</div>
-                          {order.promo_discount && order.promo_discount > 0 && (
-                            <div className="text-xs text-red-600">
-                              -{formatCurrency(order.promo_discount)} discount
-                            </div>
-                          )}
-                        </div>
-                      </td>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {orderHistory.map((order) => (
+                  <tr key={order.order_id}>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                      {order.order_number}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
+                        <div className="text-xs sm:text-sm text-gray-500">{order.customer_phone}</div>
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col space-y-1">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                          order.order_status === 'completed' ? 'bg-green-500' :
+                          order.order_status === 'preparing' ? 'bg-orange-500' :
+                          order.order_status === 'ready' ? 'bg-blue-500' :
+                          'bg-gray-500'
+                        }`}>
+                          {order.order_status}
+                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                          order.payment_status === 'paid' ? 'bg-green-500' :
+                          order.payment_status === 'pending' ? 'bg-orange-500' :
+                          'bg-red-500'
+                        }`}>
+                          {order.payment_status}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div>
+                        <div className="font-medium">{formatCurrency(order.total_amount)}</div>
+                        {order.promo_discount && order.promo_discount > 0 && (
+                          <div className="text-xs text-red-600">
+                            -{formatCurrency(order.promo_discount)} discount
+                          </div>
+                        )}
+                      </div>
+                    </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="font-semibold text-emerald-600">
                           {formatCurrency(order.total_commission || 0)}
                         </div>
                       </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order.branch_name}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDateTime(order.created_at)}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order.qr_code ? (
-                          <div className="flex items-center space-x-2">
-                            <QrCode className="w-4 h-4 text-green-500" />
-                            <span className="text-green-600 text-xs">Generated</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">Not Generated</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order.branch_name}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDateTime(order.created_at)}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order.qr_code ? (
+                        <div className="flex items-center space-x-2">
+                          <QrCode className="w-4 h-4 text-green-500" />
+                          <span className="text-green-600 text-xs">Generated</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">Not Generated</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             </div>
           </div>
         </div>
