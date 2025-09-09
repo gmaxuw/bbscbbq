@@ -28,6 +28,7 @@ interface CartContextType {
   syncCartWithDatabase: () => Promise<void>
   checkout: (customerData: { name: string; phone: string; branch_id?: string; pickup_time?: string; payment_method?: string; payment_reference?: string; payment_screenshot_url?: string; user_id?: string }) => Promise<{ success: boolean; order_id?: string; conflicts?: string[] }>
   isSyncing: boolean
+  isLoading: boolean
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -35,45 +36,72 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isLoading, setIsLoading] = useState(true) // Add loading state
   const [platformFee, setPlatformFee] = useState(20) // Default ₱20
   const supabase = createClient()
 
   // Load cart from localStorage on mount
   useEffect(() => {
+    console.log('🛒 Cart context loading...')
     if (typeof window !== 'undefined') {
       const savedCart = localStorage.getItem('bbq-cart')
+      console.log('🛒 Saved cart from localStorage:', savedCart)
       if (savedCart) {
         try {
           const parsedCart = JSON.parse(savedCart)
+          console.log('🛒 Parsed cart:', parsedCart)
           setItems(parsedCart)
         } catch (error) {
-          console.error('Failed to load cart from localStorage:', error)
+          console.error('❌ Failed to load cart from localStorage:', error)
         }
       }
+      
+      // Load platform fee
+      loadPlatformFee()
+      
+      // Set up real-time subscription for platform fee changes
+      const platformFeeChannel = supabase
+        .channel('platform_fee_changes')
+        .on('postgres_changes', 
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'platform_settings',
+            filter: 'setting_key=eq.platform_fee'
+          }, 
+          (payload) => {
+            console.log('💰 Platform fee updated:', payload.new)
+            if (payload.new?.setting_value) {
+              setPlatformFee(parseFloat(payload.new.setting_value) || 20)
+            }
+          }
+        )
+        .subscribe()
+      
+      // Sync with database first, then mark loading complete
+      syncCartWithDatabase().finally(() => {
+        console.log('🛒 Cart loading complete')
+        setIsLoading(false)
+      })
+      
+      // Fallback timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.log('⏰ Cart loading timeout - forcing completion')
+        setIsLoading(false)
+      }, 5000) // 5 second timeout
+      
+      return () => {
+        clearTimeout(timeout)
+        platformFeeChannel.unsubscribe()
+      }
+    } else {
+      // Server-side, mark as not loading
+      console.log('🛒 Server-side, marking as not loading')
+      setIsLoading(false)
     }
   }, [])
 
-  // Load platform fee and sync cart with database when user logs in (skip on admin pages)
-  useEffect(() => {
-    const syncCart = async () => {
-      // Load platform fee first
-      await loadPlatformFee()
-      
-      // Skip cart sync on admin pages
-      if (typeof window !== 'undefined' && 
-          (window.location.pathname.startsWith('/admin') || 
-           window.location.pathname.startsWith('/crew'))) {
-        return
-      }
-      
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await syncCartWithDatabase()
-      }
-    }
-    
-    syncCart()
-  }, [supabase])
+  // This useEffect is now handled in the main cart loading useEffect above
 
   // Save cart to localStorage whenever items change
   useEffect(() => {
@@ -365,6 +393,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         syncCartWithDatabase,
         checkout,
         isSyncing,
+        isLoading,
       }}
     >
       {children}

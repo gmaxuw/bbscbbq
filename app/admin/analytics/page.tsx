@@ -39,9 +39,31 @@ interface DailyReport {
   total_subtotal: number
   total_discount: number
   total_commission: number
+  total_platform_fees: number
   net_profit: number
   average_order_value: number
   orders_by_status: Record<string, number>
+}
+
+interface FinancialAnalytics {
+  total_revenue: number
+  total_commission: number
+  total_platform_fees: number
+  net_profit: number
+  average_order_value: number
+  total_orders: number
+}
+
+interface TimeSeriesData {
+  date: string
+  revenue: number
+  commission: number
+  platform_fees: number
+  orders: number
+  lastMonthRevenue?: number
+  lastMonthCommission?: number
+  lastMonthPlatformFees?: number
+  lastMonthOrders?: number
 }
 
 interface BranchReport {
@@ -77,9 +99,13 @@ export default function AdminAnalytics() {
   const [dailyReports, setDailyReports] = useState<DailyReport[]>([])
   const [branchReports, setBranchReports] = useState<BranchReport[]>([])
   const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([])
+  const [financialAnalytics, setFinancialAnalytics] = useState<FinancialAnalytics | null>(null)
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedBranch, setSelectedBranch] = useState<string>('')
+  const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [comparisonType, setComparisonType] = useState<'revenue' | 'orders' | 'profit'>('revenue')
   const [dateRange, setDateRange] = useState({
     start: '2025-09-01', // Start from September 1st to include all your orders
     end: '2025-09-10' // Extend to September 10th to include all your orders
@@ -94,7 +120,9 @@ export default function AdminAnalytics() {
     loadDailyReport()
     loadBranchReport()
     loadOrderHistory()
-  }, [selectedDate, selectedBranch, dateRange])
+    loadFinancialAnalytics()
+    loadTimeSeriesData()
+  }, [selectedDate, selectedBranch, dateRange, selectedPeriod])
 
   const checkAuth = async () => {
     try {
@@ -204,7 +232,8 @@ export default function AdminAnalytics() {
           total_subtotal: data.subtotal,
           total_discount: data.discount,
           total_commission: data.commission,
-          net_profit: data.commission, // Commission is our profit
+          total_platform_fees: data.orders * 10, // Platform fee per order
+          net_profit: data.commission + (data.orders * 10), // Commission + Platform Fee
           average_order_value: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
           orders_by_status: {}
         })
@@ -343,6 +372,148 @@ export default function AdminAnalytics() {
     }
   }
 
+  // Load comprehensive financial analytics
+  const loadFinancialAnalytics = async () => {
+    try {
+      // Get platform fee from settings
+      const { data: platformSettings } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'platform_fee')
+        .single()
+
+      const platformFee = parseFloat(platformSettings?.setting_value || '10')
+
+      // Get all completed orders in date range
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select('total_amount, total_commission, subtotal, promo_discount, created_at')
+        .eq('order_status', 'completed')
+        .gte('created_at', dateRange.start)
+        .lte('created_at', dateRange.end)
+
+      if (error) throw error
+
+      // Calculate financial metrics
+      const totalRevenue = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0
+      const totalCommission = orders?.reduce((sum, order) => sum + parseFloat(order.total_commission || '0'), 0) || 0
+      const totalPlatformFees = (orders?.length || 0) * platformFee
+      const netProfit = totalCommission + totalPlatformFees
+      const totalOrders = orders?.length || 0
+      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+
+      setFinancialAnalytics({
+        total_revenue: totalRevenue,
+        total_commission: totalCommission,
+        total_platform_fees: totalPlatformFees,
+        net_profit: netProfit,
+        average_order_value: averageOrderValue,
+        total_orders: totalOrders
+      })
+    } catch (error) {
+      console.error('Failed to load financial analytics:', error)
+    }
+  }
+
+  // Load month-over-month comparison data
+  const loadTimeSeriesData = async () => {
+    try {
+      // Get platform fee from settings
+      const { data: platformSettings } = await supabase
+        .from('platform_settings')
+        .select('setting_value')
+        .eq('setting_key', 'platform_fee')
+        .single()
+
+      const platformFee = parseFloat(platformSettings?.setting_value || '10')
+
+      // Get current month and last month data
+      const currentDate = new Date()
+      const currentMonth = currentDate.getMonth()
+      const currentYear = currentDate.getFullYear()
+      const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
+      const lastYear = currentMonth === 0 ? currentYear - 1 : currentYear
+
+      // Get current month orders
+      const { data: currentMonthOrders, error: currentError } = await supabase
+        .from('orders')
+        .select('total_amount, total_commission, created_at')
+        .eq('order_status', 'completed')
+        .gte('created_at', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`)
+        .lt('created_at', `${currentYear}-${String(currentMonth + 2).padStart(2, '0')}-01`)
+        .order('created_at', { ascending: true })
+
+      // Get last month orders
+      const { data: lastMonthOrders, error: lastError } = await supabase
+        .from('orders')
+        .select('total_amount, total_commission, created_at')
+        .eq('order_status', 'completed')
+        .gte('created_at', `${lastYear}-${String(lastMonth + 1).padStart(2, '0')}-01`)
+        .lt('created_at', `${lastYear}-${String(lastMonth + 2).padStart(2, '0')}-01`)
+        .order('created_at', { ascending: true })
+
+      if (currentError || lastError) throw currentError || lastError
+
+      // Group by days for both months
+      const currentMonthData: { [key: string]: { revenue: number, commission: number, platform_fees: number, orders: number } } = {}
+      const lastMonthData: { [key: string]: { revenue: number, commission: number, platform_fees: number, orders: number } } = {}
+
+      // Process current month
+      currentMonthOrders?.forEach(order => {
+        const orderDate = new Date(order.created_at)
+        const dayKey = orderDate.getDate().toString()
+        
+        if (!currentMonthData[dayKey]) {
+          currentMonthData[dayKey] = { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
+        }
+        
+        currentMonthData[dayKey].revenue += parseFloat(order.total_amount || '0')
+        currentMonthData[dayKey].commission += parseFloat(order.total_commission || '0')
+        currentMonthData[dayKey].platform_fees += platformFee
+        currentMonthData[dayKey].orders += 1
+      })
+
+      // Process last month
+      lastMonthOrders?.forEach(order => {
+        const orderDate = new Date(order.created_at)
+        const dayKey = orderDate.getDate().toString()
+        
+        if (!lastMonthData[dayKey]) {
+          lastMonthData[dayKey] = { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
+        }
+        
+        lastMonthData[dayKey].revenue += parseFloat(order.total_amount || '0')
+        lastMonthData[dayKey].commission += parseFloat(order.total_commission || '0')
+        lastMonthData[dayKey].platform_fees += platformFee
+        lastMonthData[dayKey].orders += 1
+      })
+
+      // Create comparison data for the first 30 days
+      const comparisonData: TimeSeriesData[] = []
+      for (let day = 1; day <= 30; day++) {
+        const dayKey = day.toString()
+        const currentData = currentMonthData[dayKey] || { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
+        const lastData = lastMonthData[dayKey] || { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
+        
+        comparisonData.push({
+          date: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${dayKey.padStart(2, '0')}`,
+          revenue: currentData.revenue,
+          commission: currentData.commission,
+          platform_fees: currentData.platform_fees,
+          orders: currentData.orders,
+          lastMonthRevenue: lastData.revenue,
+          lastMonthCommission: lastData.commission,
+          lastMonthPlatformFees: lastData.platform_fees,
+          lastMonthOrders: lastData.orders
+        })
+      }
+
+      setTimeSeriesData(comparisonData)
+    } catch (error) {
+      console.error('Failed to load time series data:', error)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
@@ -390,8 +561,9 @@ export default function AdminAnalytics() {
   const totalOrders = branchReports.reduce((sum, report) => sum + report.total_orders, 0)
   const totalDiscounts = branchReports.reduce((sum, report) => sum + report.total_discount, 0)
   const totalCommission = branchReports.reduce((sum, report) => sum + report.total_commission, 0)
-  const netRevenue = totalRevenue - totalDiscounts
-  const netProfit = totalCommission // Commission is our profit
+  const totalPlatformFees = totalOrders * 10 // Platform fee per order
+  const stallIncome = totalRevenue - totalCommission - totalPlatformFees // What stalls actually earn
+  const yourProfit = totalCommission + totalPlatformFees // Your actual profit
 
   if (isLoading) {
     return (
@@ -494,8 +666,246 @@ export default function AdminAnalytics() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        {/* Financial Analytics Overview */}
+        {financialAnalytics && (
+          <div className="bbq-card p-4 sm:p-6 mb-6 sm:mb-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Financial Overview</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <DollarSign className="w-8 h-8 text-green-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-green-800">Total Revenue</p>
+                    <p className="text-2xl font-bold text-green-900">{formatCurrency(financialAnalytics.total_revenue)}</p>
+                    <p className="text-xs text-green-600">What customers pay</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <TrendingUp className="w-8 h-8 text-orange-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-orange-800">Stall Income</p>
+                    <p className="text-2xl font-bold text-orange-900">{formatCurrency(financialAnalytics.total_revenue - financialAnalytics.total_commission - financialAnalytics.total_platform_fees)}</p>
+                    <p className="text-xs text-orange-600">What stalls earn</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <BarChart3 className="w-8 h-8 text-blue-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-blue-800">Commission</p>
+                    <p className="text-2xl font-bold text-blue-900">{formatCurrency(financialAnalytics.total_commission)}</p>
+                    <p className="text-xs text-blue-600">Hidden profit</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <PieChart className="w-8 h-8 text-purple-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-purple-800">Platform Fees</p>
+                    <p className="text-2xl font-bold text-purple-900">{formatCurrency(financialAnalytics.total_platform_fees)}</p>
+                    <p className="text-xs text-purple-600">Visible profit</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Time Series Analytics */}
+        <div className="bbq-card p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-2 sm:mb-0">Income Trends</h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setSelectedPeriod('daily')}
+                className={`px-3 py-1 rounded text-sm font-medium ${
+                  selectedPeriod === 'daily' 
+                    ? 'bg-lays-orange-gold text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Daily
+              </button>
+              <button
+                onClick={() => setSelectedPeriod('weekly')}
+                className={`px-3 py-1 rounded text-sm font-medium ${
+                  selectedPeriod === 'weekly' 
+                    ? 'bg-lays-orange-gold text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Weekly
+              </button>
+              <button
+                onClick={() => setSelectedPeriod('monthly')}
+                className={`px-3 py-1 rounded text-sm font-medium ${
+                  selectedPeriod === 'monthly' 
+                    ? 'bg-lays-orange-gold text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Monthly
+              </button>
+            </div>
+          </div>
+          
+          {/* Line Chart - Like the photo */}
+          <div className="bg-gray-50 rounded-lg p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Current Month vs Last Month</h3>
+              <select 
+                value={comparisonType}
+                onChange={(e) => setComparisonType(e.target.value as 'revenue' | 'orders' | 'profit')}
+                className="bbq-input text-sm"
+              >
+                <option value="revenue">Revenue Comparison</option>
+                <option value="orders">Orders Comparison</option>
+                <option value="profit">Profit Comparison</option>
+              </select>
+            </div>
+            
+            {/* Chart Container */}
+            <div className="relative h-64 bg-white rounded-lg p-4">
+              {/* Y-axis labels */}
+              <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500 pr-2">
+                <span>100</span>
+                <span>50</span>
+                <span>0</span>
+              </div>
+              
+              {/* Chart Area */}
+              <div className="ml-8 h-full relative">
+                {/* Grid lines */}
+                <div className="absolute inset-0">
+                  <div className="absolute top-1/2 left-0 right-0 border-t border-gray-200"></div>
+                  <div className="absolute top-0 left-0 right-0 border-t border-gray-200"></div>
+                </div>
+                
+                {/* Line Chart */}
+                <svg className="w-full h-full" viewBox="0 0 400 200">
+                  {/* Get current and last month values based on comparison type */}
+                  {(() => {
+                    const getCurrentValue = (data: TimeSeriesData) => {
+                      switch (comparisonType) {
+                        case 'revenue': return data.revenue
+                        case 'orders': return data.orders
+                        case 'profit': return data.commission + data.platform_fees
+                        default: return data.revenue
+                      }
+                    }
+                    
+                    const getLastValue = (data: TimeSeriesData) => {
+                      switch (comparisonType) {
+                        case 'revenue': return data.lastMonthRevenue || 0
+                        case 'orders': return data.lastMonthOrders || 0
+                        case 'profit': return (data.lastMonthCommission || 0) + (data.lastMonthPlatformFees || 0)
+                        default: return data.lastMonthRevenue || 0
+                      }
+                    }
+                    
+                    const currentValues = timeSeriesData.map(getCurrentValue)
+                    const lastValues = timeSeriesData.map(getLastValue)
+                    const maxValue = Math.max(...currentValues, ...lastValues, 1)
+                    
+                    return (
+                      <>
+                        {/* Current Month Line (Blue) */}
+                        <polyline
+                          fill="none"
+                          stroke="#3B82F6"
+                          strokeWidth="3"
+                          points={timeSeriesData.map((data, index) => {
+                            const x = (index / Math.max(timeSeriesData.length - 1, 1)) * 380 + 10
+                            const y = 190 - (getCurrentValue(data) / maxValue) * 180
+                            return `${x},${y}`
+                          }).join(' ')}
+                        />
+                        
+                        {/* Last Month Line (Red) */}
+                        <polyline
+                          fill="none"
+                          stroke="#EF4444"
+                          strokeWidth="3"
+                          points={timeSeriesData.map((data, index) => {
+                            const x = (index / Math.max(timeSeriesData.length - 1, 1)) * 380 + 10
+                            const y = 190 - (getLastValue(data) / maxValue) * 180
+                            return `${x},${y}`
+                          }).join(' ')}
+                        />
+                        
+                        {/* Data Points - Current Month */}
+                        {timeSeriesData.map((data, index) => {
+                          const x = (index / Math.max(timeSeriesData.length - 1, 1)) * 380 + 10
+                          const y = 190 - (getCurrentValue(data) / maxValue) * 180
+                          return (
+                            <circle key={`current-${index}`} cx={x} cy={y} r="4" fill="#3B82F6" />
+                          )
+                        })}
+                        
+                        {/* Data Points - Last Month */}
+                        {timeSeriesData.map((data, index) => {
+                          const x = (index / Math.max(timeSeriesData.length - 1, 1)) * 380 + 10
+                          const y = 190 - (getLastValue(data) / maxValue) * 180
+                          return (
+                            <circle key={`last-${index}`} cx={x} cy={y} r="4" fill="#EF4444" />
+                          )
+                        })}
+                      </>
+                    )
+                  })()}
+                </svg>
+                
+                {/* X-axis labels */}
+                <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500 mt-2">
+                  {timeSeriesData.map((data, index) => {
+                    const date = new Date(data.date)
+                    const label = selectedPeriod === 'daily' 
+                      ? `${date.getMonth() + 1}/${date.getDate()}`
+                      : selectedPeriod === 'weekly'
+                      ? `W${Math.ceil(date.getDate() / 7)}`
+                      : `${date.getMonth() + 1}/${date.getFullYear()}`
+                    return (
+                      <span key={index} className="transform -rotate-45 origin-left">
+                        {label}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+            
+            {/* Legend */}
+            <div className="flex justify-end space-x-6 mt-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-0.5 bg-blue-500"></div>
+                <span className="text-sm font-medium text-gray-700">
+                  Current Month: {
+                    comparisonType === 'revenue' ? formatCurrency(timeSeriesData.reduce((sum, d) => sum + d.revenue, 0)) :
+                    comparisonType === 'orders' ? timeSeriesData.reduce((sum, d) => sum + d.orders, 0).toString() :
+                    formatCurrency(timeSeriesData.reduce((sum, d) => sum + d.commission + d.platform_fees, 0))
+                  }
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-0.5 bg-red-500"></div>
+                <span className="text-sm font-medium text-gray-700">
+                  Last Month: {
+                    comparisonType === 'revenue' ? formatCurrency(timeSeriesData.reduce((sum, d) => sum + (d.lastMonthRevenue || 0), 0)) :
+                    comparisonType === 'orders' ? timeSeriesData.reduce((sum, d) => sum + (d.lastMonthOrders || 0), 0).toString() :
+                    formatCurrency(timeSeriesData.reduce((sum, d) => sum + (d.lastMonthCommission || 0) + (d.lastMonthPlatformFees || 0), 0))
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary Cards - Clear Financial Breakdown */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
               <div className="p-2 bg-green-500/10 rounded-lg flex-shrink-0">
@@ -504,6 +914,7 @@ export default function AdminAnalytics() {
               <div className="ml-3 sm:ml-4 min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Revenue</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalRevenue)}</p>
+                <p className="text-xs text-gray-400">What customers pay</p>
               </div>
             </div>
           </div>
@@ -516,30 +927,7 @@ export default function AdminAnalytics() {
               <div className="ml-3 sm:ml-4 min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Orders</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{totalOrders}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bbq-card p-4 sm:p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-500/10 rounded-lg flex-shrink-0">
-                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
-              </div>
-              <div className="ml-3 sm:ml-4 min-w-0 flex-1">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Commission</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalCommission)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bbq-card p-4 sm:p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-emerald-500/10 rounded-lg flex-shrink-0">
-                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
-              </div>
-              <div className="ml-3 sm:ml-4 min-w-0 flex-1">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Net Profit</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(netProfit)}</p>
+                <p className="text-xs text-gray-400">Completed orders</p>
               </div>
             </div>
           </div>
@@ -550,20 +938,22 @@ export default function AdminAnalytics() {
                 <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
               </div>
               <div className="ml-3 sm:ml-4 min-w-0 flex-1">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Net Revenue</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(netRevenue)}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Stall Income</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(stallIncome)}</p>
+                <p className="text-xs text-gray-400">Revenue - Commission - Platform Fee</p>
               </div>
             </div>
           </div>
 
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-red-500/10 rounded-lg flex-shrink-0">
-                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
+              <div className="p-2 bg-purple-500/10 rounded-lg flex-shrink-0">
+                <PieChart className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
               </div>
               <div className="ml-3 sm:ml-4 min-w-0 flex-1">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Discounts</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalDiscounts)}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Your Profit</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(yourProfit)}</p>
+                <p className="text-xs text-gray-400">Commission + Platform Fee</p>
               </div>
             </div>
           </div>

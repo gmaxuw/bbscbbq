@@ -17,7 +17,7 @@ interface Branch {
 }
 
 export default function CheckoutPage() {
-  const { items, getTotalPrice, getItemTotalPrice, getPlatformFee, getTotalPriceWithPlatformFee, checkout, clearCart } = useCart()
+  const { items, getTotalPrice, getItemTotalPrice, getPlatformFee, getTotalPriceWithPlatformFee, checkout, clearCart, isLoading: isCartLoading } = useCart()
   const router = useRouter()
   const [isProcessing, setIsProcessing] = useState(false)
   const [customerData, setCustomerData] = useState({
@@ -54,6 +54,8 @@ export default function CheckoutPage() {
 
   // Load customer data and branches
   useEffect(() => {
+    console.log('🚀 Checkout useEffect starting...')
+    
     // Check localStorage first for instant auth state
     if (typeof window !== 'undefined') {
       const customerEmail = localStorage.getItem('customer_email')
@@ -81,34 +83,64 @@ export default function CheckoutPage() {
         })
         console.log('✅ Instant auth from localStorage:', { customerName, customerEmail })
         
-        // Also verify with Supabase to ensure session is valid
-        checkAuthentication()
+        // Don't override with Supabase check - trust localStorage auth
+        // Only check Supabase if we need to refresh the session
       } else {
         // No stored auth, check with Supabase
         checkAuthentication()
       }
     }
+    
+    // Always load branches
+    console.log('🔄 Calling loadBranches...')
     loadBranches()
+    
+    // Fallback timeout in case branches loading gets stuck
+    const timeout = setTimeout(() => {
+      console.log('⏰ Branches loading timeout - forcing completion')
+      setIsLoadingBranches(false)
+    }, 5000) // 5 second timeout
+    
+    return () => clearTimeout(timeout)
   }, [])
 
   // Check if user is authenticated
   const checkAuthentication = async () => {
     try {
       const supabase = createClient()
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      // First check if there's an active session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       console.log('🔐 Checkout auth check:', { 
-        user: user?.id, 
-        userEmail: user?.email,
-        userRole: user?.user_metadata?.role,
-        userError: userError?.message,
         hasSession: !!session,
-        sessionUser: session?.user?.id,
-        sessionError: sessionError?.message
+        sessionValid: session?.expires_at ? new Date(session.expires_at) > new Date() : false,
+        sessionError: sessionError?.message,
+        sessionUser: session?.user?.id
       })
       
-      if (user) {
+      // If no session or session expired, user is not authenticated
+      if (!session || !session.user) {
+        console.log('❌ No valid session found in checkout')
+        setIsAuthenticated(false)
+        setCurrentUser(null)
+        setShowLoginModal(true)
+        return
+      }
+      
+      // Check if session is expired
+      if (session.expires_at && new Date(session.expires_at) <= new Date()) {
+        console.log('❌ Session expired in checkout')
+        setIsAuthenticated(false)
+        setCurrentUser(null)
+        setShowLoginModal(true)
+        return
+      }
+      
+      // Get fresh user data
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (user && user.id === session.user.id) {
         // Check if user has customer role
         const userRole = user.user_metadata?.role
         if (userRole === 'customer') {
@@ -126,16 +158,41 @@ export default function CheckoutPage() {
         } else {
           // Not a customer, show login modal
           console.log('❌ User is not a customer:', userRole)
+          setIsAuthenticated(false)
+          setCurrentUser(null)
           setShowLoginModal(true)
         }
       } else {
-        // No user, show login modal
-        console.log('❌ No user found in checkout')
+        // User data doesn't match session, not authenticated
+        console.log('❌ User data mismatch in checkout')
+        setIsAuthenticated(false)
+        setCurrentUser(null)
         setShowLoginModal(true)
       }
     } catch (error) {
       console.error('Auth check error:', error)
+      setIsAuthenticated(false)
+      setCurrentUser(null)
       setShowLoginModal(true)
+    }
+  }
+
+  // Logout function to clear session
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      setIsAuthenticated(false)
+      setCurrentUser(null)
+      setCustomerData({
+        name: '',
+        phone: '',
+        email: '',
+        branch_id: ''
+      })
+      console.log('✅ User logged out successfully')
+    } catch (error) {
+      console.error('Logout error:', error)
     }
   }
 
@@ -179,6 +236,7 @@ export default function CheckoutPage() {
   // Load branches from database
   const loadBranches = async () => {
     try {
+      console.log('🔄 Loading branches...')
       const supabase = createClient()
       const { data, error } = await supabase
         .from('branches')
@@ -187,14 +245,18 @@ export default function CheckoutPage() {
         .order('created_at')
 
       if (error) {
-        console.error('Error loading branches:', error)
+        console.error('❌ Error loading branches:', error)
+        setBranches([]) // Set empty array on error
         return
       }
 
+      console.log('✅ Branches loaded:', data?.length || 0)
       setBranches(data || [])
     } catch (error) {
-      console.error('Error loading branches:', error)
+      console.error('❌ Error loading branches:', error)
+      setBranches([]) // Set empty array on error
     } finally {
+      console.log('🏁 Branches loading complete')
       setIsLoadingBranches(false)
     }
   }
@@ -346,6 +408,18 @@ export default function CheckoutPage() {
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  // Show loading state while cart is loading
+  if (isCartLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-lays-orange-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your cart...</p>
+        </div>
+      </div>
+    )
   }
 
   if (items.length === 0) {

@@ -55,7 +55,8 @@ export default function AccountPage() {
   const [userName, setUserName] = useState('')
   const [userPhone, setUserPhone] = useState('')
   const [userId, setUserId] = useState('')
-  const [showLoginForm, setShowLoginForm] = useState(true)
+  const [showLoginForm, setShowLoginForm] = useState(false) // Start as false
+  const [isLoading, setIsLoading] = useState(true) // Add loading state
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -81,7 +82,6 @@ export default function AccountPage() {
   })
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [showProfileEdit, setShowProfileEdit] = useState(false)
   const [profileEditData, setProfileEditData] = useState({
     fullName: '',
@@ -117,6 +117,11 @@ export default function AccountPage() {
           ready_at,
           cooking_started_at,
           updated_at,
+          branch_id,
+          branches!inner(
+            name,
+            is_active
+          ),
           order_items (
             product_name,
             quantity,
@@ -124,6 +129,7 @@ export default function AccountPage() {
           )
         `)
         .or(`customer_email.eq.${userEmail},customer_phone.eq.${userPhone}`)
+        .eq('branches.is_active', true)
         .order('created_at', { ascending: false })
 
       if (ordersError) {
@@ -161,7 +167,7 @@ export default function AccountPage() {
         actual_pickup_time: order.actual_pickup_time,
         ready_at: order.ready_at,
         cooking_started_at: order.cooking_started_at,
-        branch_name: 'Main Branch',
+        branch_name: (order as any).branches?.name || 'Unknown Branch',
         items: order.order_items || []
       })) || []
 
@@ -236,7 +242,17 @@ export default function AccountPage() {
         setUserPhone(customerPhone || '')
         setUserId(customerId || '')
         setIsLoggedIn(true)
+        setShowLoginForm(false)
+      } else {
+        setShowLoginForm(true)
       }
+      
+      // Mark loading as complete
+      setIsLoading(false)
+    } else {
+      // Server-side, show login form
+      setShowLoginForm(true)
+      setIsLoading(false)
     }
   }, [])
 
@@ -516,10 +532,22 @@ export default function AccountPage() {
   }
 
 
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-lays-orange-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your account...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <DesignLock pageName="User Account Dashboard" />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <DesignLock pageName="User Account Dashboard" />
         
         {/* Header */}
         <div className="bg-white shadow-sm border-b">

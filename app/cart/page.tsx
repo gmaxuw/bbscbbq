@@ -8,7 +8,7 @@ import { useCart } from '@/lib/cart-context'
 import DesignLock from '@/components/layout/DesignLock'
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, getTotalItems, getTotalPrice, getItemTotalPrice, getPlatformFee, getTotalPriceWithPlatformFee, clearCart } = useCart()
+  const { items, updateQuantity, removeItem, getTotalItems, getTotalPrice, getItemTotalPrice, getPlatformFee, getTotalPriceWithPlatformFee, clearCart, isLoading } = useCart()
   const [isProcessing, setIsProcessing] = useState(false)
   const router = useRouter()
 
@@ -18,7 +18,43 @@ export default function CartPage() {
     router.push('/checkout')
   }
 
-  if (items.length === 0) {
+  // Show loading state while cart is loading
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <DesignLock pageName="Cart Page" />
+        
+        {/* Header */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="max-w-6xl mx-auto px-4 py-6">
+            <div className="flex items-center space-x-4">
+              <Link 
+                href="/" 
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </Link>
+              <div className="flex items-center space-x-3">
+                <ShoppingCart className="w-6 h-6 text-lays-dark-red" />
+                <h1 className="text-2xl font-bold text-gray-900">Shopping Cart</h1>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading State */}
+        <div className="max-w-6xl mx-auto px-4 py-16">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-lays-orange-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your cart...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Only show empty cart if we're not loading AND items is actually empty
+  if (!isLoading && items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
         <DesignLock pageName="Cart Page" />

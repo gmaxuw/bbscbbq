@@ -300,13 +300,18 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       
       const pollInterval = setInterval(async () => {
         try {
-          // Get the latest order timestamp
-          const { data: latestOrder } = await supabase
+          // Get the latest order timestamp - handle RLS properly
+          const { data: latestOrder, error: orderError } = await supabase
             .from('orders')
             .select('created_at, id')
             .order('created_at', { ascending: false })
             .limit(1)
             .single()
+            
+          if (orderError) {
+            console.log('⚠️ Polling order check failed (RLS):', orderError.message)
+            return // Skip this poll cycle
+          }
 
           if (latestOrder) {
             const latestTime = new Date(latestOrder.created_at).getTime()
@@ -333,9 +338,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
             }
           }
         } catch (error) {
-          console.error('Global polling error:', error)
+          console.log('⚠️ Global polling error (RLS/Network):', error)
+          // Don't log as error since this is expected with RLS
         }
-      }, 3000) // Poll every 3 seconds
+      }, 5000) // Poll every 5 seconds (reduced frequency)
 
       // Store interval ID for cleanup
       ;(window as any).globalPollInterval = pollInterval
