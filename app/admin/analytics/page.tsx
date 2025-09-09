@@ -977,51 +977,106 @@ export default function AdminAnalytics() {
         {/* Branch Performance */}
         <div className="bbq-card p-4 sm:p-6 mb-6 sm:mb-8">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Branch Performance</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Order</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {branchReports.map((report) => (
-                  <tr key={report.branch_id}>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {report.branch_name}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {report.total_orders}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(report.total_revenue)}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(report.total_commission)}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span className="font-semibold text-emerald-600">
+          
+          {/* Mobile Card Layout */}
+          <div className="block lg:hidden">
+            <div className="space-y-4">
+              {branchReports.map((report) => (
+                <div key={report.branch_id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  {/* Branch Header */}
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{report.branch_name}</h3>
+                      <div className="text-sm text-gray-500">{report.total_orders} orders</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-emerald-600">
                         {formatCurrency(report.net_profit)}
-                      </span>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(report.average_order_value)}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        100%
-                      </span>
-                    </td>
+                      </div>
+                      <div className="text-xs text-gray-500">Our Profit</div>
+                    </div>
+                  </div>
+
+                  {/* Performance Stats */}
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <div className="text-sm text-gray-500">Gross Revenue</div>
+                      <div className="text-sm font-medium text-gray-900">{formatCurrency(report.total_revenue)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Commission</div>
+                      <div className="text-sm font-medium text-gray-900">{formatCurrency(report.total_commission)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Avg Order</div>
+                      <div className="text-sm font-medium text-gray-900">{formatCurrency(report.average_order_value)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Completion</div>
+                      <div className="text-sm font-medium text-green-600">100%</div>
+                    </div>
+                  </div>
+
+                  {/* Performance Bar */}
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-emerald-500 h-2 rounded-full" 
+                      style={{ width: '100%' }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden lg:block">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Order</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {branchReports.map((report) => (
+                    <tr key={report.branch_id}>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {report.branch_name}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {report.total_orders}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(report.total_revenue)}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(report.total_commission)}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className="font-semibold text-emerald-600">
+                          {formatCurrency(report.net_profit)}
+                        </span>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(report.average_order_value)}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          100%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -1032,86 +1087,176 @@ export default function AdminAnalytics() {
             <span className="text-sm text-gray-500">{orderHistory.length} orders</span>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {orderHistory.map((order) => (
-                  <tr key={order.order_id}>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                      {order.order_number}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
-                        <div className="text-xs sm:text-sm text-gray-500">{order.customer_phone}</div>
+          {/* Mobile Card Layout */}
+          <div className="block lg:hidden">
+            <div className="space-y-4">
+              {orderHistory.map((order) => (
+                <div key={order.order_id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  {/* Order Header */}
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 font-mono">#{order.order_number}</h3>
+                      <div className="text-sm text-gray-500">{formatDateTime(order.created_at)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-lays-dark-red">
+                        {formatCurrency(order.total_amount)}
                       </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col space-y-1">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
-                          order.order_status === 'completed' ? 'bg-green-500' :
-                          order.order_status === 'preparing' ? 'bg-orange-500' :
-                          order.order_status === 'ready' ? 'bg-blue-500' :
-                          'bg-gray-500'
-                        }`}>
-                          {order.order_status}
-                        </span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
-                          order.payment_status === 'paid' ? 'bg-green-500' :
-                          order.payment_status === 'pending' ? 'bg-orange-500' :
-                          'bg-red-500'
-                        }`}>
-                          {order.payment_status}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div>
-                        <div className="font-medium">{formatCurrency(order.total_amount)}</div>
-                        {order.promo_discount && order.promo_discount > 0 && (
-                          <div className="text-xs text-red-600">
-                            -{formatCurrency(order.promo_discount)} discount
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="font-semibold text-emerald-600">
+                      <div className="text-xs text-gray-500">Total Amount</div>
+                    </div>
+                  </div>
+
+                  {/* Customer Info */}
+                  <div className="mb-3">
+                    <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
+                    <div className="text-sm text-gray-500">{order.customer_phone}</div>
+                  </div>
+
+                  {/* Status Badges */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                      order.order_status === 'completed' ? 'bg-green-500' :
+                      order.order_status === 'preparing' ? 'bg-orange-500' :
+                      order.order_status === 'ready' ? 'bg-blue-500' :
+                      'bg-gray-500'
+                    }`}>
+                      {order.order_status}
+                    </span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                      order.payment_status === 'paid' ? 'bg-green-500' :
+                      order.payment_status === 'pending' ? 'bg-orange-500' :
+                      'bg-red-500'
+                    }`}>
+                      {order.payment_status}
+                    </span>
+                  </div>
+
+                  {/* Order Details */}
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <div className="text-sm text-gray-500">Commission</div>
+                      <div className="text-sm font-semibold text-emerald-600">
                         {formatCurrency(order.total_commission || 0)}
                       </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.branch_name}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDateTime(order.created_at)}
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.qr_code ? (
-                        <div className="flex items-center space-x-2">
-                          <QrCode className="w-4 h-4 text-green-500" />
-                          <span className="text-green-600 text-xs">Generated</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-xs">Not Generated</span>
-                      )}
-                    </td>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Branch</div>
+                      <div className="text-sm font-medium text-gray-900">{order.branch_name}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">QR Code</div>
+                      <div className="text-sm">
+                        {order.qr_code ? (
+                          <div className="flex items-center space-x-1">
+                            <QrCode className="w-4 h-4 text-green-500" />
+                            <span className="text-green-600 text-xs">Generated</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">Not Generated</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Discount</div>
+                      <div className="text-sm">
+                        {order.promo_discount && order.promo_discount > 0 ? (
+                          <span className="text-red-600 text-xs">
+                            -{formatCurrency(order.promo_discount)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">None</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden lg:block">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {orderHistory.map((order) => (
+                    <tr key={order.order_id}>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                        {order.order_number}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
+                          <div className="text-xs sm:text-sm text-gray-500">{order.customer_phone}</div>
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col space-y-1">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                            order.order_status === 'completed' ? 'bg-green-500' :
+                            order.order_status === 'preparing' ? 'bg-orange-500' :
+                            order.order_status === 'ready' ? 'bg-blue-500' :
+                            'bg-gray-500'
+                          }`}>
+                            {order.order_status}
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                            order.payment_status === 'paid' ? 'bg-green-500' :
+                            order.payment_status === 'pending' ? 'bg-orange-500' :
+                            'bg-red-500'
+                          }`}>
+                            {order.payment_status}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div>
+                          <div className="font-medium">{formatCurrency(order.total_amount)}</div>
+                          {order.promo_discount && order.promo_discount > 0 && (
+                            <div className="text-xs text-red-600">
+                              -{formatCurrency(order.promo_discount)} discount
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div className="font-semibold text-emerald-600">
+                          {formatCurrency(order.total_commission || 0)}
+                        </div>
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {order.branch_name}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatDateTime(order.created_at)}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {order.qr_code ? (
+                          <div className="flex items-center space-x-2">
+                            <QrCode className="w-4 h-4 text-green-500" />
+                            <span className="text-green-600 text-xs">Generated</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">Not Generated</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
