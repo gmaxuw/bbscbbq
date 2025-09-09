@@ -5,7 +5,7 @@
  * with customer authentication. It uses a separate session management system.
  */
 
-import { createClientComponentClient } from './supabase'
+import { createClientComponentClient } from '@/lib/supabase'
 
 interface AdminUser {
   id: string

@@ -31,6 +31,7 @@ import Link from 'next/link'
 import { Star, Clock, Flame, ArrowRight, Minus, Plus, ShoppingCart } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCart } from '@/lib/cart-context'
+import FavoriteButton from '@/components/ui/FavoriteButton'
 
 interface Product {
   id: string
@@ -40,6 +41,7 @@ interface Product {
   commission: number
   category: string
   is_active: boolean
+  is_featured: boolean
   stock_quantity: number
   min_stock_level: number
   is_out_of_stock: boolean
@@ -77,6 +79,7 @@ export default function FeaturedMenu() {
             commission,
             category,
             is_active,
+            is_featured,
             stock_quantity,
             min_stock_level,
             is_out_of_stock,
@@ -134,6 +137,7 @@ export default function FeaturedMenu() {
           commission,
           category,
           is_active,
+          is_featured,
           stock_quantity,
           min_stock_level,
           is_out_of_stock,
@@ -290,8 +294,17 @@ export default function FeaturedMenu() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 
+                {/* Heart Icon for Favorites */}
+                <div className="absolute top-3 left-3">
+                  <FavoriteButton 
+                    product={item} 
+                    size="md"
+                    className="bg-white/90 backdrop-blur-sm"
+                  />
+                </div>
+                
                 {item.category === 'BBQ' && (
-                  <div className="absolute top-3 left-3 bg-lays-bright-red text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1">
+                  <div className="absolute top-3 left-16 bg-lays-bright-red text-white text-xs font-bold px-3 py-1 rounded-full flex items-center space-x-1">
                     <Star className="w-3 h-3 fill-current" />
                     <span>FEATURED</span>
                   </div>

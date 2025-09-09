@@ -65,7 +65,7 @@ export default function DesignLock({ pageName, allowedComponents = [] }: DesignL
                   // Layout
             'flex', 'grid', 'block', 'inline', 'inline-block', 'hidden',
             'container', 'mx-auto', 'px-4', 'py-2', 'py-3', 'm-0', 'p-0',
-            'w-full', 'h-full', 'min-h-screen', 'max-w-5xl', 'max-w-4xl',
+            'w-full', 'h-full', 'min-h-screen', 'max-w-5xl', 'max-w-4xl', 'max-w-2xl',
             'inset-0', 'absolute', 'relative', 'fixed', 'sticky',
             'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4', 'grid-cols-5', 'grid-cols-6',
             'grid-rows-1', 'grid-rows-2', 'grid-rows-3', 'grid-rows-4', 'grid-rows-5', 'grid-rows-6',

@@ -116,7 +116,7 @@ class InventoryManager {
     pickup_time?: string
     payment_method?: string
     payment_reference?: string
-    payment_screenshot?: File | null
+    payment_screenshot_url?: string
   }): Promise<{ success: boolean; order_id?: string; conflicts?: string[] }> {
     try {
       if (this.isOnline) {
@@ -141,7 +141,7 @@ class InventoryManager {
     pickup_time?: string
     payment_method?: string
     payment_reference?: string
-    payment_screenshot?: File | null
+    payment_screenshot_url?: string
   }): Promise<{ success: boolean; order_id?: string; conflicts?: string[] }> {
     const supabase = createClient()
     
@@ -172,6 +172,9 @@ class InventoryManager {
       }
     }
 
+    // Use provided screenshot URL
+    const screenshotUrl = orderData.payment_screenshot_url || null
+
     // Create order
     const total_amount = orderData.items.reduce((sum, item) => sum + item.subtotal, 0)
     const total_commission = orderData.items.reduce((sum, item) => sum + (item.unit_commission * item.quantity), 0)
@@ -189,7 +192,8 @@ class InventoryManager {
         order_status: 'pending',
         payment_status: 'pending',
         payment_method: orderData.payment_method || 'gcash',
-        gcash_reference: orderData.payment_reference
+        gcash_reference: orderData.payment_reference,
+        payment_screenshot_url: screenshotUrl
       }])
       .select()
       .single()
@@ -227,6 +231,10 @@ class InventoryManager {
     customer_name: string
     customer_phone: string
     branch_id?: string
+    pickup_time?: string
+    payment_method?: string
+    payment_reference?: string
+    payment_screenshot_url?: string
   }): Promise<{ success: boolean; order_id?: string }> {
     const orderId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     

@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useCart } from '@/lib/cart-context'
 import { useRouter } from 'next/navigation'
-import { ShoppingCart, CreditCard, User, Phone, MapPin, AlertCircle, CheckCircle, Wifi, WifiOff, UserCheck, Edit3, Clock } from 'lucide-react'
+import { ShoppingCart, CreditCard, User, Phone, MapPin, AlertCircle, CheckCircle, Wifi, WifiOff, UserCheck, Edit3, Clock, Upload, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
+import { uploadPaymentScreenshot, UploadProgress } from '@/lib/file-upload'
 
 interface Branch {
   id: string
@@ -36,12 +37,15 @@ export default function CheckoutPage() {
   const [paymentData, setPaymentData] = useState({
     method: 'gcash',
     reference: '',
-    screenshot: null as File | null
+    screenshot: null as File | null,
+    screenshotUrl: null as string | null
   })
   const [branches, setBranches] = useState<Branch[]>([])
   const [errors, setErrors] = useState<string[]>([])
   const [isOnline, setIsOnline] = useState(true)
   const [isLoadingBranches, setIsLoadingBranches] = useState(true)
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
   // Load customer data and branches
   useEffect(() => {
@@ -109,6 +113,67 @@ export default function CheckoutPage() {
     }
   }
 
+  // Handle file upload
+  const handleFileUpload = async (file: File) => {
+    if (!file) return
+
+    setIsUploading(true)
+    setUploadProgress({ progress: 0, status: 'uploading' })
+    setErrors([])
+
+    try {
+      const result = await uploadPaymentScreenshot(file, (progress) => {
+        setUploadProgress(progress)
+      })
+
+      if (result.status === 'success' && result.url) {
+        setPaymentData(prev => ({
+          ...prev,
+          screenshot: file,
+          screenshotUrl: result.url!
+        }))
+        console.log('✅ Screenshot uploaded successfully:', result.url)
+      } else {
+        setErrors([result.error || 'Failed to upload screenshot'])
+        setPaymentData(prev => ({
+          ...prev,
+          screenshot: null,
+          screenshotUrl: null
+        }))
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      setErrors(['Failed to upload screenshot. Please try again.'])
+      setPaymentData(prev => ({
+        ...prev,
+        screenshot: null,
+        screenshotUrl: null
+      }))
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // Handle file input change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setErrors(['Please select an image file'])
+        return
+      }
+      
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors(['File size must be less than 5MB'])
+        return
+      }
+
+      handleFileUpload(file)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrors([])
@@ -121,8 +186,8 @@ export default function CheckoutPage() {
         return
       }
 
-      if (!paymentData.reference || !paymentData.screenshot) {
-        setErrors(['Please provide payment reference number and screenshot'])
+      if (!paymentData.reference || !paymentData.screenshotUrl) {
+        setErrors(['Please provide payment reference number and upload screenshot'])
         return
       }
 
@@ -134,7 +199,7 @@ export default function CheckoutPage() {
         pickup_time: new Date(`${pickupDateTime.date}T${pickupDateTime.time}:00`).toISOString(),
         payment_method: paymentData.method,
         payment_reference: paymentData.reference,
-        payment_screenshot: paymentData.screenshot
+        payment_screenshot_url: paymentData.screenshotUrl
       } : {
         name: customerData.name,
         phone: customerData.phone,
@@ -142,7 +207,7 @@ export default function CheckoutPage() {
         pickup_time: new Date(`${pickupDateTime.date}T${pickupDateTime.time}:00`).toISOString(),
         payment_method: paymentData.method,
         payment_reference: paymentData.reference,
-        payment_screenshot: paymentData.screenshot
+        payment_screenshot_url: paymentData.screenshotUrl
       }
 
       const result = await checkout(orderData)
@@ -502,14 +567,71 @@ export default function CheckoutPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Payment Screenshot *
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setPaymentData({...paymentData, screenshot: e.target.files?.[0] || null})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
+                    
+                    {/* File Upload Area */}
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-lays-orange-gold transition-colors">
+                      {!paymentData.screenshotUrl ? (
+                        <div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            disabled={isUploading}
+                            className="hidden"
+                            id="screenshot-upload"
+                          />
+                          <label
+                            htmlFor="screenshot-upload"
+                            className={`cursor-pointer flex flex-col items-center space-y-2 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <Upload className="w-8 h-8 text-gray-400" />
+                            <span className="text-sm text-gray-600">
+                              {isUploading ? 'Uploading...' : 'Click to upload screenshot'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              PNG, JPG, GIF up to 5MB
+                            </span>
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                            <div className="text-left">
+                              <p className="text-sm font-medium text-gray-900">
+                                {paymentData.screenshot?.name || 'Screenshot uploaded'}
+                              </p>
+                              <p className="text-xs text-green-600">Upload successful</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentData(prev => ({ ...prev, screenshot: null, screenshotUrl: null }))}
+                            className="text-gray-400 hover:text-red-500"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload Progress */}
+                    {isUploading && uploadProgress && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+                          <span>Uploading...</span>
+                          <span>{uploadProgress.progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-lays-orange-gold h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-gray-500 mt-2">
                       Upload screenshot of your payment confirmation
                     </p>
                   </div>
@@ -538,13 +660,23 @@ export default function CheckoutPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isProcessing}
+                  disabled={isProcessing || !isOnline || isUploading || !paymentData.screenshotUrl}
                   className="flex-1 px-4 py-3 bg-lays-orange-gold text-white rounded-lg hover:bg-lays-dark-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {isProcessing ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Processing...</span>
+                      <span>Processing Order...</span>
+                    </>
+                  ) : isUploading ? (
+                    <>
+                      <Upload className="w-4 h-4 animate-pulse" />
+                      <span>Uploading Screenshot...</span>
+                    </>
+                  ) : !paymentData.screenshotUrl ? (
+                    <>
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Upload Screenshot First</span>
                     </>
                   ) : (
                     <>

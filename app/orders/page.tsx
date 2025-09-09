@@ -39,6 +39,9 @@ interface Order {
   qr_code?: string
   created_at: string
   updated_at: string
+  cooking_started_at?: string
+  ready_at?: string
+  actual_pickup_time?: string
   order_items: OrderItem[]
   branch?: {
     name: string
@@ -444,6 +447,71 @@ export default function CustomerOrdersPage() {
                   Placed on {formatDate(selectedOrder.created_at)}
                 </p>
               </div>
+
+              {/* Pickup Timing Information */}
+              {(selectedOrder.cooking_started_at || selectedOrder.ready_at || selectedOrder.actual_pickup_time) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center space-x-2">
+                    <Clock className="w-5 h-5 text-lays-dark-red" />
+                    <span>Order Timeline</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                    <div className="text-center p-3 bg-white rounded-lg border">
+                      <div className="text-gray-600 mb-1">Order Placed</div>
+                      <div className="font-medium text-gray-900">{formatDate(selectedOrder.created_at)}</div>
+                    </div>
+                    
+                    {selectedOrder.cooking_started_at && (
+                      <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                        <div className="text-orange-600 mb-1">Cooking Started</div>
+                        <div className="font-medium text-orange-800">{formatDate(selectedOrder.cooking_started_at)}</div>
+                      </div>
+                    )}
+                    
+                    {selectedOrder.ready_at && (
+                      <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div className="text-green-600 mb-1">Ready for Pickup</div>
+                        <div className="font-medium text-green-800">{formatDate(selectedOrder.ready_at)}</div>
+                      </div>
+                    )}
+                    
+                    {selectedOrder.actual_pickup_time && (
+                      <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="text-blue-600 mb-1">Actually Picked Up</div>
+                        <div className="font-medium text-blue-800">{formatDate(selectedOrder.actual_pickup_time)}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Timing Analysis for Customer */}
+                  {selectedOrder.ready_at && selectedOrder.actual_pickup_time && (
+                    <div className="mt-4 p-3 bg-white rounded-lg border">
+                      <h5 className="font-medium text-gray-900 mb-2">Your Pickup Details</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Food was ready at:</span>
+                          <span className="font-medium text-green-600">{formatDate(selectedOrder.ready_at)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">You picked up at:</span>
+                          <span className="font-medium text-blue-600">{formatDate(selectedOrder.actual_pickup_time)}</span>
+                        </div>
+                        <div className="flex justify-between col-span-full pt-2 border-t">
+                          <span className="text-gray-600">Your wait time:</span>
+                          <span className={`font-medium ${
+                            (new Date(selectedOrder.actual_pickup_time).getTime() - new Date(selectedOrder.ready_at).getTime()) / 60000 > 15 
+                              ? 'text-red-600' 
+                              : 'text-green-600'
+                          }`}>
+                            {Math.round((new Date(selectedOrder.actual_pickup_time).getTime() - new Date(selectedOrder.ready_at).getTime()) / 60000)} minutes
+                            {(new Date(selectedOrder.actual_pickup_time).getTime() - new Date(selectedOrder.ready_at).getTime()) / 60000 > 15 && ' (You were late!)'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Order Items */}
               <div className="mb-6">

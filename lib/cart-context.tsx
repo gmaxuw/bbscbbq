@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { createClient } from './supabase'
+import { createClient } from '@/lib/supabase'
 import { inventoryManager } from './inventory-manager'
 
 interface CartItem {
@@ -23,7 +23,7 @@ interface CartContextType {
   getTotalItems: () => number
   getTotalPrice: () => number
   syncCartWithDatabase: () => Promise<void>
-  checkout: (customerData: { name: string; phone: string; branch_id?: string }) => Promise<{ success: boolean; order_id?: string; conflicts?: string[] }>
+  checkout: (customerData: { name: string; phone: string; branch_id?: string; pickup_time?: string; payment_method?: string; payment_reference?: string; payment_screenshot_url?: string }) => Promise<{ success: boolean; order_id?: string; conflicts?: string[] }>
   isSyncing: boolean
 }
 
@@ -171,7 +171,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       const { error } = await supabase
         .from('user_carts')
-        .insert(cartData)
+        .upsert(cartData, { 
+          onConflict: 'user_id,product_id',
+          ignoreDuplicates: false 
+        })
 
       if (error) {
         console.error('🛒 Error uploading cart to database:', error)
@@ -251,7 +254,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return items.reduce((total, item) => total + (item.price * item.quantity), 0)
   }
 
-  const checkout = async (customerData: { name: string; phone: string; branch_id?: string }) => {
+  const checkout = async (customerData: { 
+    name: string; 
+    phone: string; 
+    branch_id?: string;
+    pickup_time?: string;
+    payment_method?: string;
+    payment_reference?: string;
+    payment_screenshot_url?: string;
+  }) => {
     if (items.length === 0) {
       return { success: false, conflicts: ['Cart is empty'] }
     }
@@ -272,7 +283,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         items: orderItems,
         customer_name: customerData.name,
         customer_phone: customerData.phone,
-        branch_id: customerData.branch_id
+        branch_id: customerData.branch_id,
+        pickup_time: customerData.pickup_time,
+        payment_method: customerData.payment_method,
+        payment_reference: customerData.payment_reference,
+        payment_screenshot_url: customerData.payment_screenshot_url
       })
 
       if (result.success) {

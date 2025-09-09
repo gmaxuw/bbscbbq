@@ -170,6 +170,7 @@ export default function OrderManagement() {
             product:products(name)
           )
         `)
+        .neq('order_status', 'completed') // Exclude completed orders from main view
         .order('created_at', { ascending: false })
 
       console.log('📊 Orders query result:', { data, error })
@@ -362,7 +363,7 @@ export default function OrderManagement() {
       currentPage="orders" 
       userName={user?.full_name || 'Admin'}
       pageTitle="Order Management"
-      pageDescription="Manage all orders, verify payments, and update order statuses across all branches."
+      pageDescription="Manage active orders, verify payments, and update order statuses. Completed orders are available in Analytics."
     >
       {/* Filters and Search */}
       <div className="mb-6 space-y-4">
@@ -391,7 +392,6 @@ export default function OrderManagement() {
             <option value="pending">Pending</option>
             <option value="preparing">Preparing</option>
             <option value="ready">Ready</option>
-            <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
 
@@ -509,7 +509,7 @@ export default function OrderManagement() {
                         {order.payment_method === 'gcash' ? 'GCash' : order.payment_method === 'bank_transfer' ? 'Bank Transfer' : order.payment_method}
                       </div>
                       {order.gcash_reference && (
-                        <div className="text-xs text-gray-500 font-mono">
+                        <div className="text-xs text-blue-600 font-mono bg-blue-50 px-2 py-1 rounded">
                           Ref: {order.gcash_reference}
                         </div>
                       )}

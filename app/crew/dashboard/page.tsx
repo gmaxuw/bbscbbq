@@ -49,6 +49,9 @@ interface Order {
   order_status: string
   payment_status: 'pending' | 'paid' | 'cancelled'
   created_at: string
+  cooking_started_at?: string
+  ready_at?: string
+  actual_pickup_time?: string
   order_items?: Array<{
     product_name: string
     quantity: number
@@ -80,6 +83,10 @@ export default function CrewDashboard() {
   const [lastOrderCount, setLastOrderCount] = useState(0)
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({})
   const [generatingQR, setGeneratingQR] = useState<string | null>(null)
+  const [currentView, setCurrentView] = useState<'active' | 'history'>('active')
+  const [orderHistory, setOrderHistory] = useState<Order[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyDateFilter, setHistoryDateFilter] = useState('today')
   const router = useRouter()
   const supabase = createClient()
 
@@ -102,6 +109,12 @@ export default function CrewDashboard() {
   useEffect(() => {
     filterOrders()
   }, [orders, statusFilter, searchTerm])
+
+  useEffect(() => {
+    if (currentView === 'history' && crewMember?.branch_id) {
+      loadOrderHistory()
+    }
+  }, [currentView, historyDateFilter, crewMember?.branch_id])
 
   const setupOnlineStatus = () => {
     if (typeof window === 'undefined') return
@@ -284,6 +297,9 @@ export default function CrewDashboard() {
           payment_status,
           qr_code,
           created_at,
+          cooking_started_at,
+          ready_at,
+          actual_pickup_time,
           order_items(
             product_name,
             quantity,
@@ -292,6 +308,7 @@ export default function CrewDashboard() {
           )
         `)
         .eq('branch_id', crewMember.branch_id)
+        .neq('order_status', 'completed')
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -338,6 +355,82 @@ export default function CrewDashboard() {
       } else {
         setOrders([])
       }
+    }
+  }
+
+  const loadOrderHistory = async () => {
+    try {
+      if (!crewMember?.branch_id) {
+        console.log('No crew member or branch_id, skipping order history load')
+        return
+      }
+
+      setHistoryLoading(true)
+      console.log('Loading order history for branch:', crewMember.branch_id)
+
+      // Calculate date range based on filter
+      let startDate = new Date()
+      let endDate = new Date()
+      
+      switch (historyDateFilter) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0)
+          endDate.setHours(23, 59, 59, 999)
+          break
+        case 'week':
+          startDate.setDate(startDate.getDate() - 7)
+          break
+        case 'month':
+          startDate.setMonth(startDate.getMonth() - 1)
+          break
+        case 'all':
+          startDate = new Date('2020-01-01') // Very old date to get all records
+          break
+      }
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          customer_name,
+          customer_phone,
+          pickup_time,
+          total_amount,
+          subtotal,
+          promo_discount,
+          order_status,
+          payment_status,
+          qr_code,
+          created_at,
+          cooking_started_at,
+          ready_at,
+          actual_pickup_time,
+          order_items(
+            product_name,
+            quantity,
+            unit_price,
+            subtotal
+          )
+        `)
+        .eq('branch_id', crewMember.branch_id)
+        .eq('order_status', 'completed')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Database error loading order history:', error)
+        throw error
+      }
+      
+      console.log('Order history loaded successfully:', data?.length || 0)
+      setOrderHistory(data || [])
+    } catch (error) {
+      console.error('Failed to load order history:', error)
+      setOrderHistory([])
+    } finally {
+      setHistoryLoading(false)
     }
   }
 
@@ -444,7 +537,15 @@ export default function CrewDashboard() {
     let filtered = orders
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(order => order.order_status === statusFilter)
+      if (statusFilter === 'pending' || statusFilter === 'confirmed') {
+        // Show both pending and confirmed orders as "Ready to Cook" if they're paid
+        filtered = filtered.filter(order => 
+          (order.order_status === 'pending' || order.order_status === 'confirmed') && 
+          order.payment_status === 'paid'
+        )
+      } else {
+        filtered = filtered.filter(order => order.order_status === statusFilter)
+      }
     }
 
     if (searchTerm) {
@@ -462,45 +563,64 @@ export default function CrewDashboard() {
     try {
       setIsSubmitting(true)
 
+      // Prepare update data with timestamps
+      const updateData: any = { order_status: newStatus }
+      const now = new Date().toISOString()
+
+      // Add specific timestamps based on status
+      if (newStatus === 'preparing') {
+        updateData.cooking_started_at = now
+        console.log('🍳 Recording cooking start time:', now)
+      } else if (newStatus === 'ready') {
+        updateData.ready_at = now
+        console.log('✅ Recording ready time:', now)
+      } else if (newStatus === 'completed') {
+        updateData.actual_pickup_time = now
+        console.log('📦 Recording actual pickup time:', now)
+      }
+
       if (isOnline) {
         // Online: Update directly to Supabase
-      const { error } = await supabase
-        .from('orders')
-        .update({ order_status: newStatus })
-        .eq('id', orderId)
+        const { error } = await supabase
+          .from('orders')
+          .update(updateData)
+          .eq('id', orderId)
 
-      if (error) throw error
+        if (error) throw error
 
-      // Update local state
-      setOrders(prev => prev.map(order => 
-        order.id === orderId ? { ...order, order_status: newStatus } : order
-      ))
+        // Update local state
+        setOrders(prev => prev.map(order => 
+          order.id === orderId ? { ...order, ...updateData } : order
+        ))
 
-      // Log the action
-      await supabase.from('system_logs').insert({
-        log_type: 'order_status_update',
-        order_id: orderId,
-        user_id: crewMember?.id,
-        message: `Order status updated to ${newStatus} by crew member`,
-        ip_address: '127.0.0.1'
-      })
+        // Log the action with timing info
+        await supabase.from('system_logs').insert({
+          log_type: 'order_status_update',
+          order_id: orderId,
+          user_id: crewMember?.id,
+          message: `Order status updated to ${newStatus} by crew member at ${now}`,
+          ip_address: '127.0.0.1'
+        })
+
+        console.log(`✅ Order ${orderId} updated to ${newStatus} with timestamps`)
       } else {
         // Offline: Store update for later sync
         const update = {
           type: 'status_update',
           orderId,
           newStatus,
-          timestamp: new Date().toISOString()
+          updateData,
+          timestamp: now
         }
         
         setPendingUpdates(prev => [...prev, update])
         
         // Update local state immediately
         setOrders(prev => prev.map(order => 
-          order.id === orderId ? { ...order, order_status: newStatus } : order
+          order.id === orderId ? { ...order, ...updateData } : order
         ))
         
-        console.log('📱 Offline update stored:', update)
+        console.log('📱 Offline update stored with timestamps:', update)
       }
     } catch (error) {
       console.error('Failed to update order status:', error)
@@ -602,7 +722,7 @@ export default function CrewDashboard() {
                 <div className="w-8 h-8 bg-lays-dark-red rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-sm">🔥</span>
                 </div>
-          <div>
+                <div>
                   <h1 className="font-bbq-display text-lg font-bold text-gray-900">
                     Crew Dashboard
                   </h1>
@@ -611,18 +731,18 @@ export default function CrewDashboard() {
                   </p>
                 </div>
               </div>
-          </div>
+            </div>
           
             {/* Center - Online Status */}
             <div className="flex items-center space-x-2">
               {isOnline ? (
                 <div className="flex items-center space-x-1 text-green-600">
-                <Wifi className="w-4 h-4" />
+                  <Wifi className="w-4 h-4" />
                   <span className="text-sm font-medium">Online</span>
                 </div>
               ) : (
                 <div className="flex items-center space-x-1 text-orange-600">
-                <WifiOff className="w-4 h-4" />
+                  <WifiOff className="w-4 h-4" />
                   <span className="text-sm font-medium">Offline</span>
                 </div>
               )}
@@ -651,14 +771,14 @@ export default function CrewDashboard() {
                 </span>
               </div>
               <button
-              onClick={handleSignOut}
+                onClick={handleSignOut}
                 className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
+              >
+                <LogOut className="w-4 h-4" />
                 <span className="text-sm">Sign Out</span>
               </button>
+            </div>
           </div>
-        </div>
         </div>
       </nav>
 
@@ -677,8 +797,8 @@ export default function CrewDashboard() {
                   <p className="text-sm font-medium text-gray-600">Total Orders</p>
                   <p className="text-2xl font-bold text-gray-900">{orders.length}</p>
                 </div>
-        </div>
-      </div>
+              </div>
+            </div>
 
             <div className="bbq-card p-6">
               <div className="flex items-center">
@@ -686,12 +806,12 @@ export default function CrewDashboard() {
                   <Clock className="w-6 h-6 text-blue-500" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Pending</p>
+                  <p className="text-sm font-medium text-gray-600">Ready to Cook</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {orders.filter(o => o.order_status === 'pending').length}
-              </p>
-            </div>
-          </div>
+                    {orders.filter(o => (o.order_status === 'confirmed' || o.order_status === 'pending') && o.payment_status === 'paid').length}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="bbq-card p-6">
@@ -700,7 +820,7 @@ export default function CrewDashboard() {
                   <RefreshCw className="w-6 h-6 text-lays-orange-gold" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Preparing</p>
+                  <p className="text-sm font-medium text-gray-600">Cooking</p>
                   <p className="text-2xl font-bold text-gray-900">
                     {orders.filter(o => o.order_status === 'preparing').length}
                   </p>
@@ -714,12 +834,50 @@ export default function CrewDashboard() {
                   <CheckCircle className="w-6 h-6 text-green-500" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Ready</p>
+                  <p className="text-sm font-medium text-gray-600">Ready for Pickup</p>
                   <p className="text-2xl font-bold text-gray-900">
                     {orders.filter(o => o.order_status === 'ready').length}
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="bbq-card p-6 mb-6">
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setCurrentView('active')}
+                className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                  currentView === 'active'
+                    ? 'bg-white text-lays-dark-red shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <Clock className="w-4 h-4" />
+                  <span>Active Orders</span>
+                  <span className="bg-lays-orange-gold text-white text-xs px-2 py-1 rounded-full">
+                    {orders.length}
+                  </span>
+                </div>
+              </button>
+              <button
+                onClick={() => setCurrentView('history')}
+                className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                  currentView === 'history'
+                    ? 'bg-white text-lays-dark-red shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Order History</span>
+                  <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                    {orderHistory.length}
+                  </span>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -746,35 +904,68 @@ export default function CrewDashboard() {
                   className="bbq-input"
                 >
                   <option value="all">All Orders</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="preparing">Preparing</option>
-                  <option value="ready">Ready</option>
+                  <option value="pending">Ready to Cook</option>
+                  <option value="confirmed">Ready to Cook</option>
+                  <option value="preparing">Cooking</option>
+                  <option value="ready">Ready for Pickup</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
-        </div>
+              </div>
             </div>
           </div>
 
-      {/* Orders List */}
-      <div className="space-y-4">
-            {filteredOrders.length === 0 ? (
-              <div className="bbq-card p-8 text-center">
-                <ShoppingCart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Orders Found</h3>
-                <p className="text-gray-600">
-                  {searchTerm ? 'No orders match your search criteria.' : 'No orders available for your branch.'}
-                </p>
+          {/* Date Filter for Order History */}
+          {currentView === 'history' && (
+            <div className="bbq-card p-6 mb-6">
+              <div className="flex items-center space-x-4">
+                <Filter className="w-4 h-4 text-gray-400" />
+                <span className="text-sm font-medium text-gray-700">Filter by Date:</span>
+                <select
+                  value={historyDateFilter}
+                  onChange={(e) => setHistoryDateFilter(e.target.value)}
+                  className="bbq-input"
+                >
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                  <option value="all">All Time</option>
+                </select>
+                <button
+                  onClick={() => loadOrderHistory()}
+                  disabled={historyLoading}
+                  className="bbq-button-primary text-sm px-4 py-2"
+                >
+                  {historyLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </button>
               </div>
-            ) : (
-              filteredOrders.map((order) => (
-                <div key={order.id} id={`order-${order.id}`} className="bbq-card p-6">
+            </div>
+          )}
+
+          {/* Orders List */}
+          <div className="space-y-4">
+            {currentView === 'active' ? (
+              // Active Orders View
+              filteredOrders.length === 0 ? (
+                <div className="bbq-card p-8 text-center">
+                  <ShoppingCart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Orders</h3>
+                  <p className="text-gray-600">
+                    {searchTerm ? 'No orders match your search criteria.' : 'No active orders for your branch.'}
+                  </p>
+                </div>
+              ) : (
+                filteredOrders.map((order) => (
+                  <div key={order.id} id={`order-${order.id}`} className="bbq-card p-6">
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     {/* Order Info */}
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-2">
-                <div>
+                        <div>
                           <div className="flex items-center space-x-2 mb-1">
                             <h3 className="text-lg font-semibold text-gray-900">
                               {order.customer_name}
@@ -783,36 +974,37 @@ export default function CrewDashboard() {
                               #{order.order_number}
                             </span>
                           </div>
-                  <p className="text-sm text-gray-600">{order.customer_phone}</p>
-                </div>
-                <div className="text-right">
+                          <p className="text-sm text-gray-600">{order.customer_phone}</p>
+                        </div>
+                        <div className="text-right">
                           <p className="text-lg font-bold text-gray-900">
                             {formatCurrency(order.total_amount)}
                           </p>
                           <p className="text-sm text-gray-600">
                             {formatDateTime(order.created_at)}
                           </p>
-                </div>
-              </div>
+                        </div>
+                      </div>
 
-              {/* Order Items */}
-              {order.order_items && order.order_items.length > 0 && (
+                      {/* Order Items */}
+                      {order.order_items && order.order_items.length > 0 && (
                         <div className="mb-4">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">Order Items:</h4>
                           <div className="space-y-1">
-                    {order.order_items.map((item, index) => (
+                            {order.order_items.map((item, index) => (
                               <div key={index} className="flex justify-between text-sm">
-                        <span className="text-gray-600">
-                          {item.quantity}x {item.product_name}
-                        </span>
+                                <span className="text-gray-600">
+                                  {item.quantity}x {item.product_name}
+                                </span>
                                 <span className="text-gray-900">
                                   {formatCurrency(item.subtotal)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
 
                       {/* Status Badges */}
                       <div className="flex items-center space-x-2 mb-4">
@@ -822,6 +1014,67 @@ export default function CrewDashboard() {
                         <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getPaymentStatusColor(order.payment_status)}`}>
                           {order.payment_status.toUpperCase()}
                         </span>
+                      </div>
+
+                      {/* Timing Information */}
+                      <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">⏱️ Timing Details</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Order Placed:</span>
+                            <span className="text-gray-900">{formatDateTime(order.created_at)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Scheduled Pickup:</span>
+                            <span className="text-gray-900">{formatDateTime(order.pickup_time)}</span>
+                          </div>
+                          {order.cooking_started_at && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Cooking Started:</span>
+                              <span className="text-orange-600 font-medium">{formatDateTime(order.cooking_started_at)}</span>
+                            </div>
+                          )}
+                          {order.ready_at && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Ready for Pickup:</span>
+                              <span className="text-green-600 font-medium">{formatDateTime(order.ready_at)}</span>
+                            </div>
+                          )}
+                          {order.actual_pickup_time && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Actually Picked Up:</span>
+                              <span className="text-blue-600 font-medium">{formatDateTime(order.actual_pickup_time)}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Timing Analysis */}
+                        {order.ready_at && order.cooking_started_at && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-600">Cooking Time:</span>
+                              <span className="text-gray-900">
+                                {Math.round((new Date(order.ready_at).getTime() - new Date(order.cooking_started_at).getTime()) / 60000)} min
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {order.actual_pickup_time && order.ready_at && (
+                          <div className="mt-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-600">Customer Wait Time:</span>
+                              <span className={`font-medium ${
+                                (new Date(order.actual_pickup_time).getTime() - new Date(order.ready_at).getTime()) / 60000 > 15 
+                                  ? 'text-red-600' 
+                                  : 'text-green-600'
+                              }`}>
+                                {Math.round((new Date(order.actual_pickup_time).getTime() - new Date(order.ready_at).getTime()) / 60000)} min
+                                {(new Date(order.actual_pickup_time).getTime() - new Date(order.ready_at).getTime()) / 60000 > 15 && ' (Late!)'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* QR Code Section */}
@@ -876,134 +1129,275 @@ export default function CrewDashboard() {
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
-                <div className="flex flex-wrap gap-2">
-                  {order.order_status === 'pending' && (
+                    {/* Action Buttons - Crew Workflow */}
+                    <div className="flex flex-wrap gap-2">
+                      {/* Start Cooking - Show for confirmed/paid orders that haven't started cooking yet */}
+                      {(order.order_status === 'confirmed' || order.order_status === 'pending') && order.payment_status === 'paid' && (
                         <button
-                      onClick={() => updateOrderStatus(order.id, 'confirmed')}
-                      disabled={isSubmitting}
+                          onClick={() => updateOrderStatus(order.id, 'preparing')}
+                          disabled={isSubmitting}
                           className="bbq-button-primary text-sm px-4 py-2"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Confirm Order
-                        </button>
-                  )}
-                  
-                  {order.order_status === 'confirmed' && (
-                        <button
-                      onClick={() => updateOrderStatus(order.id, 'preparing')}
-                      disabled={isSubmitting}
-                          className="bbq-button-primary text-sm px-4 py-2"
-                    >
+                        >
                           <RefreshCw className="w-4 h-4 mr-2" />
-                      Start Cooking
+                          Start Cooking
                         </button>
-                  )}
-                  
-                  {order.order_status === 'preparing' && (
+                      )}
+                      
+                      {/* Ready For Pickup - Show when order is being prepared */}
+                      {order.order_status === 'preparing' && (
                         <button
-                      onClick={() => updateOrderStatus(order.id, 'ready')}
-                      disabled={isSubmitting}
+                          onClick={() => updateOrderStatus(order.id, 'ready')}
+                          disabled={isSubmitting}
                           className="bbq-button-primary text-sm px-4 py-2"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                          Mark Ready
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Ready For Pickup
                         </button>
-                  )}
-                  
-                  {order.order_status === 'ready' && (
+                      )}
+                      
+                      {/* Complete Order - Show when order is ready for pickup */}
+                      {order.order_status === 'ready' && (
                         <button
-                      onClick={() => updateOrderStatus(order.id, 'completed')}
-                      disabled={isSubmitting}
+                          onClick={() => updateOrderStatus(order.id, 'completed')}
+                          disabled={isSubmitting}
                           className="bbq-button-primary text-sm px-4 py-2"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Complete Order
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Complete Order
                         </button>
+                      )}
+
+                      {/* Show status if no action needed */}
+                      {order.order_status === 'completed' && (
+                        <div className="flex items-center space-x-2 text-green-600">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm font-medium">Order Completed</span>
+                        </div>
+                      )}
+
+                      {order.order_status === 'cancelled' && (
+                        <div className="flex items-center space-x-2 text-red-600">
+                          <XCircle className="w-4 h-4" />
+                          <span className="text-sm font-medium">Order Cancelled</span>
+                        </div>
                       )}
                     </div>
                   </div>
                 </div>
               ))
-                  )}
-                </div>
+            )
+          ) : (
+            // Order History View
+            historyLoading ? (
+              <div className="bbq-card p-8 text-center">
+                <RefreshCw className="w-16 h-16 text-gray-300 mx-auto mb-4 animate-spin" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Order History...</h3>
+                <p className="text-gray-600">Fetching completed orders from database</p>
               </div>
-            </div>
-
-      {/* New Order Notification Modal */}
-      {newOrderNotification && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-pulse">
-            <div className="bg-lays-dark-red text-white p-6 rounded-t-2xl text-center">
-              <div className="text-6xl mb-4">🆕</div>
-              <h2 className="text-3xl font-bold mb-2">NEW ORDER!</h2>
-              <p className="text-lg opacity-90">Customer just placed an order</p>
-      </div>
-
-            <div className="p-6">
-              <div className="text-center mb-4">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  {newOrderNotification.customer_name}
-                </h3>
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <span className="px-3 py-1 bg-lays-dark-red text-white text-sm font-bold rounded-full">
-                    #{newOrderNotification.order_number}
-                  </span>
-                  <span className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(newOrderNotification.total_amount)}
-                  </span>
-                </div>
+            ) : orderHistory.length === 0 ? (
+              <div className="bbq-card p-8 text-center">
+                <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Order History</h3>
+                <p className="text-gray-600">
+                  No completed orders found for the selected date range.
+                </p>
               </div>
+            ) : (
+              orderHistory.map((order) => (
+                <div key={order.id} className="bbq-card p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    {/* Order Info */}
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="flex items-center space-x-2 mb-1">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {order.customer_name}
+                            </h3>
+                            <span className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded">
+                              #{order.order_number}
+                            </span>
+                            <span className="px-2 py-1 bg-gray-500 text-white text-xs font-bold rounded">
+                              COMPLETED
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600">{order.customer_phone}</p>
+                          <p className="text-xs text-gray-500">
+                            Completed: {formatDateTime(order.created_at)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-gray-900">
+                            {formatCurrency(order.total_amount)}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {formatDateTime(order.created_at)}
+                          </p>
+                        </div>
+                      </div>
 
-              {/* Order Items Preview */}
-              {newOrderNotification.order_items && newOrderNotification.order_items.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Order Contains:</h4>
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
-                    {newOrderNotification.order_items.slice(0, 3).map((item, index) => (
-                      <div key={index} className="flex justify-between text-sm">
-                        <span className="text-gray-600">
-                          {item.quantity}x {item.product_name}
-                        </span>
-                        <span className="text-gray-900 font-medium">
-                          {formatCurrency(item.subtotal)}
-                        </span>
-                      </div>
-                    ))}
-                    {newOrderNotification.order_items.length > 3 && (
-                      <div className="text-xs text-gray-500 text-center">
-                        +{newOrderNotification.order_items.length - 3} more items
-                      </div>
-                    )}
+                      {/* Order Items */}
+                      {order.order_items && order.order_items.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Order Items:</h4>
+                          <div className="space-y-1">
+                            {order.order_items.map((item: any, index: number) => (
+                              <div key={index} className="flex justify-between text-sm">
+                                <span className="text-gray-600">
+                                  {item.quantity}x {item.product_name}
+                                </span>
+                                <span className="text-gray-900">
+                                  {formatCurrency(item.subtotal)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                        {/* Status Badges */}
+                        <div className="flex items-center space-x-2 mb-4">
+                          <span className="px-2 py-1 rounded-full text-xs font-medium text-white bg-green-500">
+                            COMPLETED
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getPaymentStatusColor(order.payment_status)}`}>
+                            {order.payment_status.toUpperCase()}
+                          </span>
+                        </div>
+
+                        {/* Timing Summary for History */}
+                        {(order.cooking_started_at || order.ready_at || order.actual_pickup_time) && (
+                          <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">⏱️ Order Timeline</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                              {order.cooking_started_at && (
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Cooking Started:</span>
+                                  <span className="text-orange-600">{formatDateTime(order.cooking_started_at)}</span>
+                                </div>
+                              )}
+                              {order.ready_at && (
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Ready for Pickup:</span>
+                                  <span className="text-green-600">{formatDateTime(order.ready_at)}</span>
+                                </div>
+                              )}
+                              {order.actual_pickup_time && (
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Actually Picked Up:</span>
+                                  <span className="text-blue-600">{formatDateTime(order.actual_pickup_time)}</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Performance Summary */}
+                            {order.ready_at && order.cooking_started_at && order.actual_pickup_time && (
+                              <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-gray-600">Cooking Time:</span>
+                                  <span className="text-gray-900">
+                                    {Math.round((new Date(order.ready_at).getTime() - new Date(order.cooking_started_at).getTime()) / 60000)} min
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-gray-600">Customer Wait:</span>
+                                  <span className={`font-medium ${
+                                    (new Date(order.actual_pickup_time).getTime() - new Date(order.ready_at).getTime()) / 60000 > 15 
+                                      ? 'text-red-600' 
+                                      : 'text-green-600'
+                                  }`}>
+                                    {Math.round((new Date(order.actual_pickup_time).getTime() - new Date(order.ready_at).getTime()) / 60000)} min
+                                    {(new Date(order.actual_pickup_time).getTime() - new Date(order.ready_at).getTime()) / 60000 > 15 && ' (Late!)'}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                    </div>
                   </div>
                 </div>
-              )}
+              ))
+            )
+          )}
+          </div>
 
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setNewOrderNotification(null)}
-                  className="flex-1 bbq-button-primary"
-                >
-                  Got It!
-                </button>
-                <button
-                  onClick={() => {
-                    setNewOrderNotification(null)
-                    // Scroll to the order in the list
-                    const orderElement = document.getElementById(`order-${newOrderNotification.id}`)
-                    if (orderElement) {
-                      orderElement.scrollIntoView({ behavior: 'smooth' })
-                    }
-                  }}
-                  className="flex-1 bbq-button-secondary"
-                >
-                  View Order
-                </button>
+          {/* New Order Notification Modal */}
+          {newOrderNotification && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-pulse">
+                <div className="bg-lays-dark-red text-white p-6 rounded-t-2xl text-center">
+                  <div className="text-6xl mb-4">🆕</div>
+                  <h2 className="text-3xl font-bold mb-2">NEW ORDER!</h2>
+                  <p className="text-lg opacity-90">Customer just placed an order</p>
+                </div>
+
+                <div className="p-6">
+                  <div className="text-center mb-4">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                      {newOrderNotification.customer_name}
+                    </h3>
+                    <div className="flex items-center justify-center space-x-2 mb-2">
+                      <span className="px-3 py-1 bg-lays-dark-red text-white text-sm font-bold rounded-full">
+                        #{newOrderNotification.order_number}
+                      </span>
+                      <span className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(newOrderNotification.total_amount)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Order Items Preview */}
+                  {newOrderNotification.order_items && newOrderNotification.order_items.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Order Contains:</h4>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {newOrderNotification.order_items.slice(0, 3).map((item, index) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span className="text-gray-600">
+                              {item.quantity}x {item.product_name}
+                            </span>
+                            <span className="text-gray-900 font-medium">
+                              {formatCurrency(item.subtotal)}
+                            </span>
+                          </div>
+                        ))}
+                        {newOrderNotification.order_items.length > 3 && (
+                          <div className="text-xs text-gray-500 text-center">
+                            +{newOrderNotification.order_items.length - 3} more items
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => setNewOrderNotification(null)}
+                      className="flex-1 bbq-button-primary"
+                    >
+                      Got It!
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNewOrderNotification(null)
+                        // Scroll to the order in the list
+                        const orderElement = document.getElementById(`order-${newOrderNotification.id}`)
+                        if (orderElement) {
+                          orderElement.scrollIntoView({ behavior: 'smooth' })
+                        }
+                      }}
+                      className="flex-1 bbq-button-secondary"
+                    >
+                      View Order
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

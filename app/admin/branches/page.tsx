@@ -16,7 +16,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   MapPin, 
@@ -49,6 +49,19 @@ interface Branch {
   crew_count?: number
   order_count?: number
   total_revenue?: number
+  pending_orders?: PendingOrder[]
+}
+
+interface PendingOrder {
+  id: string
+  order_number: string
+  customer_name: string
+  customer_phone: string
+  total_amount: number
+  payment_status: string
+  order_status: string
+  created_at: string
+  is_offline?: boolean
 }
 
 interface CrewMember {
@@ -66,6 +79,8 @@ export default function BranchManagement() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
+  const [isOnline, setIsOnline] = useState(true)
+  const [offlinePendingOrders, setOfflinePendingOrders] = useState<PendingOrder[]>([])
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -83,6 +98,57 @@ export default function BranchManagement() {
     checkAuth()
     loadData()
   }, [])
+
+  useEffect(() => {
+    const cleanupOffline = setupOfflineHandling()
+    
+    return () => {
+      cleanupOffline?.()
+    }
+  }, [])
+
+  // Offline handling
+  const setupOfflineHandling = () => {
+    // Check online status
+    const updateOnlineStatus = () => {
+      setIsOnline(navigator.onLine)
+    }
+
+    window.addEventListener('online', updateOnlineStatus)
+    window.addEventListener('offline', updateOnlineStatus)
+    updateOnlineStatus()
+
+    // Load offline data from localStorage
+    const savedOfflineOrders = localStorage.getItem('bbq-offline-pending-orders')
+    if (savedOfflineOrders) {
+      try {
+        setOfflinePendingOrders(JSON.parse(savedOfflineOrders))
+      } catch (error) {
+        console.error('Failed to load offline pending orders:', error)
+      }
+    }
+
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus)
+      window.removeEventListener('offline', updateOnlineStatus)
+    }
+  }
+
+  // Simple refresh function for pending orders
+  const refreshPendingOrders = () => {
+    loadPendingOrders()
+  }
+
+  // Sync offline data when internet comes back
+  useEffect(() => {
+    if (isOnline && offlinePendingOrders.length > 0) {
+      console.log('Internet back online - syncing offline data')
+      loadPendingOrders()
+      // Clear offline data after sync
+      setOfflinePendingOrders([])
+      localStorage.removeItem('bbq-offline-pending-orders')
+    }
+  }, [isOnline, offlinePendingOrders.length])
 
   const checkAuth = async () => {
     try {
@@ -159,7 +225,8 @@ export default function BranchManagement() {
           ...branch,
           crew_count: crewCount,
           order_count: orderCount,
-          total_revenue: totalRevenue
+          total_revenue: totalRevenue,
+          pending_orders: [] // Will be loaded separately
         }
       }) || []
 
@@ -184,12 +251,73 @@ export default function BranchManagement() {
         })) || []
         setCrewMembers(crewMembers)
       }
+
+      // Load pending orders for each branch
+      await loadPendingOrders()
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
       setIsLoading(false)
     }
   }
+
+  // Load pending orders for all branches
+  const loadPendingOrders = useCallback(async () => {
+    try {
+      if (!isOnline) {
+        console.log('Offline mode - using cached pending orders')
+        return
+      }
+
+      const { data: pendingOrdersData, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          customer_name,
+          customer_phone,
+          total_amount,
+          payment_status,
+          order_status,
+          created_at,
+          branch_id
+        `)
+        .or('order_status.eq.pending,payment_status.eq.pending')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error loading pending orders:', error)
+        return
+      }
+
+      // Group pending orders by branch
+      const ordersByBranch = (pendingOrdersData || []).reduce((acc, order) => {
+        const branchId = order.branch_id
+        if (!acc[branchId]) {
+          acc[branchId] = []
+        }
+        acc[branchId].push({
+          ...order,
+          total_amount: parseFloat(order.total_amount || '0'),
+          is_offline: false
+        })
+        return acc
+      }, {} as Record<string, PendingOrder[]>)
+
+      // Update branches with pending orders
+      setBranches(prevBranches => 
+        prevBranches.map(branch => ({
+          ...branch,
+          pending_orders: ordersByBranch[branch.id] || []
+        }))
+      )
+
+      // Save to localStorage for offline use
+      localStorage.setItem('bbq-offline-pending-orders', JSON.stringify(pendingOrdersData || []))
+    } catch (error) {
+      console.error('Failed to load pending orders:', error)
+    }
+  }, [isOnline, supabase])
 
   const resetForm = () => {
     setFormData({
@@ -376,8 +504,19 @@ export default function BranchManagement() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Branch Management</h1>
-          <p className="text-gray-600 mt-1">{filteredBranches.length} branches found</p>
+          <div className="flex items-center space-x-3">
+            <h1 className="text-2xl font-bold text-gray-900">Branch Management</h1>
+            {!isOnline && (
+              <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
+                <Clock className="w-3 h-3 mr-1" />
+                Offline Mode
+              </span>
+            )}
+          </div>
+          <p className="text-gray-600 mt-1">
+            {filteredBranches.length} branches found
+            {!isOnline && ' (using cached data)'}
+          </p>
         </div>
         <button 
           onClick={() => setShowAddForm(true)}
@@ -603,6 +742,76 @@ export default function BranchManagement() {
                 </div>
               </div>
 
+              {/* Pending Orders Section */}
+              {branch.pending_orders && branch.pending_orders.length > 0 && (
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-red-600 flex items-center">
+                      <Clock className="w-4 h-4 mr-1" />
+                      Pending Orders ({branch.pending_orders.length})
+                    </h4>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={refreshPendingOrders}
+                        className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200"
+                      >
+                        Refresh
+                      </button>
+                      {!isOnline && (
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                          Offline
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {branch.pending_orders.map((order) => (
+                      <div key={order.id} className="bg-red-50 border border-red-200 rounded-lg p-2">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="text-xs font-medium text-red-800">
+                              #{order.order_number}
+                            </div>
+                            <div className="text-xs text-red-700">
+                              {order.customer_name}
+                            </div>
+                            <div className="text-xs text-red-600">
+                              {order.customer_phone}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs font-bold text-red-800">
+                              {formatCurrency(order.total_amount)}
+                            </div>
+                            <div className="text-xs text-red-600">
+                              {order.payment_status === 'pending' ? 'Payment Pending' : 'Order Pending'}
+                            </div>
+                            {order.is_offline && (
+                              <div className="text-xs text-yellow-600">
+                                Offline
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-xs text-red-500 mt-1">
+                          {new Date(order.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* No Pending Orders */}
+              {branch.pending_orders && branch.pending_orders.length === 0 && (
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="text-center text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg p-2">
+                    <Clock className="w-4 h-4 mx-auto mb-1" />
+                    No Pending Orders
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex space-x-2 pt-3 border-t border-gray-200">
                 <button
@@ -649,7 +858,7 @@ export default function BranchManagement() {
       )}
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
           <h3 className="text-2xl font-bold text-gray-900">{branches.length}</h3>
           <p className="text-gray-600">Total Branches</p>
@@ -665,6 +874,12 @@ export default function BranchManagement() {
             {branches.reduce((sum, b) => sum + (b.crew_count || 0), 0)}
           </h3>
           <p className="text-gray-600">Total Crew</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
+          <h3 className="text-2xl font-bold text-red-600">
+            {branches.reduce((sum, b) => sum + (b.pending_orders?.length || 0), 0)}
+          </h3>
+          <p className="text-gray-600">Pending Orders</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
           <h3 className="text-2xl font-bold text-lays-dark-red">

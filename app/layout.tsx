@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from 'next/font/google'
 import './globals.css'
 import DesignLock from '@/components/layout/DesignLock'
 import { CartProvider } from '@/lib/cart-context'
+import { FavoritesProvider } from '@/lib/favorites-context'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -43,7 +44,9 @@ export default function RootLayout({
       <body className="font-bbq-body bg-white text-gray-900 antialiased" suppressHydrationWarning={true}>
         <DesignLock pageName="Global Layout" />
         <CartProvider>
-          {children}
+          <FavoritesProvider>
+            {children}
+          </FavoritesProvider>
         </CartProvider>
       </body>
     </html>
