@@ -88,6 +88,9 @@ export default function CrewDashboard() {
   const [orderHistory, setOrderHistory] = useState<Order[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyDateFilter, setHistoryDateFilter] = useState('today')
+  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -103,9 +106,33 @@ export default function CrewDashboard() {
     if (crewMember && crewMember.branch_id) {
       console.log('Crew member loaded, setting up orders and realtime')
       loadOrders()
-      setupRealtimeSubscription()
+      const subscription = setupRealtimeSubscription()
+      
+      // Set up periodic refresh as fallback (every 30 seconds)
+      const refreshInterval = setInterval(() => {
+        console.log('🔄 Periodic refresh triggered')
+        loadOrders()
+      }, 30000)
+      
+      return () => {
+        clearInterval(refreshInterval)
+        if (subscription) {
+          console.log('🧹 Cleaning up realtime subscription')
+          subscription.unsubscribe()
+        }
+      }
     }
   }, [crewMember])
+
+  // Cleanup realtime subscription on unmount
+  useEffect(() => {
+    return () => {
+      if (realtimeSubscription) {
+        console.log('🧹 Component unmounting, cleaning up realtime subscription')
+        realtimeSubscription.unsubscribe()
+      }
+    }
+  }, [realtimeSubscription])
 
   useEffect(() => {
     filterOrders()
@@ -215,12 +242,47 @@ export default function CrewDashboard() {
 
       console.log('✅ User found:', user.id)
 
-      const { data: crewUser, error: crewError } = await supabase
-        .from('admin_users')
-        .select('role, branch_id, name')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .single()
+      // Try multiple approaches to find the crew user
+      let crewUser = null
+      let crewError = null
+      
+      // Approach 1: Query by user_id
+      try {
+        const result1 = await supabase
+          .from('admin_users')
+          .select('role, branch_id, name')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .single()
+        
+        if (result1.data && result1.data.role === 'crew') {
+          crewUser = result1.data
+        } else {
+          crewError = result1.error
+        }
+      } catch (error) {
+        console.log('❌ Query by user_id failed:', error)
+      }
+      
+      // Approach 2: Query by email if first approach failed
+      if (!crewUser && user.email) {
+        try {
+          const result2 = await supabase
+            .from('admin_users')
+            .select('role, branch_id, name')
+            .eq('email', user.email.toLowerCase().trim())
+            .eq('is_active', true)
+            .single()
+          
+          if (result2.data && result2.data.role === 'crew') {
+            crewUser = result2.data
+          } else {
+            crewError = result2.error
+          }
+        } catch (error) {
+          console.log('❌ Query by email failed:', error)
+        }
+      }
 
       if (crewError || !crewUser || crewUser.role !== 'crew') {
         console.error('❌ Invalid crew user or role:', crewError)
@@ -282,6 +344,7 @@ export default function CrewDashboard() {
       }
 
       console.log('Loading orders for branch:', crewMember.branch_id)
+      setLastRefresh(new Date())
 
       // First try to get active orders (not completed)
       let { data, error } = await supabase
@@ -312,6 +375,9 @@ export default function CrewDashboard() {
         .eq('branch_id', crewMember.branch_id)
         .neq('order_status', 'completed')
         .order('created_at', { ascending: false })
+
+      // Reset completed orders flag initially
+      setShowingCompletedOrders(false)
 
       // If no active orders, get recent completed orders (last 10)
       if (!error && (!data || data.length === 0)) {
@@ -360,10 +426,7 @@ export default function CrewDashboard() {
       
       console.log('Orders loaded successfully:', data?.length || 0)
       
-      // Reset completed orders flag if we have active orders
-      if (data && data.length > 0) {
-        setShowingCompletedOrders(false)
-      }
+      // The showingCompletedOrders flag is already set correctly above
       
       // Check for new orders and show notification
       if (data && data.length > lastOrderCount && lastOrderCount > 0) {
@@ -490,17 +553,17 @@ export default function CrewDashboard() {
     try {
       console.log('Setting up realtime subscription for branch:', crewMember.branch_id)
 
-    const subscription = supabase
-      .channel('crew_orders_changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'orders',
-          filter: `branch_id=eq.${crewMember.branch_id}`
-        },
+      const subscription = supabase
+        .channel('crew_orders_changes')
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'orders',
+            filter: `branch_id=eq.${crewMember.branch_id}`
+          },
           (payload) => {
-            console.log('🔄 Order change detected:', payload.eventType)
+            console.log('🔄 Order change detected:', payload.eventType, payload.new, payload.old)
             // Reload orders immediately on any change
             loadOrders()
           }
@@ -509,8 +572,7 @@ export default function CrewDashboard() {
           {
             event: '*',
             schema: 'public',
-            table: 'order_items',
-            filter: `order_id=in.(${orders.map(o => o.id).join(',')})`
+            table: 'order_items'
           },
           (payload) => {
             console.log('🔄 Order items change detected:', payload.eventType)
@@ -518,12 +580,17 @@ export default function CrewDashboard() {
             loadOrders()
           }
         )
-      .subscribe()
+        .subscribe((status) => {
+          console.log('📡 Realtime subscription status:', status)
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Realtime subscription active')
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Realtime subscription error')
+          }
+        })
 
-    return () => {
-        console.log('Unsubscribing from realtime updates')
-      subscription.unsubscribe()
-      }
+      setRealtimeSubscription(subscription)
+      return subscription
     } catch (error) {
       console.error('Failed to setup realtime subscription:', error)
     }
@@ -531,7 +598,12 @@ export default function CrewDashboard() {
 
   const handleRefresh = async () => {
     console.log('🔄 Manual refresh triggered')
-    await loadOrders()
+    setIsRefreshing(true)
+    try {
+      await loadOrders()
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   const generateQRForOrder = async (order: Order) => {
@@ -805,11 +877,12 @@ export default function CrewDashboard() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleRefresh}
-                className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors"
-                title="Refresh Orders"
+                disabled={isRefreshing}
+                className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
+                title={`Refresh Orders${lastRefresh ? ` (Last: ${lastRefresh.toLocaleTimeString()})` : ''}`}
               >
-                <RefreshCw className="w-4 h-4" />
-                <span className="text-sm">Refresh</span>
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="text-sm">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
               <div className="flex items-center space-x-2">
                 <User className="w-5 h-5 text-gray-600" />
