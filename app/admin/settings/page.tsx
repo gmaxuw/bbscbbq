@@ -1691,7 +1691,7 @@ export default function AdminSettingsPage() {
                           </div>
                         </div>
                         <div className="space-y-2 max-h-32 overflow-y-auto">
-                          {branch.pending_orders.map((order) => (
+                          {branch.pending_orders.map((order: any) => (
                             <div key={order.id} className="bg-red-50 border border-red-200 rounded-lg p-2">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
@@ -1917,7 +1917,7 @@ export default function AdminSettingsPage() {
 
             {/* Crew Members List */}
             <div className="space-y-4">
-              {filteredCrewMembers.map((crew) => (
+              {filteredCrewMembers.map((crew: any) => (
                 <div key={crew.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -2107,7 +2107,7 @@ export default function AdminSettingsPage() {
 
             {/* Products Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProducts.map((product) => (
+              {filteredProducts.map((product: any) => (
                 <div key={product.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                   {/* Product Images Gallery */}
                   <div className="h-48 bg-gray-100 flex items-center justify-center relative">
