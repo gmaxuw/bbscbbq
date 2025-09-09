@@ -646,19 +646,19 @@ export default function CrewManagement() {
                 </div>
 
                 {/* Actions - Mobile Layout */}
-                <div className="space-y-3 pt-3 border-t border-gray-200">
-                  {/* Primary Actions */}
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="pt-3 border-t border-gray-200">
+                  {/* All Actions in One Row */}
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => handleEdit(member)}
-                      className="px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center"
+                      className="px-2 py-2 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center"
                     >
-                      <Edit className="w-4 h-4 mr-1" />
+                      <Edit className="w-3 h-3 mr-1" />
                       Edit
                     </button>
                     <button
                       onClick={() => toggleMemberStatus(member.id, member.is_active)}
-                      className={`px-3 py-2 text-sm rounded transition-colors duration-200 flex items-center justify-center ${
+                      className={`px-2 py-2 text-xs rounded transition-colors duration-200 flex items-center justify-center ${
                         member.is_active 
                           ? 'bg-gray-600 text-white hover:bg-gray-700' 
                           : 'bg-lays-dark-red text-white hover:bg-red-800'
@@ -666,35 +666,31 @@ export default function CrewManagement() {
                     >
                       {member.is_active ? 'Disable' : 'Enable'}
                     </button>
-                  </div>
-
-                  {/* Secondary Actions */}
-                  <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handleDelete(member.id, member.full_name)}
-                      className="px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors duration-200 flex items-center justify-center"
+                      className="px-2 py-2 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors duration-200 flex items-center justify-center"
                     >
-                      <Trash2 className="w-4 h-4 mr-1" />
+                      <Trash2 className="w-3 h-3 mr-1" />
                       Delete
                     </button>
-                    
-                    {/* Create Auth User button (only if no user_id) */}
-                    {!member.user_id ? (
-                      <button
-                        onClick={() => createAuthUser(member)}
-                        className="px-3 py-2 bg-lays-orange-gold text-white text-sm rounded hover:bg-orange-600 transition-colors duration-200 flex items-center justify-center"
-                      >
-                        <UserPlus className="w-4 h-4 mr-1" />
-                        Create Login
-                      </button>
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          ✓ Login Active
-                        </span>
-                      </div>
-                    )}
                   </div>
+                  
+                  {/* Create Auth User button - Full Width */}
+                  {!member.user_id ? (
+                    <button
+                      onClick={() => createAuthUser(member)}
+                      className="w-full mt-2 px-3 py-2 bg-lays-orange-gold text-white text-sm rounded hover:bg-orange-600 transition-colors duration-200 flex items-center justify-center"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Create Login Credentials
+                    </button>
+                  ) : (
+                    <div className="w-full mt-2 flex items-center justify-center">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        ✓ Login credentials active
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -723,19 +719,19 @@ export default function CrewManagement() {
                 </div>
 
                 {/* Actions - Desktop Layout */}
-                <div className="space-y-2 pt-3 border-t border-gray-200">
-                  {/* First row - Edit and Status */}
+                <div className="pt-3 border-t border-gray-200">
+                  {/* All Actions in One Row */}
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleEdit(member)}
-                      className="flex-1 px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200"
+                      className="flex-1 px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center"
                     >
-                      <Edit className="w-4 h-4 mr-2 inline" />
+                      <Edit className="w-4 h-4 mr-2" />
                       Edit
                     </button>
                     <button
                       onClick={() => toggleMemberStatus(member.id, member.is_active)}
-                      className={`flex-1 px-3 py-2 text-sm rounded transition-colors duration-200 ${
+                      className={`flex-1 px-3 py-2 text-sm rounded transition-colors duration-200 flex items-center justify-center ${
                         member.is_active 
                           ? 'bg-gray-600 text-white hover:bg-gray-700' 
                           : 'bg-lays-dark-red text-white hover:bg-red-800'
@@ -745,27 +741,24 @@ export default function CrewManagement() {
                     </button>
                     <button
                       onClick={() => handleDelete(member.id, member.full_name)}
-                      className="px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors duration-200"
+                      className="px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors duration-200 flex items-center justify-center"
                     >
-                      <Trash2 className="w-4 h-4 inline" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                   
-                  {/* Second row - Create Auth User button (only if no user_id) */}
-                  {!member.user_id && (
+                  {/* Create Auth User button - Full Width */}
+                  {!member.user_id ? (
                     <button
                       onClick={() => createAuthUser(member)}
-                      className="w-full px-3 py-2 bg-lays-orange-gold text-white text-sm rounded hover:bg-orange-600 transition-colors duration-200"
+                      className="w-full mt-2 px-3 py-2 bg-lays-orange-gold text-white text-sm rounded hover:bg-orange-600 transition-colors duration-200 flex items-center justify-center"
                     >
-                      <UserPlus className="w-4 h-4 mr-2 inline" />
+                      <UserPlus className="w-4 h-4 mr-2" />
                       Create Login Credentials
                     </button>
-                  )}
-                  
-                  {/* Show status if auth user exists */}
-                  {member.user_id && (
-                    <div className="text-center">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  ) : (
+                    <div className="w-full mt-2 flex items-center justify-center">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         ✓ Login credentials active
                       </span>
                     </div>
