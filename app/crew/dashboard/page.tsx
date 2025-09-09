@@ -34,7 +34,8 @@ import {
   Clock,
   Filter,
   Search,
-  QrCode
+  QrCode,
+  Eye
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import DesignLock from '@/components/layout/DesignLock'
@@ -88,6 +89,8 @@ export default function CrewDashboard() {
   const [currentView, setCurrentView] = useState<'active' | 'history'>('active')
   const [orderHistory, setOrderHistory] = useState<Order[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [showOrderModal, setShowOrderModal] = useState(false)
   const [historyDateFilter, setHistoryDateFilter] = useState('today')
   const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
@@ -653,6 +656,16 @@ export default function CrewDashboard() {
     }
   }
 
+  const handleViewOrder = (order: Order) => {
+    setSelectedOrder(order)
+    setShowOrderModal(true)
+  }
+
+  const closeOrderModal = () => {
+    setShowOrderModal(false)
+    setSelectedOrder(null)
+  }
+
   const filterOrders = () => {
     let filtered = orders
 
@@ -1208,74 +1221,18 @@ export default function CrewDashboard() {
                         )}
                       </div>
 
-                      {/* QR Code Section */}
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-4 border border-blue-200">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center space-x-2">
-                            <QrCode className="w-5 h-5 text-blue-600" />
-                            <h4 className="text-lg font-semibold text-gray-800">Customer Verification QR Code</h4>
-                          </div>
-                          <span className="text-sm font-mono text-gray-600 bg-white px-3 py-1 rounded-full border">
-                            #{order.order_number}
-                          </span>
-                        </div>
-                        
-                        {qrCodes[order.id] ? (
-                          <div className="text-center">
-                            <div className="inline-block p-4 bg-white rounded-xl shadow-lg border-2 border-blue-200">
-                              <img 
-                                src={qrCodes[order.id]} 
-                                alt={`QR Code for ${order.order_number}`}
-                                className="w-64 h-64 mx-auto"
-                              />
-                            </div>
-                            <div className="mt-4 space-y-2">
-                              <p className="text-sm font-medium text-gray-700">
-                                📱 Customer Instructions:
-                              </p>
-                              <div className="text-xs text-gray-600 space-y-1">
-                                <p>• Open your phone camera</p>
-                                <p>• Point camera at this QR code</p>
-                                <p>• Tap the notification to verify order</p>
-                                <p>• Or visit: <span className="font-mono bg-gray-100 px-2 py-1 rounded">/verify-order</span></p>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-8">
-                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <QrCode className="w-8 h-8 text-blue-600" />
-                            </div>
-                            <p className="text-gray-700 mb-4 font-medium">
-                              Generate QR code for customer verification
-                            </p>
-                            <p className="text-sm text-gray-600 mb-6">
-                              This QR code allows customers to verify their order status using their phone camera
-                            </p>
-                            <button
-                              onClick={() => generateQRForOrder(order)}
-                              disabled={generatingQR === order.id}
-                              className="bbq-button-primary px-6 py-3 text-sm font-medium"
-                            >
-                              {generatingQR === order.id ? (
-                                <>
-                                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                  Generating QR Code...
-                                </>
-                              ) : (
-                                <>
-                                  <QrCode className="w-4 h-4 mr-2" />
-                                  Generate QR Code
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
                     </div>
 
                     {/* Action Buttons - Crew Workflow */}
                     <div className="flex flex-wrap gap-2">
+                      {/* View Order Button */}
+                      <button
+                        onClick={() => handleViewOrder(order)}
+                        className="bbq-button-secondary text-sm px-4 py-2 flex items-center space-x-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>View Order</span>
+                      </button>
                       {/* Start Cooking - Show for confirmed/paid orders that haven't started cooking yet */}
                       {(order.order_status === 'confirmed' || order.order_status === 'pending') && order.payment_status === 'paid' && (
                         <button
@@ -1537,6 +1494,158 @@ export default function CrewDashboard() {
                       View Order
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Order Details Modal */}
+          {showOrderModal && selectedOrder && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-lays-dark-red rounded-full flex items-center justify-center">
+                      <ShoppingCart className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Order Details</h3>
+                      <p className="text-sm text-gray-600">#{selectedOrder.order_number}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={closeOrderModal}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <XCircle className="w-6 h-6 text-gray-500" />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="p-6 space-y-6">
+                  {/* Order Status */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-3 h-3 rounded-full ${
+                        selectedOrder.order_status === 'completed' ? 'bg-green-500' :
+                        selectedOrder.order_status === 'ready' ? 'bg-blue-500' :
+                        selectedOrder.order_status === 'cooking' ? 'bg-orange-500' :
+                        selectedOrder.order_status === 'preparing' ? 'bg-yellow-500' :
+                        'bg-gray-500'
+                      }`}></div>
+                      <span className="text-lg font-semibold capitalize">{selectedOrder.order_status}</span>
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedOrder.payment_status === 'paid' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {selectedOrder.payment_status}
+                    </div>
+                  </div>
+
+                  {/* Customer Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-900 mb-2">Customer Information</h4>
+                      <p><strong>Name:</strong> {selectedOrder.customer_name}</p>
+                      <p><strong>Phone:</strong> {selectedOrder.customer_phone}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-900 mb-2">Order Information</h4>
+                      <p><strong>Total:</strong> ₱{selectedOrder.total_amount.toFixed(2)}</p>
+                      <p><strong>Pickup Time:</strong> {new Date(selectedOrder.pickup_time).toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  {/* Order Items */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Order Items</h4>
+                    <div className="space-y-2">
+                      {selectedOrder.order_items?.map((item, index) => (
+                        <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                          <span className="font-medium">{item.product_name}</span>
+                          <div className="text-right">
+                            <div className="text-sm text-gray-600">{item.quantity}x ₱{item.unit_price.toFixed(2)}</div>
+                            <div className="font-semibold">₱{(item.quantity * item.unit_price).toFixed(2)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* QR Code Section */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-2">
+                        <QrCode className="w-5 h-5 text-blue-600" />
+                        <h4 className="text-lg font-semibold text-gray-800">Customer Verification QR Code</h4>
+                      </div>
+                    </div>
+                    
+                    {qrCodes[selectedOrder.id] ? (
+                      <div className="text-center">
+                        <div className="inline-block p-4 bg-white rounded-xl shadow-lg border-2 border-blue-200">
+                          <img 
+                            src={qrCodes[selectedOrder.id]} 
+                            alt={`QR Code for ${selectedOrder.order_number}`}
+                            className="w-64 h-64 mx-auto"
+                          />
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          <p className="text-sm font-medium text-gray-700">
+                            📱 Customer Instructions:
+                          </p>
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <p>• Open your phone camera</p>
+                            <p>• Point camera at this QR code</p>
+                            <p>• Tap the notification to verify order</p>
+                            <p>• Or visit: <span className="font-mono bg-gray-100 px-2 py-1 rounded">/verify-order</span></p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <QrCode className="w-8 h-8 text-blue-600" />
+                        </div>
+                        <p className="text-gray-700 mb-4 font-medium">
+                          Generate QR code for customer verification
+                        </p>
+                        <p className="text-sm text-gray-600 mb-6">
+                          This QR code allows customers to verify their order status using their phone camera
+                        </p>
+                        <button
+                          onClick={() => generateQRForOrder(selectedOrder)}
+                          disabled={generatingQR === selectedOrder.id}
+                          className="bbq-button-primary px-6 py-3 text-sm font-medium"
+                        >
+                          {generatingQR === selectedOrder.id ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                              Generating QR Code...
+                            </>
+                          ) : (
+                            <>
+                              <QrCode className="w-4 h-4 mr-2" />
+                              Generate QR Code
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+                  <button
+                    onClick={closeOrderModal}
+                    className="bbq-button-secondary px-6 py-2"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
