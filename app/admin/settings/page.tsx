@@ -619,6 +619,9 @@ export default function AdminSettingsPage() {
     }
     
     fetchSettings()
+    // Load all data on component mount
+    loadProducts()
+    loadBranches()
   }, [searchParams])
 
   useEffect(() => {
@@ -860,7 +863,10 @@ export default function AdminSettingsPage() {
 
         if (error) throw error
         setMessage('Product updated successfully!')
-        await loadProducts()
+        // Small delay to ensure database update is complete
+        setTimeout(async () => {
+          await loadProducts()
+        }, 100)
       } else {
         // Create new product
         const { data, error } = await supabase
@@ -870,7 +876,10 @@ export default function AdminSettingsPage() {
 
         if (error) throw error
         setMessage('Product created successfully!')
-        await loadProducts()
+        // Small delay to ensure database update is complete
+        setTimeout(async () => {
+          await loadProducts()
+        }, 100)
       }
 
       // Close modal and reset form
