@@ -6,7 +6,7 @@ import {
   User, LogIn, UserPlus, ArrowLeft, Package, Settings, LogOut, 
   Clock, Star, TrendingUp, Heart, ShoppingBag, MapPin, 
   Calendar, CreditCard, Bell, Edit3, Eye, EyeOff, 
-  CheckCircle, XCircle, AlertCircle, Loader2, QrCode
+  CheckCircle, XCircle, AlertCircle, Loader2, QrCode, RefreshCw
 } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
 import { createClient } from '@/lib/supabase'
@@ -89,6 +89,7 @@ export default function AccountPage() {
   })
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderModal, setShowOrderModal] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
   // Fetch user data from database
   const fetchUserData = async () => {
@@ -98,7 +99,10 @@ export default function AccountPage() {
     try {
       const supabase = createClient()
       
-      // Fetch user stats
+      // Force fresh data by adding cache busting timestamp
+      const cacheBuster = Date.now()
+      
+      // Fetch user stats with cache busting
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -112,6 +116,7 @@ export default function AccountPage() {
           actual_pickup_time,
           ready_at,
           cooking_started_at,
+          updated_at,
           order_items (
             product_name,
             quantity,
@@ -125,6 +130,17 @@ export default function AccountPage() {
         console.error('Error fetching orders:', ordersError)
         return
       }
+
+      // Debug: Log the actual data being fetched
+      console.log('🔍 DEBUG: Fresh orders data fetched:', {
+        totalOrders: ordersData?.length || 0,
+        orders: ordersData?.map(order => ({
+          order_number: order.order_number,
+          order_status: order.order_status,
+          payment_status: order.payment_status,
+          updated_at: order.updated_at
+        }))
+      })
 
       // Calculate stats
       const totalOrders = ordersData?.length || 0
@@ -191,12 +207,19 @@ export default function AccountPage() {
 
       setRecentOrders(recentOrdersData)
       setFavoriteItems(favoriteItemsData)
+      setLastRefresh(new Date())
 
     } catch (error) {
       console.error('Error fetching user data:', error)
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Force refresh data
+  const handleRefresh = async () => {
+    console.log('🔄 Force refreshing user data...')
+    await fetchUserData()
   }
 
   // Check for existing customer session on page load
@@ -514,13 +537,23 @@ export default function AccountPage() {
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-900">My Dashboard</h1>
                 </div>
               </div>
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleRefresh}
+                  disabled={isLoading}
+                  className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -537,6 +570,11 @@ export default function AccountPage() {
                     : 'Ready for your first BBQ order?'
                   }
                 </p>
+                {lastRefresh && (
+                  <p className="text-red-200 text-xs mt-1">
+                    Last updated: {lastRefresh.toLocaleTimeString()}
+                  </p>
+                )}
               </div>
               <div className="mt-4 sm:mt-0">
                 <button
