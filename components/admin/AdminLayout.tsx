@@ -22,6 +22,7 @@ interface AdminLayoutProps {
   userName?: string
   pageTitle?: string
   pageDescription?: string
+  notificationCount?: number
 }
 
 export default function AdminLayout({ 
@@ -29,12 +30,13 @@ export default function AdminLayout({
   currentPage = 'dashboard',
   userName = 'Admin',
   pageTitle,
-  pageDescription 
+  pageDescription,
+  notificationCount = 0
 }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Admin Navigation */}
-      <AdminNavigation currentPage={currentPage} userName={userName} />
+      <AdminNavigation currentPage={currentPage} userName={userName} notificationCount={notificationCount} />
       
       {/* Main Content Area - No left margin needed for top nav */}
       <div className="pt-20"> {/* Add top padding to account for fixed top nav */}

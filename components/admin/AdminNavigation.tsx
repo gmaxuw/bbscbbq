@@ -35,9 +35,10 @@ import { createClient } from '@/lib/supabase'
 interface AdminNavigationProps {
   currentPage?: string
   userName?: string
+  notificationCount?: number
 }
 
-export default function AdminNavigation({ currentPage = 'dashboard', userName = 'Admin' }: AdminNavigationProps) {
+export default function AdminNavigation({ currentPage = 'dashboard', userName = 'Admin', notificationCount = 0 }: AdminNavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const router = useRouter()
@@ -72,12 +73,6 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
       href: '/admin/orders',
       icon: ShoppingBag,
       description: 'Manage orders and payments'
-    },
-    {
-      name: 'Branches',
-      href: '/admin/branches',
-      icon: Building2,
-      description: 'Manage locations'
     },
     {
       name: 'Analytics',
@@ -150,10 +145,11 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
               {/* Notifications */}
               <Link href="/admin/orders" className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full relative">
                 <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-lays-bright-red text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                  {/* TODO: Connect to real notification count */}
-                  3
-                </span>
+                {notificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-lays-bright-red text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </span>
+                )}
               </Link>
 
               {/* User Menu */}

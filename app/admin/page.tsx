@@ -46,6 +46,16 @@ interface DashboardStats {
   todayOrders: number
 }
 
+interface RecentActivity {
+  id: string
+  type: 'order' | 'payment' | 'crew' | 'product' | 'branch'
+  message: string
+  timestamp: string
+  branch_name?: string
+  order_number?: string
+  user_name?: string
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalOrders: 0,
@@ -55,6 +65,8 @@ export default function AdminDashboard() {
     totalProducts: 0,
     todayOrders: 0
   })
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
+  const [notificationCount, setNotificationCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
@@ -63,6 +75,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     checkAuth()
     loadDashboardStats()
+    loadRecentActivity()
+    loadNotificationCount()
   }, [])
 
   const checkAuth = async () => {
@@ -142,10 +156,171 @@ export default function AdminDashboard() {
     }
   }
 
+  const loadRecentActivity = async () => {
+    try {
+      // Get recent orders with branch names
+      const { data: recentOrders, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          customer_name,
+          total_amount,
+          order_status,
+          payment_status,
+          created_at,
+          branches (name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (ordersError) throw ordersError
+
+      // Get recent crew additions
+      const { data: recentCrew, error: crewError } = await supabase
+        .from('admin_users')
+        .select(`
+          id,
+          name,
+          created_at,
+          branches (name)
+        `)
+        .eq('role', 'crew')
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      if (crewError) throw crewError
+
+      // Get recent system logs
+      const { data: recentLogs, error: logsError } = await supabase
+        .from('system_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      if (logsError) throw logsError
+
+      // Combine and format activities
+      const activities: RecentActivity[] = []
+
+      // Add recent orders
+      recentOrders?.forEach(order => {
+        activities.push({
+          id: `order-${order.id}`,
+          type: 'order',
+          message: `New order received from ${order.branches?.name || 'Unknown'} branch`,
+          timestamp: order.created_at,
+          branch_name: order.branches?.name,
+          order_number: order.order_number
+        })
+      })
+
+      // Add recent crew additions
+      recentCrew?.forEach(crew => {
+        activities.push({
+          id: `crew-${crew.id}`,
+          type: 'crew',
+          message: `New crew member assigned to ${crew.branches?.name || 'Unknown'} branch`,
+          timestamp: crew.created_at,
+          branch_name: crew.branches?.name,
+          user_name: crew.name
+        })
+      })
+
+      // Add recent system logs
+      recentLogs?.forEach(log => {
+        activities.push({
+          id: `log-${log.id}`,
+          type: 'payment',
+          message: log.message,
+          timestamp: log.created_at
+        })
+      })
+
+      // Sort by timestamp and take the most recent 5
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      setRecentActivity(activities.slice(0, 5))
+
+    } catch (error) {
+      console.error('Failed to load recent activity:', error)
+    }
+  }
+
+  const loadNotificationCount = async () => {
+    try {
+      // Count pending payments
+      const { data: pendingPayments, error: paymentsError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('payment_status', 'pending')
+
+      if (paymentsError) throw paymentsError
+
+      // Count pending orders
+      const { data: pendingOrders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_status', 'pending')
+
+      if (ordersError) throw ordersError
+
+      // Count low stock products
+      const { data: lowStockProducts, error: stockError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('is_out_of_stock', true)
+
+      if (stockError) throw stockError
+
+      const totalNotifications = (pendingPayments?.length || 0) + (pendingOrders?.length || 0) + (lowStockProducts?.length || 0)
+      setNotificationCount(totalNotifications)
+
+    } catch (error) {
+      console.error('Failed to load notification count:', error)
+    }
+  }
+
   const handleLogout = async () => {
     console.log('🚪 Admin logging out from dashboard...')
     await supabase.auth.signOut()
     router.push('/admin/login')
+  }
+
+  const formatTimeAgo = (timestamp: string) => {
+    const now = new Date()
+    const time = new Date(timestamp)
+    const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60))
+    
+    if (diffInMinutes < 1) return 'Just now'
+    if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`
+    
+    const diffInHours = Math.floor(diffInMinutes / 60)
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
+    
+    const diffInDays = Math.floor(diffInHours / 24)
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
+  }
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'order': return '🛒'
+      case 'payment': return '💳'
+      case 'crew': return '👥'
+      case 'product': return '📦'
+      case 'branch': return '🏪'
+      default: return '📋'
+    }
+  }
+
+  const getActivityColor = (type: string) => {
+    switch (type) {
+      case 'order': return 'bg-lays-orange-gold'
+      case 'payment': return 'bg-lays-bright-red'
+      case 'crew': return 'bg-lays-dark-red'
+      case 'product': return 'bg-lays-brown-gold'
+      case 'branch': return 'bg-bbq-secondary'
+      default: return 'bg-gray-500'
+    }
   }
 
   const StatCard = ({ title, value, icon: Icon, color, description }: any) => (
@@ -194,6 +369,7 @@ export default function AdminDashboard() {
       userName={user?.full_name || 'Admin'}
       pageTitle="Dashboard Overview"
       pageDescription={`Welcome back, ${user?.full_name || 'Administrator'}. Here's your business overview.`}
+      notificationCount={notificationCount}
     >
 
       {/* Stats Grid */}
@@ -274,29 +450,30 @@ export default function AdminDashboard() {
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-lays-orange-gold rounded-full"></div>
-                <span className="text-gray-700">New order received from Downtown branch</span>
-              </div>
-              <span className="text-sm text-gray-500">2 minutes ago</span>
+          {recentActivity.length > 0 ? (
+            <div className="space-y-4">
+              {recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-3 h-3 ${getActivityColor(activity.type)} rounded-full`}></div>
+                    <span className="text-gray-700">{activity.message}</span>
+                    {activity.order_number && (
+                      <span className="text-xs bg-lays-orange-gold text-white px-2 py-1 rounded-full">
+                        #{activity.order_number}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-500">{formatTimeAgo(activity.timestamp)}</span>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-lays-bright-red rounded-full"></div>
-                <span className="text-gray-700">Payment verified for order #1234</span>
-              </div>
-              <span className="text-sm text-gray-500">15 minutes ago</span>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-gray-400 text-4xl mb-4">📋</div>
+              <p className="text-gray-500">No recent activity</p>
+              <p className="text-sm text-gray-400">Activity will appear here as orders and updates come in</p>
             </div>
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-lays-dark-red rounded-full"></div>
-                <span className="text-gray-700">New crew member assigned to Mall branch</span>
-              </div>
-              <span className="text-sm text-gray-500">1 hour ago</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
