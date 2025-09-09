@@ -46,12 +46,14 @@ interface DailyReport {
 }
 
 interface FinancialAnalytics {
-  total_revenue: number
+  total_revenue: number // OUR ACTUAL REVENUE (commission + platform fee)
   total_commission: number
   total_platform_fees: number
-  net_profit: number
+  net_profit: number // Same as total_revenue
   average_order_value: number
   total_orders: number
+  gross_revenue: number // Total customer payments
+  vendor_payments: number // What goes to vendors
 }
 
 interface TimeSeriesData {
@@ -387,28 +389,31 @@ export default function AdminAnalytics() {
       // Get all completed orders in date range
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('total_amount, total_commission, subtotal, promo_discount, created_at')
+        .select('total_amount, total_commission, subtotal, promo_discount, platform_fee, created_at')
         .eq('order_status', 'completed')
         .gte('created_at', dateRange.start)
         .lte('created_at', dateRange.end)
 
       if (error) throw error
 
-      // Calculate financial metrics
-      const totalRevenue = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0
+      // Calculate financial metrics - BULLETPROOF REVENUE TRACKING
+      const grossRevenue = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0
       const totalCommission = orders?.reduce((sum, order) => sum + parseFloat(order.total_commission || '0'), 0) || 0
-      const totalPlatformFees = (orders?.length || 0) * platformFee
-      const netProfit = totalCommission + totalPlatformFees
+      const totalPlatformFees = orders?.reduce((sum, order) => sum + parseFloat(order.platform_fee || '0'), 0) || 0
+      const vendorPayments = orders?.reduce((sum, order) => sum + parseFloat(order.subtotal || '0'), 0) || 0
+      const netRevenue = totalCommission + totalPlatformFees // OUR ACTUAL REVENUE
       const totalOrders = orders?.length || 0
-      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+      const averageOrderValue = totalOrders > 0 ? grossRevenue / totalOrders : 0
 
       setFinancialAnalytics({
-        total_revenue: totalRevenue,
+        total_revenue: netRevenue, // Changed to show OUR revenue, not customer payments
         total_commission: totalCommission,
         total_platform_fees: totalPlatformFees,
-        net_profit: netProfit,
+        net_profit: netRevenue, // Same as total_revenue now
         average_order_value: averageOrderValue,
-        total_orders: totalOrders
+        total_orders: totalOrders,
+        gross_revenue: grossRevenue, // Add gross revenue for reference
+        vendor_payments: vendorPayments // Add vendor payments for reference
       })
     } catch (error) {
       console.error('Failed to load financial analytics:', error)
@@ -437,7 +442,7 @@ export default function AdminAnalytics() {
       // Get current month orders
       const { data: currentMonthOrders, error: currentError } = await supabase
         .from('orders')
-        .select('total_amount, total_commission, created_at')
+        .select('total_amount, total_commission, platform_fee, created_at')
         .eq('order_status', 'completed')
         .gte('created_at', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`)
         .lt('created_at', `${currentYear}-${String(currentMonth + 2).padStart(2, '0')}-01`)
@@ -446,7 +451,7 @@ export default function AdminAnalytics() {
       // Get last month orders
       const { data: lastMonthOrders, error: lastError } = await supabase
         .from('orders')
-        .select('total_amount, total_commission, created_at')
+        .select('total_amount, total_commission, platform_fee, created_at')
         .eq('order_status', 'completed')
         .gte('created_at', `${lastYear}-${String(lastMonth + 1).padStart(2, '0')}-01`)
         .lt('created_at', `${lastYear}-${String(lastMonth + 2).padStart(2, '0')}-01`)
@@ -467,9 +472,9 @@ export default function AdminAnalytics() {
           currentMonthData[dayKey] = { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
         }
         
-        currentMonthData[dayKey].revenue += parseFloat(order.total_amount || '0')
+        currentMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') + parseFloat(order.platform_fee || '0') // OUR ACTUAL REVENUE
         currentMonthData[dayKey].commission += parseFloat(order.total_commission || '0')
-        currentMonthData[dayKey].platform_fees += platformFee
+        currentMonthData[dayKey].platform_fees += parseFloat(order.platform_fee || '0')
         currentMonthData[dayKey].orders += 1
       })
 
@@ -482,9 +487,9 @@ export default function AdminAnalytics() {
           lastMonthData[dayKey] = { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
         }
         
-        lastMonthData[dayKey].revenue += parseFloat(order.total_amount || '0')
+        lastMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') + parseFloat(order.platform_fee || '0') // OUR ACTUAL REVENUE
         lastMonthData[dayKey].commission += parseFloat(order.total_commission || '0')
-        lastMonthData[dayKey].platform_fees += platformFee
+        lastMonthData[dayKey].platform_fees += parseFloat(order.platform_fee || '0')
         lastMonthData[dayKey].orders += 1
       })
 
@@ -670,14 +675,14 @@ export default function AdminAnalytics() {
         {financialAnalytics && (
           <div className="bbq-card p-4 sm:p-6 mb-6 sm:mb-8">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Financial Overview</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-green-50 p-4 rounded-lg">
                 <div className="flex items-center">
-                  <DollarSign className="w-8 h-8 text-green-600" />
+                  <span className="text-2xl">💰</span>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-green-800">Total Revenue</p>
+                    <p className="text-sm font-medium text-green-800">Our Revenue</p>
                     <p className="text-2xl font-bold text-green-900">{formatCurrency(financialAnalytics.total_revenue)}</p>
-                    <p className="text-xs text-green-600">What customers pay</p>
+                    <p className="text-xs text-green-600">Commission + Platform Fee</p>
                   </div>
                 </div>
               </div>
@@ -685,9 +690,9 @@ export default function AdminAnalytics() {
                 <div className="flex items-center">
                   <TrendingUp className="w-8 h-8 text-orange-600" />
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-orange-800">Stall Income</p>
-                    <p className="text-2xl font-bold text-orange-900">{formatCurrency(financialAnalytics.total_revenue - financialAnalytics.total_commission - financialAnalytics.total_platform_fees)}</p>
-                    <p className="text-xs text-orange-600">What stalls earn</p>
+                    <p className="text-sm font-medium text-orange-800">Gross Revenue</p>
+                    <p className="text-2xl font-bold text-orange-900">{formatCurrency(financialAnalytics.gross_revenue || 0)}</p>
+                    <p className="text-xs text-orange-600">Total customer payments</p>
                   </div>
                 </div>
               </div>
@@ -708,6 +713,16 @@ export default function AdminAnalytics() {
                     <p className="text-sm font-medium text-purple-800">Platform Fees</p>
                     <p className="text-2xl font-bold text-purple-900">{formatCurrency(financialAnalytics.total_platform_fees)}</p>
                     <p className="text-xs text-purple-600">Visible profit</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center">
+                  <ShoppingCart className="w-8 h-8 text-gray-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-800">Vendor Payments</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatCurrency(financialAnalytics.vendor_payments || 0)}</p>
+                    <p className="text-xs text-gray-600">What stalls earn</p>
                   </div>
                 </div>
               </div>
