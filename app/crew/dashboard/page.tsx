@@ -77,6 +77,7 @@ export default function CrewDashboard() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [showingCompletedOrders, setShowingCompletedOrders] = useState(false)
   const [offlineOrders, setOfflineOrders] = useState<Order[]>([])
   const [pendingUpdates, setPendingUpdates] = useState<any[]>([])
   const [newOrderNotification, setNewOrderNotification] = useState<Order | null>(null)
@@ -282,7 +283,8 @@ export default function CrewDashboard() {
 
       console.log('Loading orders for branch:', crewMember.branch_id)
 
-      const { data, error } = await supabase
+      // First try to get active orders (not completed)
+      let { data, error } = await supabase
         .from('orders')
         .select(`
           id,
@@ -311,12 +313,57 @@ export default function CrewDashboard() {
         .neq('order_status', 'completed')
         .order('created_at', { ascending: false })
 
+      // If no active orders, get recent completed orders (last 10)
+      if (!error && (!data || data.length === 0)) {
+        console.log('No active orders found, loading recent completed orders...')
+        const { data: completedData, error: completedError } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            customer_phone,
+            pickup_time,
+            total_amount,
+            subtotal,
+            promo_discount,
+            order_status,
+            payment_status,
+            qr_code,
+            created_at,
+            cooking_started_at,
+            ready_at,
+            actual_pickup_time,
+            order_items(
+              product_name,
+              quantity,
+              unit_price,
+              subtotal
+            )
+          `)
+          .eq('branch_id', crewMember.branch_id)
+          .eq('order_status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(10)
+        
+        if (!completedError) {
+          data = completedData
+          setShowingCompletedOrders(true)
+          console.log('Loaded recent completed orders:', data?.length || 0)
+        }
+      }
+
       if (error) {
         console.error('Database error loading orders:', error)
         throw error
       }
       
       console.log('Orders loaded successfully:', data?.length || 0)
+      
+      // Reset completed orders flag if we have active orders
+      if (data && data.length > 0) {
+        setShowingCompletedOrders(false)
+      }
       
       // Check for new orders and show notification
       if (data && data.length > lastOrderCount && lastOrderCount > 0) {
@@ -469,8 +516,8 @@ export default function CrewDashboard() {
             console.log('🔄 Order items change detected:', payload.eventType)
             // Reload orders when order items change
             loadOrders()
-        }
-      )
+          }
+        )
       .subscribe()
 
     return () => {
@@ -948,6 +995,16 @@ export default function CrewDashboard() {
 
           {/* Orders List */}
           <div className="space-y-4">
+            {showingCompletedOrders && (
+              <div className="bbq-card p-4 bg-blue-50 border-blue-200">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-blue-800">
+                    Showing recent completed orders (no active orders found)
+                  </span>
+                </div>
+              </div>
+            )}
             {currentView === 'active' ? (
               // Active Orders View
               filteredOrders.length === 0 ? (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Heart, ArrowLeft, Package, Star, ShoppingCart, Trash2 } from 'lucide-react'
+import { Heart, ArrowLeft, Package, Star, ShoppingCart, Trash2, Plus, Minus, CheckCircle, XCircle } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
 import { useFavorites } from '@/lib/favorites-context'
 import { useCart } from '@/lib/cart-context'
@@ -11,16 +11,37 @@ export default function FavoritesPage() {
   const { favorites, isLoading, removeFromFavorites, clearFavorites } = useFavorites()
   const { addItem } = useCart()
   const [addedItems, setAddedItems] = useState<{ [key: string]: boolean }>({})
+  const [quantities, setQuantities] = useState<{ [key: string]: number }>({})
+
+  // Initialize quantities
+  useEffect(() => {
+    const initialQuantities: { [key: string]: number } = {}
+    favorites.forEach(item => {
+      initialQuantities[item.id] = 1
+    })
+    setQuantities(initialQuantities)
+  }, [favorites])
+
+  const updateQuantity = (productId: string, newQuantity: number) => {
+    if (newQuantity >= 1 && newQuantity <= 10) {
+      setQuantities(prev => ({ ...prev, [productId]: newQuantity }))
+    }
+  }
 
   const addToCart = (product: any) => {
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image_url || '/placeholder-food.jpg',
-      category: product.category,
-      commission: product.commission || 0
-    })
+    const quantity = quantities[product.id] || 1
+    
+    // Add multiple items based on quantity
+    for (let i = 0; i < quantity; i++) {
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image_url || '/placeholder-food.jpg',
+        category: product.category,
+        commission: product.commission || 0
+      })
+    }
     
     setAddedItems({ ...addedItems, [product.id]: true })
     
@@ -28,6 +49,11 @@ export default function FavoritesPage() {
     setTimeout(() => {
       setAddedItems(prev => ({ ...prev, [product.id]: false }))
     }, 2000)
+  }
+
+  const isAvailable = (item: any) => {
+    // Check if item is available (not out of stock)
+    return !item.is_out_of_stock && item.stock_quantity > 0
   }
 
   const handleRemoveFavorite = async (productId: string) => {
@@ -152,25 +178,75 @@ export default function FavoritesPage() {
                       {item.description || 'Delicious BBQ item prepared with care and attention to detail.'}
                     </p>
                     
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-500">
-                        Commission: ₱{item.commission?.toFixed(2) || '0.00'}
+                    {/* Availability Status */}
+                    <div className="mb-4">
+                      <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
+                        isAvailable(item) 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {isAvailable(item) ? (
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            <span>Available</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4" />
+                            <span>Out of Stock</span>
+                          </>
+                        )}
                       </div>
-                      <button 
-                        onClick={() => addToCart(item)}
-                        disabled={addedItems[item.id]}
-                        className={`bbq-button-primary text-sm px-4 py-2 flex items-center space-x-2 transition-all duration-200 ${
-                          addedItems[item.id] 
-                            ? 'bg-green-500 hover:bg-green-600' 
-                            : 'hover:scale-105'
-                        }`}
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        <span>
-                          {addedItems[item.id] ? 'Added!' : 'Add to Cart'}
-                        </span>
-                      </button>
                     </div>
+                    
+                    {/* Quantity Selector */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Quantity:</span>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => updateQuantity(item.id, (quantities[item.id] || 1) - 1)}
+                            disabled={!isAvailable(item) || (quantities[item.id] || 1) <= 1}
+                            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <span className="w-8 text-center font-semibold text-gray-900">
+                            {quantities[item.id] || 1}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(item.id, (quantities[item.id] || 1) + 1)}
+                            disabled={!isAvailable(item) || (quantities[item.id] || 1) >= 10}
+                            className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Add to Cart Button */}
+                    <button 
+                      onClick={() => addToCart(item)}
+                      disabled={addedItems[item.id] || !isAvailable(item)}
+                      className={`w-full text-sm px-4 py-2 flex items-center justify-center space-x-2 transition-all duration-200 rounded-lg font-semibold ${
+                        !isAvailable(item)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : addedItems[item.id] 
+                            ? 'bg-green-500 hover:bg-green-600 text-white' 
+                            : 'bbq-button-primary hover:scale-105'
+                      }`}
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>
+                        {!isAvailable(item) 
+                          ? 'Out of Stock' 
+                          : addedItems[item.id] 
+                            ? `Added ${quantities[item.id] || 1} item(s)!` 
+                            : `Add ${quantities[item.id] || 1} to Cart`
+                        }
+                      </span>
+                    </button>
                   </div>
                 </div>
               ))}

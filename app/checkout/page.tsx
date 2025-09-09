@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ShoppingCart, CreditCard, User, Phone, MapPin, AlertCircle, CheckCircle, Wifi, WifiOff, UserCheck, Edit3, Clock, Upload, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { uploadPaymentScreenshot, UploadProgress } from '@/lib/file-upload'
+import LoginModal from '@/components/auth/LoginModal'
 
 interface Branch {
   id: string
@@ -46,12 +47,50 @@ export default function CheckoutPage() {
   const [isLoadingBranches, setIsLoadingBranches] = useState(true)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [isGuestMode, setIsGuestMode] = useState(false)
 
   // Load customer data and branches
   useEffect(() => {
-    loadCustomerData()
+    checkAuthentication()
     loadBranches()
   }, [])
+
+  // Check if user is authenticated
+  const checkAuthentication = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        // Check if user has customer role
+        const userRole = user.user_metadata?.role
+        if (userRole === 'customer') {
+          setIsAuthenticated(true)
+          setCurrentUser(user)
+          
+          // Load customer data from auth
+          setCustomerData({
+            name: user.user_metadata?.full_name || '',
+            phone: user.user_metadata?.phone || '',
+            email: user.email || '',
+            branch_id: ''
+          })
+        } else {
+          // Not a customer, show login modal
+          setShowLoginModal(true)
+        }
+      } else {
+        // No user, show login modal
+        setShowLoginModal(true)
+      }
+    } catch (error) {
+      console.error('Auth check error:', error)
+      setShowLoginModal(true)
+    }
+  }
 
   // Check online status
   useEffect(() => {
@@ -174,12 +213,41 @@ export default function CheckoutPage() {
     }
   }
 
+  // Handle successful login
+  const handleLoginSuccess = (user: any) => {
+    setIsAuthenticated(true)
+    setCurrentUser(user)
+    setShowLoginModal(false)
+    setIsGuestMode(false)
+    
+    // Update customer data
+    setCustomerData({
+      name: user.user_metadata?.full_name || '',
+      phone: user.user_metadata?.phone || '',
+      email: user.email || '',
+      branch_id: customerData.branch_id
+    })
+  }
+
+  // Handle guest continue
+  const handleGuestContinue = () => {
+    setIsGuestMode(true)
+    setShowLoginModal(false)
+    // Keep current customer data as is
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrors([])
     setIsProcessing(true)
 
     try {
+      // Check authentication first
+      if (!isAuthenticated && !isGuestMode) {
+        setShowLoginModal(true)
+        return
+      }
+
       // Validate required fields
       if (!pickupDateTime.date || !pickupDateTime.time) {
         setErrors(['Please select pickup date and time'])
@@ -199,7 +267,8 @@ export default function CheckoutPage() {
         pickup_time: new Date(`${pickupDateTime.date}T${pickupDateTime.time}:00`).toISOString(),
         payment_method: paymentData.method,
         payment_reference: paymentData.reference,
-        payment_screenshot_url: paymentData.screenshotUrl
+        payment_screenshot_url: paymentData.screenshotUrl,
+        user_id: isAuthenticated ? currentUser?.id : null
       } : {
         name: customerData.name,
         phone: customerData.phone,
@@ -207,7 +276,8 @@ export default function CheckoutPage() {
         pickup_time: new Date(`${pickupDateTime.date}T${pickupDateTime.time}:00`).toISOString(),
         payment_method: paymentData.method,
         payment_reference: paymentData.reference,
-        payment_screenshot_url: paymentData.screenshotUrl
+        payment_screenshot_url: paymentData.screenshotUrl,
+        user_id: isAuthenticated ? currentUser?.id : null
       }
 
       const result = await checkout(orderData)
@@ -333,9 +403,29 @@ export default function CheckoutPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Customer Information Section */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <UserCheck className="w-5 h-5 text-lays-dark-red" />
-                  <h3 className="text-lg font-medium text-gray-900">Paying Customer</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <UserCheck className="w-5 h-5 text-lays-dark-red" />
+                    <h3 className="text-lg font-medium text-gray-900">Paying Customer</h3>
+                  </div>
+                  {isAuthenticated ? (
+                    <div className="flex items-center space-x-2 text-green-600">
+                      <CheckCircle className="w-4 h-4" />
+                      <span className="text-sm font-medium">Authenticated</span>
+                    </div>
+                  ) : isGuestMode ? (
+                    <div className="flex items-center space-x-2 text-orange-600">
+                      <User className="w-4 h-4" />
+                      <span className="text-sm font-medium">Guest Mode</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowLoginModal(true)}
+                      className="text-lays-orange-gold hover:text-lays-dark-red text-sm font-medium"
+                    >
+                      Login Required
+                    </button>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -660,7 +750,7 @@ export default function CheckoutPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isProcessing || !isOnline || isUploading || !paymentData.screenshotUrl}
+                  disabled={isProcessing || !isOnline || isUploading || !paymentData.screenshotUrl || (!isAuthenticated && !isGuestMode)}
                   className="flex-1 px-4 py-3 bg-lays-orange-gold text-white rounded-lg hover:bg-lays-dark-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {isProcessing ? (
@@ -678,6 +768,11 @@ export default function CheckoutPage() {
                       <AlertCircle className="w-4 h-4" />
                       <span>Upload Screenshot First</span>
                     </>
+                  ) : (!isAuthenticated && !isGuestMode) ? (
+                    <>
+                      <User className="w-4 h-4" />
+                      <span>Login Required</span>
+                    </>
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4" />
@@ -690,6 +785,14 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={handleLoginSuccess}
+        onGuestContinue={handleGuestContinue}
+      />
     </div>
   )
 }

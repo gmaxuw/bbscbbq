@@ -117,6 +117,7 @@ class InventoryManager {
     payment_method?: string
     payment_reference?: string
     payment_screenshot_url?: string
+    user_id?: string
   }): Promise<{ success: boolean; order_id?: string; conflicts?: string[] }> {
     try {
       if (this.isOnline) {
@@ -142,6 +143,7 @@ class InventoryManager {
     payment_method?: string
     payment_reference?: string
     payment_screenshot_url?: string
+    user_id?: string
   }): Promise<{ success: boolean; order_id?: string; conflicts?: string[] }> {
     const supabase = createClient()
     
@@ -193,7 +195,8 @@ class InventoryManager {
         payment_status: 'pending',
         payment_method: orderData.payment_method || 'gcash',
         gcash_reference: orderData.payment_reference,
-        payment_screenshot_url: screenshotUrl
+        payment_screenshot_url: screenshotUrl,
+        user_id: orderData.user_id
       }])
       .select()
       .single()
@@ -235,6 +238,7 @@ class InventoryManager {
     payment_method?: string
     payment_reference?: string
     payment_screenshot_url?: string
+    user_id?: string
   }): Promise<{ success: boolean; order_id?: string }> {
     const orderId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
