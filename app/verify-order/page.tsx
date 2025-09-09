@@ -43,15 +43,19 @@ export default function VerifyOrderPage() {
 
   useEffect(() => {
     const ref = searchParams.get('ref')
+    const orderId = searchParams.get('order')
+    
     if (ref) {
-      fetchOrder(ref)
+      fetchOrderByRef(ref)
+    } else if (orderId) {
+      fetchOrderById(orderId)
     } else {
-      setError('No reference number provided')
+      setError('No reference number or order ID provided')
       setIsLoading(false)
     }
   }, [searchParams])
 
-  const fetchOrder = async (referenceNumber: string) => {
+  const fetchOrderByRef = async (referenceNumber: string) => {
     try {
       setIsLoading(true)
       
@@ -79,6 +83,44 @@ export default function VerifyOrderPage() {
           )
         `)
         .eq('order_number', referenceNumber.toUpperCase())
+        .single()
+
+      if (error) {
+        console.error('Error fetching order:', error)
+        setError('Order not found')
+      } else {
+        setOrder(data)
+      }
+    } catch (error) {
+      console.error('Error fetching order:', error)
+      setError('Failed to fetch order details')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchOrderById = async (orderId: string) => {
+    try {
+      setIsLoading(true)
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            id,
+            quantity,
+            unit_price,
+            product:products (
+              name
+            )
+          ),
+          branch:branches (
+            name,
+            address
+          )
+        `)
+        .eq('id', orderId)
         .single()
 
       if (error) {
