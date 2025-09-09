@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Save, Eye, RefreshCw, Image, Type, Settings, Star, MapPin, Clock, ShoppingCart, ArrowLeft, Plus, Edit, Trash2, Search, Users, Phone, Mail, EyeOff, DollarSign, User, ImageIcon, X, Upload, Package, DollarSign as DollarSignIcon, TrendingUp, CheckCircle, XCircle, AlertTriangle, Calendar, FileText, Filter } from 'lucide-react'
+import { Save, Eye, RefreshCw, Image, Type, Settings, Star, MapPin, Clock, ShoppingCart, ArrowLeft, Plus, Edit, Trash2, Search, Users, Phone, Mail, EyeOff, DollarSign, User, ImageIcon, X, Upload, Package, DollarSign as DollarSignIcon, TrendingUp, CheckCircle, XCircle, AlertTriangle, Calendar, FileText, Filter, Copy } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeroSettings {
@@ -121,6 +121,30 @@ export default function AdminSettingsPage() {
     branch_id: '',
     role: 'crew'
   })
+
+  // Promo Management State
+  const [promoCodes, setPromoCodes] = useState<any[]>([])
+  const [filteredPromoCodes, setFilteredPromoCodes] = useState<any[]>([])
+  const [promoSearchTerm, setPromoSearchTerm] = useState('')
+  const [promoStatusFilter, setPromoStatusFilter] = useState('all')
+  const [promoTypeFilter, setPromoTypeFilter] = useState('all')
+  const [showAddPromoForm, setShowAddPromoForm] = useState(false)
+  const [editingPromo, setEditingPromo] = useState<any>(null)
+  const [promoFormData, setPromoFormData] = useState({
+    code: '',
+    description: '',
+    discount_type: 'percentage' as 'percentage' | 'fixed',
+    discount_value: 0,
+    minimum_order_amount: 0,
+    maximum_discount: 0,
+    usage_limit: 100,
+    is_active: true,
+    valid_from: '',
+    valid_until: '',
+    branch_id: ''
+  })
+  const [isSubmittingPromo, setIsSubmittingPromo] = useState(false)
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
 
   // Branch Management Functions
   const loadBranches = async () => {
@@ -325,6 +349,218 @@ export default function AdminSettingsPage() {
     }
 
     setFilteredCrewMembers(filtered)
+  }
+
+  // Promo Management Functions
+  const loadPromoCodes = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('promo_codes')
+        .select(`
+          *,
+          branches(name)
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setPromoCodes(data || [])
+    } catch (error) {
+      console.error('Failed to load promo codes:', error)
+    }
+  }
+
+  const filterPromoCodes = () => {
+    let filtered = promoCodes
+
+    if (promoSearchTerm) {
+      filtered = filtered.filter(promo =>
+        promo.code && promo.code.toLowerCase().includes(promoSearchTerm.toLowerCase()) ||
+        promo.description && promo.description.toLowerCase().includes(promoSearchTerm.toLowerCase())
+      )
+    }
+
+    if (promoStatusFilter !== 'all') {
+      filtered = filtered.filter(promo => 
+        promoStatusFilter === 'active' ? promo.is_active : !promo.is_active
+      )
+    }
+
+    if (promoTypeFilter !== 'all') {
+      filtered = filtered.filter(promo => promo.discount_type === promoTypeFilter)
+    }
+
+    setFilteredPromoCodes(filtered)
+  }
+
+  const resetPromoForm = () => {
+    setPromoFormData({
+      code: '',
+      description: '',
+      discount_type: 'percentage',
+      discount_value: 0,
+      minimum_order_amount: 0,
+      maximum_discount: 0,
+      usage_limit: 100,
+      is_active: true,
+      valid_from: '',
+      valid_until: '',
+      branch_id: ''
+    })
+    setEditingPromo(null)
+    setShowAddPromoForm(false)
+  }
+
+  const generatePromoCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let result = ''
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    setPromoFormData({ ...promoFormData, code: result })
+  }
+
+  const handlePromoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmittingPromo(true)
+
+    try {
+      const supabase = createClient()
+      
+      if (editingPromo) {
+        // Update existing promo code
+        const { error } = await supabase
+          .from('promo_codes')
+          .update({
+            code: promoFormData.code.trim().toUpperCase(),
+            description: promoFormData.description.trim(),
+            discount_type: promoFormData.discount_type,
+            discount_value: promoFormData.discount_value,
+            minimum_order_amount: promoFormData.minimum_order_amount || null,
+            maximum_discount: promoFormData.maximum_discount || null,
+            usage_limit: promoFormData.usage_limit,
+            is_active: promoFormData.is_active,
+            valid_from: promoFormData.valid_from,
+            valid_until: promoFormData.valid_until,
+            branch_id: promoFormData.branch_id || null
+          })
+          .eq('id', editingPromo.id)
+
+        if (error) throw error
+        setMessage('Promo code updated successfully!')
+      } else {
+        // Create new promo code
+        const { error } = await supabase
+          .from('promo_codes')
+          .insert({
+            code: promoFormData.code.trim().toUpperCase(),
+            description: promoFormData.description.trim(),
+            discount_type: promoFormData.discount_type,
+            discount_value: promoFormData.discount_value,
+            minimum_order_amount: promoFormData.minimum_order_amount || null,
+            maximum_discount: promoFormData.maximum_discount || null,
+            usage_limit: promoFormData.usage_limit,
+            is_active: promoFormData.is_active,
+            valid_from: promoFormData.valid_from,
+            valid_until: promoFormData.valid_until,
+            branch_id: promoFormData.branch_id || null
+          })
+
+        if (error) throw error
+        setMessage('Promo code created successfully!')
+      }
+
+      resetPromoForm()
+      await loadPromoCodes()
+    } catch (error) {
+      console.error('Failed to save promo code:', error)
+      setMessage('Failed to save promo code. Please try again.')
+    } finally {
+      setIsSubmittingPromo(false)
+    }
+  }
+
+  const handleEditPromo = (promo: any) => {
+    setEditingPromo(promo)
+    setPromoFormData({
+      code: promo.code,
+      description: promo.description,
+      discount_type: promo.discount_type,
+      discount_value: promo.discount_value,
+      minimum_order_amount: promo.minimum_order_amount || 0,
+      maximum_discount: promo.maximum_discount || 0,
+      usage_limit: promo.usage_limit,
+      is_active: promo.is_active,
+      valid_from: promo.valid_from.split('T')[0],
+      valid_until: promo.valid_until.split('T')[0],
+      branch_id: promo.branch_id || ''
+    })
+    setShowAddPromoForm(true)
+  }
+
+  const handleDeletePromo = async (promoId: string, promoCode: string) => {
+    if (!confirm(`Are you sure you want to delete promo code "${promoCode}"? This will remove all associated discounts.`)) return
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('promo_codes')
+        .delete()
+        .eq('id', promoId)
+
+      if (error) throw error
+      setMessage('Promo code deleted successfully!')
+      await loadPromoCodes()
+    } catch (error) {
+      console.error('Failed to delete promo code:', error)
+      setMessage('Failed to delete promo code. Please try again.')
+    }
+  }
+
+  const togglePromoStatus = async (promoId: string, currentStatus: boolean) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('promo_codes')
+        .update({ is_active: !currentStatus })
+        .eq('id', promoId)
+
+      if (error) throw error
+      setMessage(`Promo code ${!currentStatus ? 'activated' : 'deactivated'} successfully!`)
+      await loadPromoCodes()
+    } catch (error) {
+      console.error('Failed to toggle promo code status:', error)
+      setMessage('Failed to update promo code status. Please try again.')
+    }
+  }
+
+  const copyToClipboard = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedCode(code)
+      setTimeout(() => setCopiedCode(null), 2000)
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  const isExpired = (validUntil: string) => {
+    return new Date(validUntil) < new Date()
+  }
+
+  const isActive = (promo: any) => {
+    const now = new Date()
+    const validFrom = new Date(promo.valid_from)
+    const validUntil = new Date(promo.valid_until)
+    return promo.is_active && now >= validFrom && now <= validUntil && promo.used_count < promo.usage_limit
   }
 
   const openEditCrew = (crew: any) => {
@@ -635,6 +871,10 @@ export default function AdminSettingsPage() {
       loadCrewMembers()
       loadBranches() // Load branches for crew assignment dropdown
     }
+    if (activeTab === 'promos') {
+      loadPromoCodes()
+      loadBranches() // Load branches for promo assignment dropdown
+    }
   }, [activeTab])
 
   // Product Management Functions
@@ -671,6 +911,10 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     filterCrewMembers()
   }, [crewMembers, crewSearchTerm, crewStatusFilter])
+
+  useEffect(() => {
+    filterPromoCodes()
+  }, [promoCodes, promoSearchTerm, promoStatusFilter, promoTypeFilter])
 
   const fetchSettings = async () => {
     try {
@@ -2583,6 +2827,398 @@ export default function AdminSettingsPage() {
               </form>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Promo Management Tab */}
+      {activeTab === 'promos' && (
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Promo Code Management</h2>
+            <button
+              onClick={() => setShowAddPromoForm(true)}
+              className="px-4 py-2 bg-lays-orange-gold text-white rounded-lg hover:bg-lays-dark-red transition-colors flex items-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Promo Code</span>
+            </button>
+          </div>
+
+          {/* Search and Filter */}
+          <div className="mb-6 flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search promo codes..."
+                value={promoSearchTerm}
+                onChange={(e) => setPromoSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent w-full"
+              />
+            </div>
+            <select
+              value={promoStatusFilter}
+              onChange={(e) => setPromoStatusFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+            </select>
+            <select
+              value={promoTypeFilter}
+              onChange={(e) => setPromoTypeFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+            >
+              <option value="all">All Types</option>
+              <option value="percentage">Percentage</option>
+              <option value="fixed">Fixed Amount</option>
+            </select>
+          </div>
+
+          {/* Promo Codes List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {filteredPromoCodes.map((promo) => (
+              <div key={promo.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-lg transition-shadow duration-200">
+                <div className="space-y-4">
+                  {/* Promo Header */}
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-semibold text-gray-900 text-lg">{promo.code}</h3>
+                        <button
+                          onClick={() => copyToClipboard(promo.code)}
+                          className="text-gray-400 hover:text-gray-600"
+                          title="Copy to clipboard"
+                        >
+                          {copiedCode === promo.code ? (
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{promo.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        isActive(promo)
+                          ? 'bg-green-100 text-green-800' 
+                          : isExpired(promo.valid_until)
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {isActive(promo) ? 'Active' : isExpired(promo.valid_until) ? 'Expired' : 'Inactive'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Discount Details */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Discount:</span>
+                      <span className="font-medium text-gray-900">
+                        {promo.discount_type === 'percentage' 
+                          ? `${promo.discount_value}%` 
+                          : formatCurrency(promo.discount_value)
+                        }
+                      </span>
+                    </div>
+                    {promo.minimum_order_amount && promo.minimum_order_amount > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Min. Order:</span>
+                        <span className="font-medium text-gray-900">
+                          {formatCurrency(promo.minimum_order_amount)}
+                        </span>
+                      </div>
+                    )}
+                    {promo.maximum_discount && promo.maximum_discount > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Max. Discount:</span>
+                        <span className="font-medium text-gray-900">
+                          {formatCurrency(promo.maximum_discount)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Usage:</span>
+                      <span className="font-medium text-gray-900">
+                        {promo.used_count} / {promo.usage_limit}
+                      </span>
+                    </div>
+                    {promo.branches?.name && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Branch:</span>
+                        <span className="font-medium text-gray-900">{promo.branches.name}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Validity Period */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Valid:</span>
+                      <span className="text-gray-900">
+                        {formatDate(promo.valid_from)} - {formatDate(promo.valid_until)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex space-x-2 pt-3 border-t border-gray-200">
+                    <button
+                      onClick={() => handleEditPromo(promo)}
+                      className="flex-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1"
+                    >
+                      <Edit className="w-4 h-4" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => togglePromoStatus(promo.id, promo.is_active)}
+                      className={`flex-1 px-3 py-2 rounded-lg transition-colors flex items-center justify-center ${
+                        promo.is_active
+                          ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      {promo.is_active ? 'Disable' : 'Enable'}
+                    </button>
+                    <button
+                      onClick={() => handleDeletePromo(promo.id, promo.code)}
+                      className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* No Promo Codes Message */}
+          {filteredPromoCodes.length === 0 && (
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center py-12">
+              <Star className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No promo codes found</h3>
+              <p className="text-gray-600">
+                {promoSearchTerm || promoStatusFilter !== 'all' || promoTypeFilter !== 'all'
+                  ? 'Try adjusting your filters or search terms.' 
+                  : 'Get started by adding your first promotional code.'
+                }
+              </p>
+            </div>
+          )}
+
+          {/* Add/Edit Promo Code Form */}
+          {showAddPromoForm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold">
+                    {editingPromo ? 'Edit Promo Code' : 'Add New Promo Code'}
+                  </h3>
+                  <button
+                    onClick={resetPromoForm}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <form onSubmit={handlePromoSubmit} className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Promo Code *
+                      </label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          value={promoFormData.code}
+                          onChange={(e) => setPromoFormData({ ...promoFormData, code: e.target.value })}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                          placeholder="e.g., SUMMER20"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={generatePromoCode}
+                          className="whitespace-nowrap px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                          Generate
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Description *
+                      </label>
+                      <input
+                        type="text"
+                        value={promoFormData.description}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, description: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        placeholder="e.g., Summer BBQ Special"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Discount Type *
+                      </label>
+                      <select
+                        value={promoFormData.discount_type}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, discount_type: e.target.value as 'percentage' | 'fixed' })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        required
+                      >
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Fixed Amount (₱)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Discount Value *
+                      </label>
+                      <input
+                        type="number"
+                        value={promoFormData.discount_value}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, discount_value: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        placeholder={promoFormData.discount_type === 'percentage' ? '20' : '100'}
+                        min="0"
+                        max={promoFormData.discount_type === 'percentage' ? '100' : '9999'}
+                        step={promoFormData.discount_type === 'percentage' ? '1' : '10'}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Minimum Order Amount (₱)
+                      </label>
+                      <input
+                        type="number"
+                        value={promoFormData.minimum_order_amount}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, minimum_order_amount: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        placeholder="0"
+                        min="0"
+                        step="10"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Maximum Discount (₱)
+                      </label>
+                      <input
+                        type="number"
+                        value={promoFormData.maximum_discount}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, maximum_discount: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        placeholder="0 (no limit)"
+                        min="0"
+                        step="10"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Usage Limit *
+                      </label>
+                      <input
+                        type="number"
+                        value={promoFormData.usage_limit}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, usage_limit: parseInt(e.target.value) || 100 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        placeholder="100"
+                        min="1"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Branch (Optional)
+                      </label>
+                      <select
+                        value={promoFormData.branch_id}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, branch_id: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                      >
+                        <option value="">All Branches</option>
+                        {branches.map(branch => (
+                          <option key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Valid From *
+                      </label>
+                      <input
+                        type="date"
+                        value={promoFormData.valid_from}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, valid_from: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Valid Until *
+                      </label>
+                      <input
+                        type="date"
+                        value={promoFormData.valid_until}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, valid_until: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lays-orange-gold focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex items-center col-span-2">
+                      <input
+                        type="checkbox"
+                        id="is_active"
+                        checked={promoFormData.is_active}
+                        onChange={(e) => setPromoFormData({ ...promoFormData, is_active: e.target.checked })}
+                        className="w-4 h-4 text-lays-dark-red border-gray-300 rounded focus:ring-lays-dark-red"
+                      />
+                      <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
+                        Promo code is active and can be used
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-3 pt-4">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingPromo}
+                      className="px-4 py-2 bg-lays-orange-gold text-white rounded-lg hover:bg-lays-dark-red transition-colors disabled:opacity-50"
+                    >
+                      {isSubmittingPromo ? 'Saving...' : (editingPromo ? 'Update Promo Code' : 'Add Promo Code')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetPromoForm}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
