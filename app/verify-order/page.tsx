@@ -102,6 +102,7 @@ export default function VerifyOrderPage() {
   const fetchOrderById = async (orderId: string) => {
     try {
       setIsLoading(true)
+      console.log('🔍 Fetching order by ID:', orderId)
       
       const { data, error } = await supabase
         .from('orders')
@@ -124,9 +125,10 @@ export default function VerifyOrderPage() {
         .single()
 
       if (error) {
-        console.error('Error fetching order:', error)
+        console.error('❌ Error fetching order by ID:', error)
         setError('Order not found')
       } else {
+        console.log('✅ Order found by ID:', data)
         setOrder(data)
       }
     } catch (error) {

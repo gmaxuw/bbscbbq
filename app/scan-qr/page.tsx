@@ -125,18 +125,27 @@ export default function QRScannerPage() {
   }
 
   const handleQRCodeDetected = (data: string) => {
+    console.log('🔍 QR Code detected:', data)
     try {
       // Parse QR code data
       const qrData = JSON.parse(data)
+      console.log('📋 Parsed QR data:', qrData)
       
       if (qrData.type === 'order_verification' && qrData.order_id) {
+        console.log('✅ Order verification QR detected, order ID:', qrData.order_id)
         setScannedData(qrData.order_id)
         router.push(`/verify-order?order=${qrData.order_id}`)
       } else if (qrData.type === 'order' && qrData.reference) {
+        console.log('✅ Order reference QR detected, reference:', qrData.reference)
         setScannedData(qrData.reference)
         router.push(`/verify-order?ref=${qrData.reference}`)
+      } else {
+        console.log('⚠️ Unknown QR data format:', qrData)
+        setScannedData(data)
+        router.push(`/verify-order?ref=${data}`)
       }
     } catch (err) {
+      console.log('⚠️ QR data is not JSON, treating as direct reference:', data)
       // If not JSON, treat as direct reference
       setScannedData(data)
       router.push(`/verify-order?ref=${data}`)
