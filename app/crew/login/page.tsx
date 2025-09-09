@@ -105,6 +105,15 @@ export default function CrewLogin() {
 
     try {
       console.log('🔐 Crew login attempt for:', loginData.email)
+      console.log('🔐 Email after processing:', loginData.email.toLowerCase().trim())
+      console.log('🔐 Password length:', loginData.password.length)
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(loginData.email)) {
+        setError('Please enter a valid email address')
+        return
+      }
 
       // Clear any existing sessions first
       await supabase.auth.signOut()
@@ -119,9 +128,23 @@ export default function CrewLogin() {
         console.error('❌ Crew auth failed:', authError?.message)
         
         if (authError?.message.includes('Invalid login credentials')) {
-          setError('Invalid email or password. If this is your first login, use the default password: temp123456')
+          // Check if this is a crew user that exists in admin_users but not in auth
+          const { data: crewUser } = await supabase
+            .from('admin_users')
+            .select('*')
+            .eq('email', loginData.email.toLowerCase().trim())
+            .eq('role', 'crew')
+            .single()
+
+          if (crewUser) {
+            setError('This crew account exists but needs to be activated. Please contact your administrator to create your login credentials.')
+          } else {
+            setError('Invalid email or password. If this is your first login, use the default password: temp123456')
+          }
         } else if (authError?.message.includes('Email not confirmed')) {
           setError('Your email confirmation has expired. Please contact your administrator to resend the confirmation email.')
+        } else if (authError?.message.includes('missing email or phone')) {
+          setError('Email is required. Please enter a valid email address.')
         } else if (authError?.message.includes('Request rate limit reached') || authError?.message.includes('too many requests')) {
           setIsRateLimited(true)
           setError('Too many requests. Please wait 5 minutes before trying again.')
@@ -134,17 +157,86 @@ export default function CrewLogin() {
       }
 
       // Verify this user is a crew member
-      const { data: crewUser, error: crewError } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('user_id', authData.user.id)
-        .eq('is_active', true)
-        .single()
+      console.log('🔍 Looking for crew user with user_id:', authData.user.id)
+      console.log('🔍 User email:', authData.user.email)
+      
+      // Wait a moment for session to be fully established
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Try multiple approaches to find the crew user
+      let crewUser = null
+      let crewError = null
+      
+      // Approach 1: Query by user_id
+      try {
+        console.log('🔍 Trying query by user_id...')
+        const result1 = await supabase
+          .from('admin_users')
+          .select('*')
+          .eq('user_id', authData.user.id)
+          .eq('is_active', true)
+          .single()
+        
+        if (result1.data && result1.data.role === 'crew') {
+          crewUser = result1.data
+          console.log('✅ Found crew user by user_id:', crewUser.name)
+        } else {
+          crewError = result1.error
+        }
+      } catch (error) {
+        console.log('❌ Query by user_id failed:', error)
+      }
+      
+      // Approach 2: Query by email if first approach failed
+      if (!crewUser) {
+        try {
+          console.log('🔍 Trying query by email...')
+          const result2 = await supabase
+            .from('admin_users')
+            .select('*')
+            .eq('email', loginData.email.toLowerCase().trim())
+            .eq('is_active', true)
+            .single()
+          
+          if (result2.data && result2.data.role === 'crew') {
+            crewUser = result2.data
+            console.log('✅ Found crew user by email:', crewUser.name)
+          } else {
+            crewError = result2.error
+          }
+        } catch (error) {
+          console.log('❌ Query by email failed:', error)
+        }
+      }
+      
+      // Approach 3: Query by auth email if both failed
+      if (!crewUser && authData.user.email) {
+        try {
+          console.log('🔍 Trying query by auth email...')
+          const result3 = await supabase
+            .from('admin_users')
+            .select('*')
+            .eq('email', authData.user.email.toLowerCase().trim())
+            .eq('is_active', true)
+            .single()
+          
+          if (result3.data && result3.data.role === 'crew') {
+            crewUser = result3.data
+            console.log('✅ Found crew user by auth email:', crewUser.name)
+          } else {
+            crewError = result3.error
+          }
+        } catch (error) {
+          console.log('❌ Query by auth email failed:', error)
+        }
+      }
 
-      if (crewError || !crewUser || crewUser.role !== 'crew') {
+      console.log('🔍 Final crew user result:', { crewUser, crewError })
+
+      if (!crewUser || crewUser.role !== 'crew') {
         console.error('❌ Invalid crew user or role:', crewError)
         await supabase.auth.signOut()
-        setError('This account does not have crew access or is not active.')
+        setError('This account does not have crew access or is not active. Please contact your administrator.')
         return
       }
 

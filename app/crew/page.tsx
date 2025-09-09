@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { QrCode, Search, Clock, CheckCircle, ChefHat, Package, Eye } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { QrCode, Search, Clock, CheckCircle, ChefHat, Package, Eye, LogOut } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
 import { createClient } from '@/lib/supabase'
 import { validateReferenceNumber } from '@/lib/qr-generator'
@@ -38,8 +39,67 @@ export default function CrewDashboard() {
   const [showScanner, setShowScanner] = useState(false)
   const [manualRef, setManualRef] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
   
   const supabase = createClient()
+  const router = useRouter()
+
+  // Check authentication
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user) {
+          console.log('❌ No authenticated user, redirecting to login')
+          router.push('/crew/login')
+          return
+        }
+
+        // Check if user is a crew member
+        const { data: crewUser, error: crewError } = await supabase
+          .from('admin_users')
+          .select('role, branch_id, name')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .single()
+
+        if (crewError || !crewUser || crewUser.role !== 'crew') {
+          console.error('❌ Invalid crew user or role:', crewError)
+          await supabase.auth.signOut()
+          router.push('/crew/login')
+          return
+        }
+
+        console.log('✅ Crew user authenticated:', crewUser.name)
+        setIsAuthenticated(true)
+      } catch (error) {
+        console.error('❌ Auth check failed:', error)
+        router.push('/crew/login')
+      } finally {
+        setAuthLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [supabase, router])
+
+  // Don't render anything until auth is checked
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-lays-dark-red border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null // Will redirect to login
+  }
 
   // Fetch branches
   useEffect(() => {
@@ -188,6 +248,15 @@ export default function CrewDashboard() {
     })
   }
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/crew/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <DesignLock pageName="Crew Dashboard" />
@@ -200,13 +269,22 @@ export default function CrewDashboard() {
               <ChefHat className="w-6 h-6 text-lays-dark-red" />
               <h1 className="text-xl font-bold text-gray-900">Crew Dashboard</h1>
             </div>
-            <button
-              onClick={() => setShowScanner(!showScanner)}
-              className="bbq-button-primary flex items-center space-x-2"
-            >
-              <QrCode className="w-4 h-4" />
-              <span>Scan QR Code</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowScanner(!showScanner)}
+                className="bbq-button-primary flex items-center space-x-2"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Scan QR Code</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="bbq-button-secondary flex items-center space-x-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

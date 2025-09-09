@@ -43,6 +43,7 @@ interface CrewMember {
   branch_name?: string
   is_active: boolean
   created_at: string
+  user_id?: string
 }
 
 interface AttendanceRecord {
@@ -149,8 +150,9 @@ export default function CrewManagement() {
           }
 
           return {
-            id: crewUser.user_id,
+            id: crewUser.id,
             email: crewUser.email,
+            user_id: crewUser.user_id,
             full_name: crewUser.name,
             role: crewUser.role,
             branch_id: crewUser.branch_id,
@@ -264,41 +266,30 @@ export default function CrewManagement() {
           ip_address: '127.0.0.1'
         })
       } else {
-        // Create new crew member using Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email: formData.email.trim(),
-          password: 'TempPassword123!', // Temporary password - crew should change this
-          user_metadata: {
-            full_name: formData.full_name.trim(),
+        // Create new crew member - add to admin_users table first
+        const { data: crewData, error: crewError } = await supabase
+          .from('admin_users')
+          .insert({
+            email: formData.email.trim(),
+            name: formData.full_name.trim(),
             role: 'crew',
-            branch_id: formData.branch_id || null
-          },
-          email_confirm: true // Auto-confirm email
-        })
+            branch_id: formData.branch_id || null,
+            is_active: formData.is_active
+          })
+          .select()
+          .single()
 
-        if (authError) throw authError
-
-        // Update the user's metadata with crew role and branch
-        if (authData.user) {
-          const { error: updateError } = await supabase.auth.admin.updateUserById(
-            authData.user.id,
-            {
-              user_metadata: {
-                full_name: formData.full_name.trim(),
-                role: 'crew',
-                branch_id: formData.branch_id || null
-              }
-            }
-          )
-          if (updateError) throw updateError
-        }
+        if (crewError) throw crewError
 
         // Log the action
         await supabase.from('system_logs').insert({
           log_type: 'crew_created',
-          message: `Crew member "${formData.full_name}" created`,
+          message: `Crew member "${formData.full_name}" created - needs auth user creation`,
           ip_address: '127.0.0.1'
         })
+
+        // Show success message with instructions
+        alert(`Crew member "${formData.full_name}" created successfully!\n\nIMPORTANT: You need to create login credentials for this crew member.\n\n1. Go to the crew member in the list below\n2. Click "Create Login Credentials" button\n3. This will create their Supabase Auth user\n\nEmail: ${formData.email}\nTemporary Password: temp123456`)
       }
 
       resetForm()
@@ -367,6 +358,63 @@ export default function CrewManagement() {
       })
     } catch (error) {
       console.error('Failed to toggle crew member status:', error)
+    }
+  }
+
+  const createAuthUser = async (member: CrewMember) => {
+    if (!confirm(`Create login credentials for "${member.full_name}" (${member.email})?`)) return
+
+    try {
+      // Since we can't use admin.createUser from client-side, we'll use a different approach
+      // We'll create a temporary auth user using the regular signUp method
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: member.email,
+        password: 'temp123456',
+        options: {
+          data: {
+            full_name: member.full_name,
+            role: 'crew'
+          }
+        }
+      })
+
+      if (authError) {
+        console.error('Failed to create auth user:', authError)
+        alert(`Failed to create login credentials: ${authError.message}\n\nThis might be because the email is already registered. Please try using a different email or contact support.`)
+        return
+      }
+
+      if (!authData.user) {
+        alert('Failed to create auth user. Please try again.')
+        return
+      }
+
+      // Update admin_users table with the auth user ID
+      const { error: updateError } = await supabase
+        .from('admin_users')
+        .update({ user_id: authData.user.id })
+        .eq('id', member.id)
+
+      if (updateError) {
+        console.error('Failed to update admin_users:', updateError)
+        alert('Auth user created but failed to link to admin_users table')
+        return
+      }
+
+      // Log the action
+      await supabase.from('system_logs').insert({
+        log_type: 'crew_auth_created',
+        message: `Login credentials created for crew member "${member.full_name}"`,
+        ip_address: '127.0.0.1'
+      })
+
+      alert(`Login credentials created for ${member.full_name}!\nEmail: ${member.email}\nPassword: temp123456\n\nIMPORTANT: The crew member needs to check their email and confirm their account before they can login.`)
+      
+      // Reload data to show updated status
+      loadData()
+    } catch (error) {
+      console.error('Failed to create auth user:', error)
+      alert('Failed to create login credentials. Please try again.')
     }
   }
 
@@ -592,30 +640,53 @@ export default function CrewManagement() {
               </div>
 
               {/* Actions */}
-              <div className="flex space-x-2 pt-3 border-t border-gray-200">
-                <button
-                  onClick={() => handleEdit(member)}
-                  className="flex-1 px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200"
-                >
-                  <Edit className="w-4 h-4 mr-2 inline" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => toggleMemberStatus(member.id, member.is_active)}
-                  className={`flex-1 px-3 py-2 text-sm rounded transition-colors duration-200 ${
-                    member.is_active 
-                      ? 'bg-gray-600 text-white hover:bg-gray-700' 
-                      : 'bg-lays-dark-red text-white hover:bg-red-800'
-                  }`}
-                >
-                  {member.is_active ? 'Disable' : 'Enable'}
-                </button>
-                <button
-                  onClick={() => handleDelete(member.id, member.full_name)}
-                  className="px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200 text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="w-4 h-4 inline" />
-                </button>
+              <div className="space-y-2 pt-3 border-t border-gray-200">
+                {/* First row - Edit and Status */}
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleEdit(member)}
+                    className="flex-1 px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200"
+                  >
+                    <Edit className="w-4 h-4 mr-2 inline" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => toggleMemberStatus(member.id, member.is_active)}
+                    className={`flex-1 px-3 py-2 text-sm rounded transition-colors duration-200 ${
+                      member.is_active 
+                        ? 'bg-gray-600 text-white hover:bg-gray-700' 
+                        : 'bg-lays-dark-red text-white hover:bg-red-800'
+                    }`}
+                  >
+                    {member.is_active ? 'Disable' : 'Enable'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(member.id, member.full_name)}
+                    className="px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors duration-200 text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4 inline" />
+                  </button>
+                </div>
+                
+                {/* Second row - Create Auth User button (only if no user_id) */}
+                {!member.user_id && (
+                  <button
+                    onClick={() => createAuthUser(member)}
+                    className="w-full px-3 py-2 bg-lays-orange-gold text-white text-sm rounded hover:bg-orange-600 transition-colors duration-200"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2 inline" />
+                    Create Login Credentials
+                  </button>
+                )}
+                
+                {/* Show status if auth user exists */}
+                {member.user_id && (
+                  <div className="text-center">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      ✓ Login credentials active
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

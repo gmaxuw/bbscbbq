@@ -53,7 +53,7 @@ export default function FavoritesPage() {
 
   const isAvailable = (item: any) => {
     // Check if item is available (not out of stock)
-    return !item.is_out_of_stock && item.stock_quantity > 0
+    return !item.is_out_of_stock
   }
 
   const handleRemoveFavorite = async (productId: string) => {

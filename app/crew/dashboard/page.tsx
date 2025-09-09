@@ -33,7 +33,8 @@ import {
   User,
   Clock,
   Filter,
-  Search
+  Search,
+  QrCode
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import DesignLock from '@/components/layout/DesignLock'
@@ -1208,48 +1209,62 @@ export default function CrewDashboard() {
                       </div>
 
                       {/* QR Code Section */}
-                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-medium text-gray-700">Order Verification</h4>
-                          <span className="text-xs text-gray-500">#{order.order_number}</span>
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-4 border border-blue-200">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center space-x-2">
+                            <QrCode className="w-5 h-5 text-blue-600" />
+                            <h4 className="text-lg font-semibold text-gray-800">Customer Verification QR Code</h4>
+                          </div>
+                          <span className="text-sm font-mono text-gray-600 bg-white px-3 py-1 rounded-full border">
+                            #{order.order_number}
+                          </span>
                         </div>
                         
                         {qrCodes[order.id] ? (
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-shrink-0">
+                          <div className="text-center">
+                            <div className="inline-block p-4 bg-white rounded-xl shadow-lg border-2 border-blue-200">
                               <img 
                                 src={qrCodes[order.id]} 
                                 alt={`QR Code for ${order.order_number}`}
-                                className="w-20 h-20 border border-gray-200 rounded"
+                                className="w-64 h-64 mx-auto"
                               />
                             </div>
-                            <div className="flex-1">
-                              <p className="text-xs text-gray-600 mb-1">
-                                Scan this QR code to verify order ownership
+                            <div className="mt-4 space-y-2">
+                              <p className="text-sm font-medium text-gray-700">
+                                📱 Customer Instructions:
                               </p>
-                              <p className="text-xs font-mono text-gray-800 bg-white px-2 py-1 rounded border">
-                                {order.order_number}
-                              </p>
+                              <div className="text-xs text-gray-600 space-y-1">
+                                <p>• Open your phone camera</p>
+                                <p>• Point camera at this QR code</p>
+                                <p>• Tap the notification to verify order</p>
+                                <p>• Or visit: <span className="font-mono bg-gray-100 px-2 py-1 rounded">/verify-order</span></p>
+                              </div>
                             </div>
                           </div>
                         ) : (
-                          <div className="text-center py-4">
-                            <p className="text-sm text-gray-600 mb-3">
+                          <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <QrCode className="w-8 h-8 text-blue-600" />
+                            </div>
+                            <p className="text-gray-700 mb-4 font-medium">
                               Generate QR code for customer verification
+                            </p>
+                            <p className="text-sm text-gray-600 mb-6">
+                              This QR code allows customers to verify their order status using their phone camera
                             </p>
                             <button
                               onClick={() => generateQRForOrder(order)}
                               disabled={generatingQR === order.id}
-                              className="bbq-button-primary text-sm px-4 py-2"
+                              className="bbq-button-primary px-6 py-3 text-sm font-medium"
                             >
                               {generatingQR === order.id ? (
                                 <>
                                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                  Generating...
+                                  Generating QR Code...
                                 </>
                               ) : (
                                 <>
-                                  <Search className="w-4 h-4 mr-2" />
+                                  <QrCode className="w-4 h-4 mr-2" />
                                   Generate QR Code
                                 </>
                               )}

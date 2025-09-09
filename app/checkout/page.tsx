@@ -54,7 +54,40 @@ export default function CheckoutPage() {
 
   // Load customer data and branches
   useEffect(() => {
-    checkAuthentication()
+    // Check localStorage first for instant auth state
+    if (typeof window !== 'undefined') {
+      const customerEmail = localStorage.getItem('customer_email')
+      const customerName = localStorage.getItem('customer_name')
+      const customerPhone = localStorage.getItem('customer_phone')
+      const customerId = localStorage.getItem('customer_id')
+      
+      if (customerEmail && customerName && customerPhone && customerId) {
+        // User is already authenticated, set state immediately
+        setIsAuthenticated(true)
+        setCurrentUser({ 
+          id: customerId, 
+          email: customerEmail,
+          user_metadata: { 
+            full_name: customerName, 
+            phone: customerPhone,
+            role: 'customer'
+          }
+        })
+        setCustomerData({
+          name: customerName,
+          phone: customerPhone,
+          email: customerEmail,
+          branch_id: ''
+        })
+        console.log('✅ Instant auth from localStorage:', { customerName, customerEmail })
+        
+        // Also verify with Supabase to ensure session is valid
+        checkAuthentication()
+      } else {
+        // No stored auth, check with Supabase
+        checkAuthentication()
+      }
+    }
     loadBranches()
   }, [])
 
@@ -62,7 +95,18 @@ export default function CheckoutPage() {
   const checkAuthentication = async () => {
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      console.log('🔐 Checkout auth check:', { 
+        user: user?.id, 
+        userEmail: user?.email,
+        userRole: user?.user_metadata?.role,
+        userError: userError?.message,
+        hasSession: !!session,
+        sessionUser: session?.user?.id,
+        sessionError: sessionError?.message
+      })
       
       if (user) {
         // Check if user has customer role
@@ -78,12 +122,15 @@ export default function CheckoutPage() {
             email: user.email || '',
             branch_id: ''
           })
+          console.log('✅ User authenticated in checkout:', user.email)
         } else {
           // Not a customer, show login modal
+          console.log('❌ User is not a customer:', userRole)
           setShowLoginModal(true)
         }
       } else {
         // No user, show login modal
+        console.log('❌ No user found in checkout')
         setShowLoginModal(true)
       }
     } catch (error) {
@@ -389,7 +436,7 @@ export default function CheckoutPage() {
                 <div className="flex items-start space-x-3">
                   <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-medium text-red-800">Order Issues</h3>
+                    <h3 className="text-sm font-medium text-red-800">Upload Error</h3>
                     <ul className="mt-2 text-sm text-red-700 list-disc list-inside">
                       {errors.map((error, index) => (
                         <li key={index}>{error}</li>
@@ -419,12 +466,10 @@ export default function CheckoutPage() {
                       <span className="text-sm font-medium">Guest Mode</span>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setShowLoginModal(true)}
-                      className="text-lays-orange-gold hover:text-lays-dark-red text-sm font-medium"
-                    >
-                      Login Required
-                    </button>
+                    <div className="flex items-center space-x-2 text-red-600">
+                      <AlertCircle className="w-4 h-4" />
+                      <span className="text-sm font-medium">Not Authenticated</span>
+                    </div>
                   )}
                 </div>
                 

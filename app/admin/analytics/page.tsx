@@ -38,6 +38,8 @@ interface DailyReport {
   total_revenue: number
   total_subtotal: number
   total_discount: number
+  total_commission: number
+  net_profit: number
   average_order_value: number
   orders_by_status: Record<string, number>
 }
@@ -48,6 +50,8 @@ interface BranchReport {
   total_orders: number
   total_revenue: number
   total_subtotal: number
+  total_commission: number
+  net_profit: number
   total_discount: number
   average_order_value: number
   completion_rate: number
@@ -61,6 +65,7 @@ interface OrderHistory {
   order_status: string
   payment_status: string
   total_amount: number
+  total_commission: number
   subtotal: number
   promo_discount: number
   qr_code: string
@@ -142,7 +147,7 @@ export default function AdminAnalytics() {
       // Get real daily data from database - use date range from filters
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, total_amount, order_status')
+        .select('created_at, total_amount, total_commission, subtotal, promo_discount, order_status')
         .eq('order_status', 'completed')
         .gte('created_at', dateRange.start)
         .lte('created_at', dateRange.end)
@@ -151,15 +156,30 @@ export default function AdminAnalytics() {
       if (error) throw error
 
       // Group orders by date
-      const dailyData: { [key: string]: { orders: number, revenue: number } } = {}
+      const dailyData: { [key: string]: { 
+        orders: number, 
+        revenue: number, 
+        subtotal: number, 
+        discount: number, 
+        commission: number 
+      } } = {}
       
       orders?.forEach(order => {
         const date = order.created_at.split('T')[0]
         if (!dailyData[date]) {
-          dailyData[date] = { orders: 0, revenue: 0 }
+          dailyData[date] = { 
+            orders: 0, 
+            revenue: 0, 
+            subtotal: 0, 
+            discount: 0, 
+            commission: 0 
+          }
         }
         dailyData[date].orders += 1
-        dailyData[date].revenue += parseFloat(order.total_amount)
+        dailyData[date].revenue += parseFloat(order.total_amount || '0')
+        dailyData[date].subtotal += parseFloat(order.subtotal || '0')
+        dailyData[date].discount += parseFloat(order.promo_discount || '0')
+        dailyData[date].commission += parseFloat(order.total_commission || '0')
       })
 
       // Convert to array format for the selected date range
@@ -170,13 +190,21 @@ export default function AdminAnalytics() {
       for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
         const dateStr = date.toISOString().split('T')[0]
         
-        const data = dailyData[dateStr] || { orders: 0, revenue: 0 }
+        const data = dailyData[dateStr] || { 
+          orders: 0, 
+          revenue: 0, 
+          subtotal: 0, 
+          discount: 0, 
+          commission: 0 
+        }
         dailyReports.push({
           order_date: dateStr,
           total_orders: data.orders,
           total_revenue: data.revenue,
-          total_subtotal: data.revenue,
-          total_discount: 0,
+          total_subtotal: data.subtotal,
+          total_discount: data.discount,
+          total_commission: data.commission,
+          net_profit: data.commission, // Commission is our profit
           average_order_value: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
           orders_by_status: {}
         })
@@ -198,6 +226,9 @@ export default function AdminAnalytics() {
         .select(`
           branch_id,
           total_amount,
+          total_commission,
+          subtotal,
+          promo_discount,
           order_status,
           branches!inner(name)
         `)
@@ -208,17 +239,34 @@ export default function AdminAnalytics() {
       if (error) throw error
 
       // Group orders by branch
-      const branchData: { [key: string]: { name: string, orders: number, revenue: number } } = {}
+      const branchData: { [key: string]: { 
+        name: string, 
+        orders: number, 
+        revenue: number, 
+        subtotal: number, 
+        discount: number, 
+        commission: number 
+      } } = {}
       
       orders?.forEach(order => {
         const branchId = order.branch_id
         const branchName = (order as any).branches?.name || 'Unknown Branch'
         
         if (!branchData[branchId]) {
-          branchData[branchId] = { name: branchName, orders: 0, revenue: 0 }
+          branchData[branchId] = { 
+            name: branchName, 
+            orders: 0, 
+            revenue: 0, 
+            subtotal: 0, 
+            discount: 0, 
+            commission: 0 
+          }
         }
         branchData[branchId].orders += 1
-        branchData[branchId].revenue += parseFloat(order.total_amount)
+        branchData[branchId].revenue += parseFloat(order.total_amount || '0')
+        branchData[branchId].subtotal += parseFloat(order.subtotal || '0')
+        branchData[branchId].discount += parseFloat(order.promo_discount || '0')
+        branchData[branchId].commission += parseFloat(order.total_commission || '0')
       })
 
       // Convert to array format
@@ -227,8 +275,10 @@ export default function AdminAnalytics() {
         branch_name: data.name,
         total_orders: data.orders,
         total_revenue: data.revenue,
-        total_subtotal: data.revenue,
-        total_discount: 0,
+        total_subtotal: data.subtotal,
+        total_discount: data.discount,
+        total_commission: data.commission,
+        net_profit: data.commission, // Commission is our profit
         average_order_value: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
         completion_rate: 100
       }))
@@ -250,6 +300,9 @@ export default function AdminAnalytics() {
           customer_name,
           customer_phone,
           total_amount,
+          total_commission,
+          subtotal,
+          promo_discount,
           payment_status,
           order_status,
           created_at,
@@ -273,14 +326,15 @@ export default function AdminAnalytics() {
         order_number: order.order_number,
         customer_name: order.customer_name,
         customer_phone: order.customer_phone,
-        total_amount: parseFloat(order.total_amount),
+        total_amount: parseFloat(order.total_amount || '0'),
+        total_commission: parseFloat(order.total_commission || '0'),
         payment_status: order.payment_status,
         order_status: order.order_status,
         created_at: order.created_at,
         qr_code: order.qr_code,
         branch_name: (order as any).branches?.name || 'Unknown Branch',
-        subtotal: parseFloat(order.total_amount),
-        promo_discount: 0
+        subtotal: parseFloat(order.subtotal || '0'),
+        promo_discount: parseFloat(order.promo_discount || '0')
       })) || []
 
       setOrderHistory(orderHistory)
@@ -334,8 +388,10 @@ export default function AdminAnalytics() {
 
   const totalRevenue = branchReports.reduce((sum, report) => sum + report.total_revenue, 0)
   const totalOrders = branchReports.reduce((sum, report) => sum + report.total_orders, 0)
-  const totalDiscounts = 0 // No discount data available yet
+  const totalDiscounts = branchReports.reduce((sum, report) => sum + report.total_discount, 0)
+  const totalCommission = branchReports.reduce((sum, report) => sum + report.total_commission, 0)
   const netRevenue = totalRevenue - totalDiscounts
+  const netProfit = totalCommission // Commission is our profit
 
   if (isLoading) {
     return (
@@ -439,7 +495,7 @@ export default function AdminAnalytics() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
               <div className="p-2 bg-green-500/10 rounded-lg">
@@ -460,6 +516,30 @@ export default function AdminAnalytics() {
               <div className="ml-3 sm:ml-4">
                 <p className="text-xs sm:text-sm font-medium text-gray-600">Total Orders</p>
                 <p className="text-lg sm:text-2xl font-bold text-gray-900">{totalOrders}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bbq-card p-4 sm:p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
+              </div>
+              <div className="ml-3 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-600">Total Commission</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(totalCommission)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bbq-card p-4 sm:p-6">
+            <div className="flex items-center">
+              <div className="p-2 bg-emerald-500/10 rounded-lg">
+                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
+              </div>
+              <div className="ml-3 sm:ml-4">
+                <p className="text-xs sm:text-sm font-medium text-gray-600">Net Profit</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(netProfit)}</p>
               </div>
             </div>
           </div>
@@ -499,6 +579,8 @@ export default function AdminAnalytics() {
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Order</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion</th>
                 </tr>
@@ -514,6 +596,14 @@ export default function AdminAnalytics() {
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(report.total_revenue)}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(report.total_commission)}
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <span className="font-semibold text-emerald-600">
+                        {formatCurrency(report.net_profit)}
+                      </span>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(report.average_order_value)}
@@ -545,6 +635,7 @@ export default function AdminAnalytics() {
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
@@ -589,6 +680,11 @@ export default function AdminAnalytics() {
                             -{formatCurrency(order.promo_discount)} discount
                           </div>
                         )}
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="font-semibold text-emerald-600">
+                        {formatCurrency(order.total_commission || 0)}
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">

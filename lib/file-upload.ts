@@ -11,15 +11,35 @@ export const uploadPaymentScreenshot = async (
   file: File,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadProgress> => {
+  // Create a completely fresh Supabase client
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  
+  if (!supabaseUrl || !supabaseKey) {
+    const errorResult = { 
+      progress: 100, 
+      status: 'error' as const, 
+      error: 'Supabase configuration missing' 
+    }
+    onProgress?.(errorResult)
+    return errorResult
+  }
+  
   const supabase = createClient()
   
   try {
     onProgress?.({ progress: 0, status: 'uploading' })
     
-    const fileExt = file.name.split('.').pop()
-    const fileName = `payment-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+    // Get user info for filename
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || 'anonymous'
     
-    console.log('📸 Starting payment screenshot upload:', fileName)
+    console.log('📸 Starting payment screenshot upload for user:', userId)
+    
+    const fileExt = file.name.split('.').pop()
+    const fileName = `payment-${userId}-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+    
+    console.log('📸 Uploading file:', fileName)
     
     // Upload file to Supabase storage
     const { data: uploadData, error: uploadError } = await supabase.storage

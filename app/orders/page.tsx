@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Package, Clock, CheckCircle, XCircle, Eye, MapPin, Phone } from 'lucide-react'
+import { ArrowLeft, Package, Clock, CheckCircle, XCircle, Eye, MapPin, Phone, QrCode } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import DesignLock from '@/components/layout/DesignLock'
+import QRScanner from '@/components/ui/QRScanner'
 
 interface OrderItem {
   id: string
@@ -55,6 +56,7 @@ export default function CustomerOrdersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
+  const [showQRScanner, setShowQRScanner] = useState(false)
 
   const supabase = createClient()
 
@@ -289,17 +291,28 @@ export default function CustomerOrdersPage() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center space-x-4">
-            <Link 
-              href="/account" 
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </Link>
-            <div className="flex items-center space-x-3">
-              <Package className="w-6 h-6 text-lays-dark-red" />
-              <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Link 
+                href="/account" 
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </Link>
+              <div className="flex items-center space-x-3">
+                <Package className="w-6 h-6 text-lays-dark-red" />
+                <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
+              </div>
             </div>
+            
+            {/* QR Scanner Button */}
+            <button
+              onClick={() => setShowQRScanner(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-lays-dark-red text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <QrCode className="w-4 h-4" />
+              <span className="text-sm font-medium">Scan QR Code</span>
+            </button>
           </div>
         </div>
       </div>
@@ -615,6 +628,16 @@ export default function CustomerOrdersPage() {
           </div>
         </div>
       )}
+
+      {/* QR Scanner Modal */}
+      <QRScanner
+        isOpen={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onScan={(data) => {
+          // Handle scanned data - navigate to verify-order page
+          window.location.href = `/verify-order?ref=${data}`
+        }}
+      />
     </div>
   )
 }

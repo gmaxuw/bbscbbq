@@ -219,7 +219,8 @@ export default function FeaturedMenu() {
 
   // Get availability status for food business
   const getAvailabilityStatus = (product: Product) => {
-    if (product.is_out_of_stock || product.stock_quantity === 0) {
+    // Only check is_out_of_stock field, not raw stock quantity
+    if (product.is_out_of_stock) {
       return {
         text: 'Sold Out',
         color: 'bg-red-100 text-red-800',
@@ -227,6 +228,7 @@ export default function FeaturedMenu() {
       }
     }
     
+    // Show limited portions if stock is at or below minimum level
     if (product.stock_quantity <= (product.min_stock_level || 5)) {
       return {
         text: 'Limited Portions',
@@ -353,7 +355,7 @@ export default function FeaturedMenu() {
                         e.stopPropagation()
                         updateQuantity(item.id, -1)
                       }}
-                      disabled={!quantities[item.id] || quantities[item.id] === 0 || item.is_out_of_stock || item.stock_quantity === 0}
+                      disabled={!quantities[item.id] || quantities[item.id] === 0 || item.is_out_of_stock}
                       className="w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full flex items-center justify-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Minus className="w-4 h-4" />
@@ -368,7 +370,7 @@ export default function FeaturedMenu() {
                         e.stopPropagation()
                         updateQuantity(item.id, 1)
                       }}
-                      disabled={item.is_out_of_stock || item.stock_quantity === 0}
+                      disabled={item.is_out_of_stock}
                       className="w-8 h-8 bg-lays-dark-red hover:bg-lays-bright-red text-white rounded-full flex items-center justify-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Plus className="w-4 h-4" />
@@ -389,9 +391,9 @@ export default function FeaturedMenu() {
                     e.stopPropagation()
                     addToCart(item.id)
                   }}
-                  disabled={!quantities[item.id] || quantities[item.id] === 0 || item.is_out_of_stock || item.stock_quantity === 0}
+                  disabled={!quantities[item.id] || quantities[item.id] === 0 || item.is_out_of_stock}
                   className={`w-full font-semibold py-3 rounded-lg transition-all duration-300 transform ${
-                    item.is_out_of_stock || item.stock_quantity === 0
+                    item.is_out_of_stock
                       ? 'bg-red-200 text-red-600 cursor-not-allowed'
                       : addedItems[item.id]
                       ? 'bg-green-500 text-white cursor-default'
@@ -400,7 +402,7 @@ export default function FeaturedMenu() {
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
                 >
-                  {item.is_out_of_stock || item.stock_quantity === 0 ? (
+                  {item.is_out_of_stock ? (
                     <span className="flex items-center justify-center">
                       ❌ Sold Out
                     </span>

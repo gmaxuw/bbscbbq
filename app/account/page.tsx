@@ -6,7 +6,7 @@ import {
   User, LogIn, UserPlus, ArrowLeft, Package, Settings, LogOut, 
   Clock, Star, TrendingUp, Heart, ShoppingBag, MapPin, 
   Calendar, CreditCard, Bell, Edit3, Eye, EyeOff, 
-  CheckCircle, XCircle, AlertCircle, Loader2
+  CheckCircle, XCircle, AlertCircle, Loader2, QrCode
 } from 'lucide-react'
 import DesignLock from '@/components/layout/DesignLock'
 import { createClient } from '@/lib/supabase'
@@ -757,12 +757,19 @@ export default function AccountPage() {
                     <Package className="w-5 h-5 text-lays-orange-gold" />
                     <span className="font-semibold text-gray-900">Order History</span>
                   </Link>
-            <Link 
-              href="/favorites" 
+                  <Link 
+                    href="/favorites" 
                     className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <Heart className="w-5 h-5 text-pink-500" />
                     <span className="font-semibold text-gray-900">Favorites</span>
+                  </Link>
+                  <Link 
+                    href="/scan-qr" 
+                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <QrCode className="w-5 h-5 text-lays-dark-red" />
+                    <span className="font-semibold text-gray-900">Scan QR Code</span>
                   </Link>
                 </div>
               </div>

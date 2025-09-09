@@ -29,12 +29,13 @@ export async function generateQRCodeClient(referenceNumber: string): Promise<str
     
     // Generate QR code as data URL
     const qrCodeDataURL = await QRCode.toDataURL(JSON.stringify(qrData), {
-      width: 200,
-      margin: 2,
+      width: 400,
+      margin: 4,
       color: {
-        dark: '#1F2937', // Dark gray
+        dark: '#000000', // Pure black for better scanning
         light: '#FFFFFF'  // White background
-      }
+      },
+      errorCorrectionLevel: 'M' // Medium error correction for better scanning
     })
     
     return qrCodeDataURL
@@ -71,12 +72,13 @@ export async function generateOrderQRCodeClient(orderNumber: string, orderId: st
     }
     
     const qrCodeDataURL = await QRCode.toDataURL(JSON.stringify(qrData), {
-      width: 150,
-      margin: 1,
+      width: 400,
+      margin: 4,
       color: {
-        dark: '#DC2626', // Red color for BBQ theme
+        dark: '#000000', // Pure black for better scanning
         light: '#FFFFFF'
-      }
+      },
+      errorCorrectionLevel: 'M' // Medium error correction for better scanning
     })
     
     return qrCodeDataURL
