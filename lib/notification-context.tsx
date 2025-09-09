@@ -7,6 +7,7 @@ interface NotificationContextType {
   showNotification: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void
   showOrderNotification: (order: any) => void
   showOrderStatusNotification: (order: any) => void
+  showPublicOrderNotification: (order: any) => void
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
@@ -145,11 +146,83 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }, 5000)
   }
 
-  // Global real-time subscription setup
-  useEffect(() => {
-    console.log('🔔 Setting up GLOBAL real-time notifications...')
+  // Censor name function - creates strategic asterisks
+  const censorName = (name: string) => {
+    if (!name || name.length < 2) return name
     
-    // Subscribe to new orders
+    const words = name.split(' ')
+    const censoredWords = words.map(word => {
+      if (word.length <= 2) return word
+      
+      // Keep first and last letter, replace middle with asterisks
+      const first = word[0]
+      const last = word[word.length - 1]
+      const middle = '*'.repeat(Math.max(1, word.length - 2))
+      
+      return first + middle + last
+    })
+    
+    return censoredWords.join(' ')
+  }
+
+  // COOL PUBLIC notification function (shows to everyone on HOMEPAGE ONLY)
+  const showPublicOrderNotification = (order: any) => {
+    console.log('🔥 COOL public notification:', order)
+    
+    // Only show on homepage (check if we're on the main page)
+    const isHomepage = window.location.pathname === '/' || window.location.pathname === '/home'
+    if (!isHomepage) {
+      console.log('Not on homepage, skipping public notification')
+      return
+    }
+    
+    const censoredName = censorName(order.customer_name)
+    
+    // Create a fun, public notification that shows to everyone
+    const notification = document.createElement('div')
+    notification.className = 'fixed top-4 left-4 bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 max-w-sm transform -translate-x-full transition-transform duration-500'
+    notification.innerHTML = `
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+          <span class="text-xl">🍖</span>
+        </div>
+        <div>
+          <div class="font-bold text-sm">🔥 Someone just ordered BBQ!</div>
+          <div class="text-xs opacity-90">${censoredName} ordered ₱${order.total_amount?.toFixed(2) || '0.00'}</div>
+          <div class="text-xs opacity-75">Order #${order.order_number}</div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(notification)
+    
+    // Animate in from left
+    setTimeout(() => {
+      notification.classList.remove('-translate-x-full')
+    }, 100)
+    
+    // Auto remove after 8 seconds (longer for public notifications)
+    setTimeout(() => {
+      notification.classList.add('-translate-x-full')
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification)
+        }
+      }, 500)
+    }, 8000)
+  }
+
+  // Global real-time subscription setup with PRIVACY
+  useEffect(() => {
+    console.log('🔔 Setting up PRIVACY-AWARE global notifications...')
+    
+    // Get current user info for privacy filtering
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      return user
+    }
+    
+    // Subscribe to new orders (PUBLIC notifications only)
     const ordersChannel = supabase
       .channel('global-orders', {
         config: {
@@ -163,9 +236,21 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
           schema: 'public', 
           table: 'orders' 
         }, 
-        (payload) => {
-          console.log('🆕 Global new order received!', payload)
-          showOrderNotification(payload.new)
+        async (payload) => {
+          console.log('🆕 New order received!', payload)
+          const order = payload.new
+          const user = await getCurrentUser()
+          
+          // 1. PUBLIC notification to everyone on HOMEPAGE ONLY (censored name)
+          showPublicOrderNotification(order)
+          
+          // 2. ADMIN notification (full name + amount)
+          if (user && user.email === 'gabu.sacro@gmail.com') {
+            showOrderNotification(order)
+          }
+          
+          // 3. CREW notification (full name + amount) - will be handled by crew-specific logic
+          // This will be implemented in crew dashboard
         }
       )
       .on('postgres_changes', 
@@ -174,9 +259,23 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
           schema: 'public', 
           table: 'orders' 
         }, 
-        (payload) => {
-          console.log('📝 Global order update received!', payload)
-          showOrderStatusNotification(payload.new)
+        async (payload) => {
+          console.log('📝 Order update received!', payload)
+          const order = payload.new
+          const user = await getCurrentUser()
+          
+          // 1. ADMIN gets all status updates
+          if (user && user.email === 'gabu.sacro@gmail.com') {
+            showOrderStatusNotification(order)
+          }
+          
+          // 2. CUSTOMER gets only THEIR order status updates
+          if (user && user.email === order.customer_email) {
+            showOrderStatusNotification(order)
+          }
+          
+          // 3. CREW gets notifications for their branch orders
+          // (This will be handled by crew-specific logic in crew dashboard)
         }
       )
       .subscribe((status) => {
@@ -255,8 +354,22 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const value = {
     showNotification,
     showOrderNotification,
-    showOrderStatusNotification
+    showOrderStatusNotification,
+    showPublicOrderNotification
   }
+
+  // Add test functions to window for debugging
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).testPublicNotification = () => {
+        showPublicOrderNotification({
+          order_number: 'TEST-001',
+          customer_name: 'Test Customer',
+          total_amount: 3000.00
+        })
+      }
+    }
+  }, [])
 
   return (
     <NotificationContext.Provider value={value}>

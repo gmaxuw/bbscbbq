@@ -110,13 +110,62 @@ export default function CrewDashboard() {
     if (crewMember && crewMember.branch_id) {
       console.log('Crew member loaded, setting up orders and realtime')
       loadOrders()
-      // Simple data refresh (notifications handled globally)
+      // Simple data refresh + crew-specific notifications
       const refreshInterval = setInterval(() => {
         loadOrders()
       }, 30000) // Refresh every 30 seconds
+
+      // Set up crew-specific real-time notifications
+      const setupCrewNotifications = async () => {
+        if (!crewMember?.branch_id) return
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        // Subscribe to orders for this crew's branch
+        const crewChannel = supabase
+          .channel(`crew-${crewMember.branch_id}`)
+          .on('postgres_changes', 
+            { 
+              event: 'INSERT', 
+              schema: 'public', 
+              table: 'orders',
+              filter: `branch_id=eq.${crewMember.branch_id}`
+            }, 
+            (payload) => {
+              console.log('🍖 New order for crew branch:', payload.new)
+              showCrewOrderNotification(payload.new)
+            }
+          )
+          .on('postgres_changes', 
+            { 
+              event: 'UPDATE', 
+              schema: 'public', 
+              table: 'orders',
+              filter: `branch_id=eq.${crewMember.branch_id}`
+            }, 
+            (payload) => {
+              console.log('📝 Order status update for crew:', payload.new)
+              showCrewStatusNotification(payload.new)
+            }
+          )
+          .subscribe()
+
+        return crewChannel
+      }
+
+      setupCrewNotifications().then(channel => {
+        if (channel) {
+          // Store channel for cleanup
+          ;(window as any).crewChannel = channel
+        }
+      })
       
       return () => {
         clearInterval(refreshInterval)
+        if ((window as any).crewChannel) {
+          (window as any).crewChannel.unsubscribe()
+        }
       }
     }
   }, [crewMember])
@@ -566,7 +615,7 @@ export default function CrewDashboard() {
             console.log('Crew order change:', payload)
             console.log('Event type:', payload.eventType)
             if (payload.eventType === 'INSERT' && payload.new) {
-              showNewOrderNotification(payload.new)
+              showCrewOrderNotification(payload.new)
             }
             
             // Reload orders immediately on any change
@@ -602,18 +651,20 @@ export default function CrewDashboard() {
   }
 
   // Show instant new order notification for crew
-  const showNewOrderNotification = (order: any) => {
-    // Create a custom notification element
+  // Show new order notification for crew (FULL NAME + AMOUNT)
+  const showCrewOrderNotification = (order: any) => {
+    console.log('🍖 Crew new order notification:', order)
+    
     const notification = document.createElement('div')
-    notification.className = 'fixed top-4 right-4 bg-lays-orange-gold text-white p-4 rounded-lg shadow-lg z-50 max-w-sm animate-pulse'
+    notification.className = 'fixed top-4 right-4 bg-orange-500 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm transform translate-x-full transition-transform duration-300'
     notification.innerHTML = `
       <div class="flex items-center space-x-3">
         <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
           <span class="text-lg">🍖</span>
         </div>
         <div>
-          <div class="font-bold text-sm">New Order!</div>
-          <div class="text-xs opacity-90">${order.customer_name} - ₱${order.total_amount}</div>
+          <div class="font-bold text-sm">New Order for Your Branch!</div>
+          <div class="text-xs opacity-90">${order.customer_name} - ₱${order.total_amount?.toFixed(2) || '0.00'}</div>
           <div class="text-xs opacity-75">Order #${order.order_number}</div>
           <div class="text-xs opacity-75">Pickup: ${order.pickup_time}</div>
         </div>
@@ -622,11 +673,87 @@ export default function CrewDashboard() {
     
     document.body.appendChild(notification)
     
+    // Animate in
+    setTimeout(() => {
+      notification.classList.remove('translate-x-full')
+    }, 100)
+    
     // Auto remove after 5 seconds
     setTimeout(() => {
-      if (notification.parentNode) {
-        notification.parentNode.removeChild(notification)
-      }
+      notification.classList.add('translate-x-full')
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification)
+        }
+      }, 300)
+    }, 5000)
+  }
+
+  // Show order status notification for crew
+  const showCrewStatusNotification = (order: any) => {
+    console.log('📝 Crew status notification:', order)
+    
+    let statusMessage = ''
+    let statusIcon = '📝'
+    let bgColor = 'bg-blue-500'
+    
+    switch (order.order_status) {
+      case 'confirmed':
+        statusMessage = 'Order Confirmed!'
+        statusIcon = '✅'
+        bgColor = 'bg-green-500'
+        break
+      case 'preparing':
+        statusMessage = 'Cooking Started!'
+        statusIcon = '👨‍🍳'
+        bgColor = 'bg-orange-500'
+        break
+      case 'ready':
+        statusMessage = 'Ready for Pickup!'
+        statusIcon = '🍴'
+        bgColor = 'bg-green-600'
+        break
+      case 'completed':
+        statusMessage = 'Order Completed!'
+        statusIcon = '🎉'
+        bgColor = 'bg-purple-500'
+        break
+      default:
+        statusMessage = 'Order Updated!'
+        statusIcon = '📝'
+        bgColor = 'bg-blue-500'
+    }
+    
+    const notification = document.createElement('div')
+    notification.className = `fixed top-4 right-4 ${bgColor} text-white p-4 rounded-lg shadow-lg z-50 max-w-sm transform translate-x-full transition-transform duration-300`
+    notification.innerHTML = `
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+          <span class="text-lg">${statusIcon}</span>
+        </div>
+        <div>
+          <div class="font-bold text-sm">${statusMessage}</div>
+          <div class="text-xs opacity-90">Order #${order.order_number}</div>
+          <div class="text-xs opacity-75">${order.customer_name}</div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(notification)
+    
+    // Animate in
+    setTimeout(() => {
+      notification.classList.remove('translate-x-full')
+    }, 100)
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      notification.classList.add('translate-x-full')
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification)
+        }
+      }, 300)
     }, 5000)
   }
 
