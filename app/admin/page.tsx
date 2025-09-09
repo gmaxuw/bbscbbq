@@ -205,24 +205,32 @@ export default function AdminDashboard() {
 
       // Add recent orders
       recentOrders?.forEach(order => {
+        const branchName = Array.isArray(order.branches) && order.branches.length > 0 
+          ? order.branches[0].name 
+          : 'Unknown'
+        
         activities.push({
           id: `order-${order.id}`,
           type: 'order',
-          message: `New order received from ${order.branches?.name || 'Unknown'} branch`,
+          message: `New order received from ${branchName} branch`,
           timestamp: order.created_at,
-          branch_name: order.branches?.name,
+          branch_name: branchName,
           order_number: order.order_number
         })
       })
 
       // Add recent crew additions
       recentCrew?.forEach(crew => {
+        const branchName = Array.isArray(crew.branches) && crew.branches.length > 0 
+          ? crew.branches[0].name 
+          : 'Unknown'
+        
         activities.push({
           id: `crew-${crew.id}`,
           type: 'crew',
-          message: `New crew member assigned to ${crew.branches?.name || 'Unknown'} branch`,
+          message: `New crew member assigned to ${branchName} branch`,
           timestamp: crew.created_at,
-          branch_name: crew.branches?.name,
+          branch_name: branchName,
           user_name: crew.name
         })
       })
