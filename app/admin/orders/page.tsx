@@ -423,10 +423,163 @@ export default function OrderManagement() {
         </div>
       </div>
 
-      {/* Orders Table */}
+      {/* Orders Display - Mobile Cards / Desktop Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        {/* Mobile Card Layout */}
+        <div className="block lg:hidden">
+          <div className="divide-y divide-gray-200">
+            {filteredOrders.map((order) => (
+              <div key={order.id} className="p-4 hover:bg-gray-50">
+                {/* Order Header */}
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      #{order.order_number || order.id.slice(-8)}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {new Date(order.created_at).toLocaleDateString()} • {new Date(order.pickup_time).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-lays-dark-red">
+                      ₱{(order.total_amount || 0).toLocaleString()}
+                    </div>
+                    {order.promo_code && (
+                      <div className="text-xs text-gray-500">
+                        Promo: {order.promo_code}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Customer Info */}
+                <div className="mb-3">
+                  <div className="text-sm font-medium text-gray-900 mb-1">
+                    {order.customer_name}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {order.customer_phone}
+                  </div>
+                  {order.customer_email && (
+                    <div className="text-sm text-gray-500">
+                      {order.customer_email}
+                    </div>
+                  )}
+                </div>
+
+                {/* Branch */}
+                <div className="mb-3">
+                  <div className="text-sm text-gray-900">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    {order.branch?.name || 'Unknown Branch'}
+                  </div>
+                </div>
+
+                {/* Status Badges */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_status)}`}>
+                    {order.payment_status}
+                  </span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.order_status)}`}>
+                    {getStatusIcon(order.order_status)}
+                    <span className="ml-1">{order.order_status}</span>
+                  </span>
+                </div>
+
+                {/* Payment Details */}
+                <div className="mb-4 text-sm">
+                  <div className="text-gray-500">
+                    {order.payment_method === 'gcash' ? 'GCash' : order.payment_method === 'bank_transfer' ? 'Bank Transfer' : order.payment_method}
+                  </div>
+                  {order.gcash_reference && (
+                    <div className="text-xs text-blue-600 font-mono bg-blue-50 px-2 py-1 rounded mt-1">
+                      Ref: {order.gcash_reference}
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col space-y-2">
+                  {/* View Details Button */}
+                  <button
+                    onClick={() => {
+                      setSelectedOrder(order)
+                      setShowOrderModal(true)
+                    }}
+                    className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-lays-orange-gold bg-orange-50 hover:bg-orange-100 rounded-md transition-colors"
+                    title="View order details"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Details
+                  </button>
+                  
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {order.payment_status === 'pending' && (
+                      <button
+                        onClick={() => verifyPayment(order.id)}
+                        className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                        title="Verify payment after checking reference number and screenshot"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Verify Payment
+                      </button>
+                    )}
+                    
+                    {order.payment_status === 'paid' && order.order_status === 'pending' && (
+                      <button
+                        onClick={() => updateOrderStatus(order.id, 'confirmed')}
+                        className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                        title="Confirm order and start preparation"
+                      >
+                        <Clock className="w-3 h-3 mr-1" />
+                        Start Prep
+                      </button>
+                    )}
+                    
+                    {order.order_status === 'confirmed' && (
+                      <button
+                        onClick={() => updateOrderStatus(order.id, 'preparing')}
+                        className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded transition-colors"
+                        title="Mark as preparing"
+                      >
+                        <Clock className="w-3 h-3 mr-1" />
+                        Cooking
+                      </button>
+                    )}
+                    
+                    {order.order_status === 'preparing' && (
+                      <button
+                        onClick={() => updateOrderStatus(order.id, 'ready')}
+                        className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                        title="Mark as ready for pickup"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Ready
+                      </button>
+                    )}
+                    
+                    {order.order_status === 'ready' && (
+                      <button
+                        onClick={() => updateOrderStatus(order.id, 'completed')}
+                        className="inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                        title="Mark as completed"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Complete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden lg:block">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -600,7 +753,9 @@ export default function OrderManagement() {
             </tbody>
           </table>
         </div>
+        </div>
 
+        {/* Empty State */}
         {filteredOrders.length === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-500">
