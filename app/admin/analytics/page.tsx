@@ -109,8 +109,8 @@ export default function AdminAnalytics() {
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily')
   const [comparisonType, setComparisonType] = useState<'revenue' | 'orders' | 'profit'>('revenue')
   const [dateRange, setDateRange] = useState({
-    start: '2025-09-01', // Start from September 1st to include all your orders
-    end: '2025-09-10' // Extend to September 10th to include all your orders
+    start: '2025-01-01', // Start from beginning of year to include all historical orders
+    end: new Date().toISOString().split('T')[0] // End today to include all orders up to now
   })
   const [branches, setBranches] = useState<Array<{id: string, name: string}>>([])
   const [user, setUser] = useState<any>(null)
@@ -330,6 +330,10 @@ export default function AdminAnalytics() {
 
   const loadOrderHistory = async () => {
     try {
+      console.log('📊 Loading order history...')
+      console.log('📅 Date range:', dateRange)
+      console.log('🏪 Selected branch:', selectedBranch || 'All branches')
+      
       // Get real order history from database
       let query = supabase
         .from('orders')
@@ -353,11 +357,25 @@ export default function AdminAnalytics() {
 
       if (selectedBranch) {
         query = query.eq('branch_id', selectedBranch)
+        console.log('🔍 Filtering by branch:', selectedBranch)
       }
 
       const { data: orders, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Error loading order history:', error)
+        throw error
+      }
+
+      console.log('✅ Orders loaded:', orders?.length || 0)
+      console.log('📋 Order details:', orders?.map(o => ({
+        id: o.id,
+        order_number: o.order_number,
+        customer_name: o.customer_name,
+        order_status: o.order_status,
+        created_at: o.created_at,
+        branch_name: (o as any).branches?.name
+      })))
 
       // Convert to OrderHistory format
       const orderHistory: OrderHistory[] = orders?.map(order => ({
@@ -376,6 +394,7 @@ export default function AdminAnalytics() {
         promo_discount: parseFloat(order.promo_discount || '0')
       })) || []
 
+      console.log('📊 Order history processed:', orderHistory.length)
       setOrderHistory(orderHistory)
     } catch (error) {
       console.error('Failed to load order history:', error)
@@ -385,6 +404,9 @@ export default function AdminAnalytics() {
   // Load comprehensive financial analytics - HISTORICAL ACCURACY
   const loadFinancialAnalytics = async () => {
     try {
+      console.log('💰 Loading financial analytics...')
+      console.log('📅 Date range:', dateRange)
+      
       // Get all completed orders in date range - USE STORED VALUES ONLY
       const { data: orders, error } = await supabase
         .from('orders')
@@ -393,7 +415,12 @@ export default function AdminAnalytics() {
         .gte('created_at', dateRange.start)
         .lte('created_at', dateRange.end)
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Error loading financial analytics:', error)
+        throw error
+      }
+
+      console.log('✅ Financial orders loaded:', orders?.length || 0)
 
       // Calculate financial metrics - HISTORICAL ACCURACY (uses stored values per order)
       const grossRevenue = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0
