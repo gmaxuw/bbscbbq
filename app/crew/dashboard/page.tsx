@@ -369,6 +369,8 @@ export default function CrewDashboard() {
       }
       
       console.log('✅ Setting crew member data:', crewData)
+      console.log('🔍 Crew member branch_id:', crewData.branch_id)
+      console.log('🔍 Crew member branch_name:', crewData.branch_name)
       setCrewMember(crewData)
       setAuthChecked(true)
       console.log('✅ Authentication check completed successfully')
@@ -385,12 +387,26 @@ export default function CrewDashboard() {
   const loadOrders = async () => {
     try {
       if (!crewMember?.branch_id) {
-        console.log('No crew member or branch_id, skipping order load')
+        console.log('❌ No crew member or branch_id, skipping order load')
+        console.log('Crew member data:', crewMember)
         return
       }
 
-      console.log('Loading orders for branch:', crewMember.branch_id)
+      console.log('📋 Loading orders for branch:', crewMember.branch_id, 'Branch name:', crewMember.branch_name)
       setLastRefresh(new Date())
+
+      // Test query to see if we can access orders at all
+      console.log('🧪 Testing basic orders access...')
+      const { data: testData, error: testError } = await supabase
+        .from('orders')
+        .select('id, order_number, branch_id')
+        .limit(1)
+      
+      if (testError) {
+        console.error('❌ Basic orders access failed:', testError)
+      } else {
+        console.log('✅ Basic orders access successful:', testData)
+      }
 
       // First try to get active orders (not completed)
       let { data, error } = await supabase
@@ -466,11 +482,19 @@ export default function CrewDashboard() {
       }
 
       if (error) {
-        console.error('Database error loading orders:', error)
+        console.error('❌ Database error loading orders:', error)
+        console.error('Error details:', error.message, error.details, error.hint)
         throw error
       }
       
-      console.log('Orders loaded successfully:', data?.length || 0)
+      console.log('✅ Orders loaded successfully:', data?.length || 0)
+      console.log('📊 Order details:', data?.map(o => ({
+        id: o.id,
+        order_number: o.order_number,
+        customer_name: o.customer_name,
+        order_status: o.order_status,
+        payment_status: o.payment_status
+      })))
       
       // The showingCompletedOrders flag is already set correctly above
       
