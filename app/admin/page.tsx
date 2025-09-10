@@ -73,25 +73,32 @@ export default function AdminDashboard() {
   const supabase = createClient()
 
   useEffect(() => {
+    let isMounted = true
+    
     const initializeDashboard = async () => {
       try {
         console.log('🚀 Initializing admin dashboard...')
         
         // Check authentication first
-        await checkAuth()
+        const authSuccess = await checkAuth()
         
-        // Only load data if user is authenticated
-        if (user || localStorage.getItem('admin_session_data')) {
+        // Only load data if authentication was successful and component is still mounted
+        if (isMounted && authSuccess) {
           console.log('✅ User authenticated, loading dashboard data...')
           await Promise.all([
             loadDashboardStats(),
             loadRecentActivity(),
             loadNotificationCount()
           ])
+        } else if (isMounted) {
+          console.log('❌ Authentication failed, stopping dashboard initialization')
+          setIsLoading(false)
         }
       } catch (error) {
         console.error('❌ Dashboard initialization failed:', error)
-        setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
     }
 
@@ -99,7 +106,7 @@ export default function AdminDashboard() {
     
     // Set up data refresh (notifications handled globally)
     const refreshInterval = setInterval(() => {
-      if (user || localStorage.getItem('admin_session_data')) {
+      if (isMounted && localStorage.getItem('admin_session_data')) {
         loadDashboardStats()
         loadRecentActivity()
         loadNotificationCount()
@@ -108,7 +115,7 @@ export default function AdminDashboard() {
     
     // Add timeout to prevent infinite loading
     const timeout = setTimeout(() => {
-      if (isLoading) {
+      if (isMounted && isLoading) {
         console.warn('⚠️ Dashboard loading timeout, forcing completion')
         setIsLoading(false)
       }
@@ -116,10 +123,21 @@ export default function AdminDashboard() {
     
     // Cleanup on unmount
     return () => {
+      isMounted = false
       clearInterval(refreshInterval)
       clearTimeout(timeout)
     }
-  }, [user])
+  }, []) // Remove user dependency to prevent infinite loop
+
+  // Separate useEffect to handle user state changes
+  useEffect(() => {
+    if (user && !isLoading) {
+      console.log('👤 User state updated, reloading dashboard data...')
+      loadDashboardStats()
+      loadRecentActivity()
+      loadNotificationCount()
+    }
+  }, [user?.id]) // Only depend on user ID, not the entire user object
 
   const checkAuth = async () => {
     try {
@@ -131,13 +149,13 @@ export default function AdminDashboard() {
       if (sessionError) {
         console.error('❌ Session error:', sessionError)
         router.push('/admin/login')
-        return
+        return false
       }
       
       if (!session?.user) {
         console.log('❌ No Supabase session found, redirecting to login')
         router.push('/admin/login')
-        return
+        return false
       }
 
       console.log('✅ Session found, checking admin role for user:', session.user.id)
@@ -154,21 +172,23 @@ export default function AdminDashboard() {
         console.error('❌ Admin user query error:', error)
         await supabase.auth.signOut()
         router.push('/admin/login')
-        return
+        return false
       }
 
       if (!adminUser || adminUser.role !== 'admin') {
         console.log('❌ Invalid admin user or role, redirecting to login')
         await supabase.auth.signOut()
         router.push('/admin/login')
-        return
+        return false
       }
 
       console.log('✅ Admin authentication successful:', adminUser.name)
       setUser(adminUser)
+      return true
     } catch (error) {
       console.error('Auth check failed:', error)
       router.push('/admin/login')
+      return false
     }
   }
 
