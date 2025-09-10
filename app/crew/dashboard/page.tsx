@@ -100,9 +100,18 @@ export default function CrewDashboard() {
 
   useEffect(() => {
     if (!authChecked) {
-    checkAuth()
-    setupOnlineStatus()
+      checkAuth()
+      setupOnlineStatus()
       loadOfflineData()
+      
+      // Safety timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.log('⏰ Auth timeout - forcing loading to false')
+        setIsLoading(false)
+        setAuthChecked(true)
+      }, 10000) // 10 second timeout
+      
+      return () => clearTimeout(timeout)
     }
   }, [authChecked])
 
@@ -373,13 +382,14 @@ export default function CrewDashboard() {
       console.log('🔍 Crew member branch_name:', crewData.branch_name)
       setCrewMember(crewData)
       setAuthChecked(true)
+      setIsLoading(false) // Set loading to false on success
       console.log('✅ Authentication check completed successfully')
       
     } catch (error) {
       console.error('❌ Auth check failed:', error)
+      setIsLoading(false) // Set loading to false on error too
       router.push('/crew/login')
     } finally {
-      setIsLoading(false)
       setAuthChecked(true)
     }
   }
