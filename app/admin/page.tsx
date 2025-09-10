@@ -73,35 +73,74 @@ export default function AdminDashboard() {
   const supabase = createClient()
 
   useEffect(() => {
-    checkAuth()
-    loadDashboardStats()
-    loadRecentActivity()
-    loadNotificationCount()
+    const initializeDashboard = async () => {
+      try {
+        console.log('🚀 Initializing admin dashboard...')
+        
+        // Check authentication first
+        await checkAuth()
+        
+        // Only load data if user is authenticated
+        if (user || localStorage.getItem('admin_session_data')) {
+          console.log('✅ User authenticated, loading dashboard data...')
+          await Promise.all([
+            loadDashboardStats(),
+            loadRecentActivity(),
+            loadNotificationCount()
+          ])
+        }
+      } catch (error) {
+        console.error('❌ Dashboard initialization failed:', error)
+        setIsLoading(false)
+      }
+    }
+
+    initializeDashboard()
     
     // Set up data refresh (notifications handled globally)
     const refreshInterval = setInterval(() => {
-      loadDashboardStats()
-      loadRecentActivity()
-      loadNotificationCount()
+      if (user || localStorage.getItem('admin_session_data')) {
+        loadDashboardStats()
+        loadRecentActivity()
+        loadNotificationCount()
+      }
     }, 30000) // Refresh every 30 seconds
+    
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      if (isLoading) {
+        console.warn('⚠️ Dashboard loading timeout, forcing completion')
+        setIsLoading(false)
+      }
+    }, 10000) // 10 second timeout
     
     // Cleanup on unmount
     return () => {
       clearInterval(refreshInterval)
+      clearTimeout(timeout)
     }
-  }, [])
+  }, [user])
 
   const checkAuth = async () => {
     try {
       console.log('🔍 Admin dashboard checking auth...')
       
       // Use proper Supabase authentication
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error('❌ Session error:', sessionError)
+        router.push('/admin/login')
+        return
+      }
+      
       if (!session?.user) {
         console.log('❌ No Supabase session found, redirecting to login')
         router.push('/admin/login')
         return
       }
+
+      console.log('✅ Session found, checking admin role for user:', session.user.id)
 
       // Verify admin role using admin_users table
       const { data: adminUser, error } = await supabase
@@ -111,7 +150,14 @@ export default function AdminDashboard() {
         .eq('is_active', true)
         .single()
 
-      if (error || !adminUser || adminUser.role !== 'admin') {
+      if (error) {
+        console.error('❌ Admin user query error:', error)
+        await supabase.auth.signOut()
+        router.push('/admin/login')
+        return
+      }
+
+      if (!adminUser || adminUser.role !== 'admin') {
         console.log('❌ Invalid admin user or role, redirecting to login')
         await supabase.auth.signOut()
         router.push('/admin/login')
@@ -128,6 +174,7 @@ export default function AdminDashboard() {
 
   const loadDashboardStats = async () => {
     try {
+      console.log('📊 Loading dashboard stats...')
       setIsLoading(true)
 
       // Load all stats from Supabase
@@ -143,27 +190,47 @@ export default function AdminDashboard() {
         supabase.from('orders').select('*').gte('created_at', new Date().toISOString().split('T')[0])
       ])
 
-      if (ordersResult.error) throw ordersResult.error
-      if (productsResult.error) throw productsResult.error
-      if (branchesResult.error) throw branchesResult.error
-      if (todayOrdersResult.error) throw todayOrdersResult.error
+      console.log('📊 Query results:', {
+        orders: ordersResult.error ? ordersResult.error.message : `${ordersResult.data?.length || 0} orders`,
+        products: productsResult.error ? productsResult.error.message : `${productsResult.data?.length || 0} products`,
+        branches: branchesResult.error ? branchesResult.error.message : `${branchesResult.data?.length || 0} branches`,
+        todayOrders: todayOrdersResult.error ? todayOrdersResult.error.message : `${todayOrdersResult.data?.length || 0} today orders`
+      })
+
+      if (ordersResult.error) throw new Error(`Orders: ${ordersResult.error.message}`)
+      if (productsResult.error) throw new Error(`Products: ${productsResult.error.message}`)
+      if (branchesResult.error) throw new Error(`Branches: ${branchesResult.error.message}`)
+      if (todayOrdersResult.error) throw new Error(`Today Orders: ${todayOrdersResult.error.message}`)
 
       const orders = ordersResult.data || []
       const products = productsResult.data || []
       const branches = branchesResult.data || []
       const todayOrders = todayOrdersResult.data || []
 
-      setStats({
+      const newStats = {
         totalOrders: orders.length,
         pendingPayments: orders.filter(o => o.payment_status === 'pending').length,
         totalRevenue: orders.reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0),
         activeBranches: branches.filter(b => b.is_active).length,
         totalProducts: products.filter(p => p.is_active).length,
         todayOrders: todayOrders.length
-      })
+      }
+
+      console.log('📊 Stats calculated:', newStats)
+      setStats(newStats)
     } catch (error) {
-      console.error('Failed to load dashboard stats:', error)
+      console.error('❌ Failed to load dashboard stats:', error)
+      // Set default stats to prevent infinite loading
+      setStats({
+        totalOrders: 0,
+        pendingPayments: 0,
+        totalRevenue: 0,
+        activeBranches: 0,
+        totalProducts: 0,
+        todayOrders: 0
+      })
     } finally {
+      console.log('📊 Dashboard stats loading complete')
       setIsLoading(false)
     }
   }
