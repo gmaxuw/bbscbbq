@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Package, Clock, CheckCircle, XCircle, Eye, MapPin, Phone, QrCode } from 'lucide-react'
+import { ArrowLeft, Package, Clock, CheckCircle, XCircle, Eye, MapPin, Phone, QrCode, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import DesignLock from '@/components/layout/DesignLock'
 import QRScanner from '@/components/ui/QRScanner'
@@ -54,6 +54,7 @@ interface Order {
 export default function CustomerOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
@@ -63,19 +64,24 @@ export default function CustomerOrdersPage() {
   useEffect(() => {
     loadOrders()
     
-    // Simple data refresh (notifications handled globally)
-    const refreshInterval = setInterval(() => {
-      loadOrders()
-    }, 30000) // Refresh every 30 seconds
+    // Remove auto-refresh to prevent annoying UX
+    // Users can manually refresh if needed
+    // const refreshInterval = setInterval(() => {
+    //   loadOrders()
+    // }, 30000) // Refresh every 30 seconds
 
-    return () => {
-      clearInterval(refreshInterval)
-    }
+    // return () => {
+    //   clearInterval(refreshInterval)
+    // }
   }, [])
 
-  const loadOrders = async () => {
+  const loadOrders = async (isManualRefresh = false) => {
     try {
-      setIsLoading(true)
+      if (isManualRefresh) {
+        setIsRefreshing(true)
+      } else {
+        setIsLoading(true)
+      }
       
       // Get current user's email and phone from localStorage or session
       const userEmail = localStorage.getItem('customer_email') || 'demo@example.com'
@@ -112,6 +118,7 @@ export default function CustomerOrdersPage() {
       console.error('Error loading orders:', error)
     } finally {
       setIsLoading(false)
+      setIsRefreshing(false)
     }
   }
 
@@ -327,14 +334,26 @@ export default function CustomerOrdersPage() {
               </div>
             </div>
             
-            {/* QR Scanner Button */}
-            <button
-              onClick={() => setShowQRScanner(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-lays-dark-red text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <QrCode className="w-4 h-4" />
-              <span className="text-sm font-medium">Scan QR Code</span>
-            </button>
+            {/* Action Buttons */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => loadOrders(true)}
+                disabled={isRefreshing}
+                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="text-sm font-medium hidden sm:inline">
+                  {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                </span>
+              </button>
+              <button
+                onClick={() => setShowQRScanner(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-lays-dark-red text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <QrCode className="w-4 h-4" />
+                <span className="text-sm font-medium">Scan QR Code</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -356,32 +375,34 @@ export default function CustomerOrdersPage() {
           <div className="space-y-6">
             {orders.map((order) => (
               <div key={order.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Order #{order.order_number}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {formatDate(order.created_at)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="space-y-2">
-                      {/* Payment Status */}
-                      <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusColor(order.payment_status)}`}>
-                        {getPaymentStatusIcon(order.payment_status)}
-                        <span>{getPaymentStatusText(order.payment_status)}</span>
-                      </div>
-                      
-                      {/* Order Status */}
-                      <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.order_status)}`}>
-                        {getStatusIcon(order.order_status)}
-                        <span>{getStatusText(order.order_status)}</span>
+                <div className="mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Order #{order.order_number}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {formatDate(order.created_at)}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <p className="text-lg font-bold text-gray-900 mb-2">
+                        ₱{(order.total_amount || 0).toLocaleString()}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {/* Payment Status */}
+                        <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusColor(order.payment_status)}`}>
+                          {getPaymentStatusIcon(order.payment_status)}
+                          <span>{getPaymentStatusText(order.payment_status)}</span>
+                        </div>
+                        
+                        {/* Order Status */}
+                        <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.order_status)}`}>
+                          {getStatusIcon(order.order_status)}
+                          <span>{getStatusText(order.order_status)}</span>
+                        </div>
                       </div>
                     </div>
-                    <p className="text-lg font-bold text-gray-900 mt-2">
-                      ₱{(order.total_amount || 0).toLocaleString()}
-                    </p>
                   </div>
                 </div>
 
@@ -403,13 +424,13 @@ export default function CustomerOrdersPage() {
                   </div>
                 </div>
 
-                {/* Order Progress */}
+                {/* Order Progress - Mobile Responsive */}
                 <div className="mb-4">
                   <h4 className="font-medium text-gray-900 mb-3">Order Progress</h4>
-                  <div className="flex items-center space-x-4">
+                  <div className="space-y-3">
                     {getOrderProgressSteps(order).map((step, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      <div key={index} className="flex items-center space-x-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 ${
                           step.completed 
                             ? 'bg-green-500 text-white' 
                             : step.current 
@@ -418,30 +439,30 @@ export default function CustomerOrdersPage() {
                         }`}>
                           {step.completed ? <CheckCircle className="w-4 h-4" /> : index + 1}
                         </div>
-                        <span className={`text-sm ${
-                          step.completed || step.current 
-                            ? 'text-gray-900 font-medium' 
-                            : 'text-gray-500'
-                        }`}>
-                          {step.label}
-                        </span>
-                        {index < getOrderProgressSteps(order).length - 1 && (
-                          <div className={`w-8 h-0.5 ${
-                            step.completed ? 'bg-green-500' : 'bg-gray-200'
-                          }`} />
+                        <div className="flex-1 min-w-0">
+                          <span className={`text-sm ${
+                            step.completed || step.current 
+                              ? 'text-gray-900 font-medium' 
+                              : 'text-gray-500'
+                          }`}>
+                            {step.label}
+                          </span>
+                        </div>
+                        {step.completed && (
+                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                         )}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-gray-100">
                   <div className="text-sm text-gray-600">
                     {order.order_items?.length || 0} item{(order.order_items?.length || 0) !== 1 ? 's' : ''}
                   </div>
                   <button
                     onClick={() => viewOrderDetails(order)}
-                    className="bbq-button-secondary flex items-center space-x-2"
+                    className="bbq-button-secondary flex items-center justify-center space-x-2 w-full sm:w-auto"
                   >
                     <Eye className="w-4 h-4" />
                     <span>View Details</span>
