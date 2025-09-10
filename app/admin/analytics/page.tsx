@@ -109,11 +109,16 @@ export default function AdminAnalytics() {
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily')
   const [comparisonType, setComparisonType] = useState<'revenue' | 'orders' | 'profit'>('revenue')
   const [dateRange, setDateRange] = useState({
-    start: '2025-01-01', // Start from beginning of year to include all historical orders
-    end: new Date().toISOString().split('T')[0] // End today to include all orders up to now
+    start: '2025-09-01', // Start from September to include actual orders
+    end: '2025-09-15' // End mid-September to include all current orders
   })
   const [branches, setBranches] = useState<Array<{id: string, name: string}>>([])
   const [user, setUser] = useState<any>(null)
+  const [realMetrics, setRealMetrics] = useState({
+    averageOrderValue: 0,
+    growthRate: 0,
+    conversionRate: 0
+  })
   const supabase = createClient()
 
   useEffect(() => {
@@ -401,6 +406,68 @@ export default function AdminAnalytics() {
     }
   }
 
+  // Calculate real metrics for summary cards
+  const calculateRealMetrics = async (totalOrders: number, averageOrderValue: number) => {
+    try {
+      console.log('📊 Calculating real metrics...')
+      
+      // Calculate growth rate (compare current period vs previous period)
+      const currentPeriodStart = new Date(dateRange.start)
+      const currentPeriodEnd = new Date(dateRange.end)
+      const previousPeriodStart = new Date(currentPeriodStart)
+      const previousPeriodEnd = new Date(currentPeriodStart)
+      previousPeriodStart.setDate(previousPeriodStart.getDate() - (currentPeriodEnd.getDate() - currentPeriodStart.getDate() + 1))
+      previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 1)
+
+      // Get current period orders
+      const { data: currentOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_status', 'completed')
+        .gte('created_at', currentPeriodStart.toISOString().split('T')[0])
+        .lte('created_at', currentPeriodEnd.toISOString().split('T')[0])
+
+      // Get previous period orders
+      const { data: previousOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_status', 'completed')
+        .gte('created_at', previousPeriodStart.toISOString().split('T')[0])
+        .lte('created_at', previousPeriodEnd.toISOString().split('T')[0])
+
+      const currentCount = currentOrders?.length || 0
+      const previousCount = previousOrders?.length || 0
+      const growthRate = previousCount > 0 ? ((currentCount - previousCount) / previousCount) * 100 : 0
+
+      // Calculate conversion rate (completed orders / total orders)
+      const { data: allOrders } = await supabase
+        .from('orders')
+        .select('order_status')
+        .gte('created_at', currentPeriodStart.toISOString().split('T')[0])
+        .lte('created_at', currentPeriodEnd.toISOString().split('T')[0])
+
+      const totalOrdersInPeriod = allOrders?.length || 0
+      const conversionRate = totalOrdersInPeriod > 0 ? (currentCount / totalOrdersInPeriod) * 100 : 0
+
+      setRealMetrics({
+        averageOrderValue: averageOrderValue,
+        growthRate: Math.round(growthRate),
+        conversionRate: Math.round(conversionRate)
+      })
+
+      console.log('📊 Real metrics calculated:', {
+        averageOrderValue,
+        growthRate: Math.round(growthRate),
+        conversionRate: Math.round(conversionRate),
+        currentCount,
+        previousCount,
+        totalOrdersInPeriod
+      })
+    } catch (error) {
+      console.error('Failed to calculate real metrics:', error)
+    }
+  }
+
   // Load comprehensive financial analytics - HISTORICAL ACCURACY
   const loadFinancialAnalytics = async () => {
     try {
@@ -454,6 +521,9 @@ export default function AdminAnalytics() {
         gross_revenue: grossRevenue, // Total revenue = Our Revenue + Store Revenue
         vendor_payments: vendorPayments // What stalls earn
       })
+
+      // Calculate real metrics for summary cards
+      await calculateRealMetrics(totalOrders, averageOrderValue)
     } catch (error) {
       console.error('Failed to load financial analytics:', error)
     }
@@ -709,15 +779,15 @@ export default function AdminAnalytics() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Financial Overview</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-green-50 p-4 rounded-lg">
-                <div className="flex items-center">
+            <div className="flex items-center">
                   <span className="text-2xl">💰</span>
                   <div className="ml-3">
                     <p className="text-sm font-medium text-green-800">Our Revenue</p>
                     <p className="text-2xl font-bold text-green-900">{formatCurrency(financialAnalytics.total_revenue)}</p>
                     <p className="text-xs text-green-600">Commission + Platform Fee</p>
-                  </div>
-                </div>
               </div>
+              </div>
+            </div>
               <div className="bg-orange-50 p-4 rounded-lg">
                 <div className="flex items-center">
                   <TrendingUp className="w-8 h-8 text-orange-600" />
@@ -725,7 +795,7 @@ export default function AdminAnalytics() {
                     <p className="text-sm font-medium text-orange-800">Gross Revenue</p>
                     <p className="text-2xl font-bold text-orange-900">{formatCurrency(financialAnalytics.gross_revenue || 0)}</p>
                     <p className="text-xs text-orange-600">Our Revenue + Store Revenue</p>
-                  </div>
+          </div>
                 </div>
               </div>
               <div className="bg-blue-50 p-4 rounded-lg">
@@ -956,41 +1026,43 @@ export default function AdminAnalytics() {
             </div>
           </div>
 
-          {/* Empty cards for spacing - can be removed or used for other metrics */}
-          <div className="bbq-card p-4 sm:p-6 opacity-50">
+          {/* Real data cards */}
+          <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-gray-500/10 rounded-lg flex-shrink-0">
-                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
+              <div className="p-2 bg-green-500/10 rounded-lg flex-shrink-0">
+                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
               </div>
               <div className="ml-3 sm:ml-4 min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Average Order</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(financialAnalytics?.average_order_value || 0)}</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{formatCurrency(realMetrics.averageOrderValue)}</p>
                 <p className="text-xs text-gray-400">Per order value</p>
               </div>
             </div>
           </div>
 
-          <div className="bbq-card p-4 sm:p-6 opacity-50">
+          <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-gray-500/10 rounded-lg flex-shrink-0">
-                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
+              <div className="p-2 bg-orange-500/10 rounded-lg flex-shrink-0">
+                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
               </div>
               <div className="ml-3 sm:ml-4 min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Growth Rate</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">+12%</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">
+                  {realMetrics.growthRate >= 0 ? '+' : ''}{realMetrics.growthRate}%
+                </p>
                 <p className="text-xs text-gray-400">vs last period</p>
               </div>
             </div>
           </div>
 
-          <div className="bbq-card p-4 sm:p-6 opacity-50">
+          <div className="bbq-card p-4 sm:p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-gray-500/10 rounded-lg flex-shrink-0">
-                <PieChart className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
+              <div className="p-2 bg-purple-500/10 rounded-lg flex-shrink-0">
+                <PieChart className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
               </div>
               <div className="ml-3 sm:ml-4 min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Conversion</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">85%</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{realMetrics.conversionRate}%</p>
                 <p className="text-xs text-gray-400">Order completion</p>
               </div>
             </div>
@@ -1086,7 +1158,7 @@ export default function AdminAnalytics() {
                         <span className="font-semibold text-emerald-600">
                           {formatCurrency(report.net_profit)}
                         </span>
-                      </td>
+                    </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatCurrency(report.average_order_value)}
                     </td>
@@ -1257,8 +1329,8 @@ export default function AdminAnalytics() {
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div className="font-semibold text-emerald-600">
                           {formatCurrency(order.total_commission || 0)}
-                        </div>
-                      </td>
+                      </div>
+                    </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {order.branch_name}
                     </td>
