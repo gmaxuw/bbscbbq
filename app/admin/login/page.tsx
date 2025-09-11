@@ -166,12 +166,23 @@ export default function AdminLoginPage() {
     setIsResettingPassword(true)
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `${window.location.origin}/admin/reset-password`
+      // Use Edge Function for password reset
+      const response = await fetch('/api/supabase/functions/send-password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: forgotPasswordEmail,
+          redirectTo: `${window.location.origin}/account/reset-password?admin=true&email=${encodeURIComponent(forgotPasswordEmail)}`
+        })
       })
 
-      if (error) {
-        setError('Error sending reset email. Please try again.')
+      const result = await response.json()
+      
+      if (!response.ok || !result.success) {
+        console.error('Password reset error:', result.error)
+        setError(`Error sending reset email: ${result.error || 'Please try again.'}`)
         return
       }
 

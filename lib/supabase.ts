@@ -23,7 +23,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 // Check if we have valid environment variables
 const hasValidEnvVars = supabaseUrl && supabaseAnonKey && 
   supabaseUrl.startsWith('https://') && 
-  !supabaseUrl.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9')
+  !supabaseAnonKey.includes('placeholder-key')
 
 // Debug: Log environment variables (only in development)
 if (process.env.NODE_ENV === 'development') {
@@ -44,7 +44,7 @@ if (typeof window !== 'undefined') {
   })
 }
 
-// Create Supabase client with fallback for build time
+// Create a legacy Supabase client (without Next.js auth cookie integration)
 export const supabase = hasValidEnvVars 
   ? createSupabaseClient(supabaseUrl, supabaseAnonKey, {
       auth: {
@@ -58,18 +58,24 @@ export const supabase = hasValidEnvVars
         }
       }
     })
-  : createSupabaseClient('https://prqfpxrtopguvelmflhk.supabase.co', 'placeholder-key', {
+  : createSupabaseClient('https://prqfpxrtopguvelmflhk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBycWZweHJ0b3BndXZlbG1mbGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NzQ4NzIsImV4cCI6MjA1MTU1MDg3Mn0.placeholder-key-replace-with-actual', {
       auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
       }
     })
 
-// Export createClient function for new pages
-export const createClient = () => supabase
+// Export createClient function that RETURNS the Next.js auth-helpers client.
+// This ensures auth sessions are synced to cookies that middleware can read.
+export const createClient = () => createSupabaseClientComponent()
 
-// Export cookie-based client for components (handles cookies automatically)
+// Export cookie-based client factory explicitly for components (handles cookies automatically)
 export const createClientComponentClient = createSupabaseClientComponent
 
 // Database table names for type safety

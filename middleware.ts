@@ -3,9 +3,38 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  // TEMPORARILY DISABLE ALL MIDDLEWARE TO STOP INFINITE LOOPS
-  console.log('🚫 Middleware: DISABLED - Allowing all requests to proceed')
-  return NextResponse.next()
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+
+  const { data: { session } } = await supabase.auth.getSession()
+  const { pathname } = req.nextUrl
+
+  const isAdminArea = pathname.startsWith('/admin')
+  const isCrewArea = pathname.startsWith('/crew')
+  const isAdminLogin = pathname.startsWith('/admin/login')
+  const isCrewLogin = pathname.startsWith('/crew/login')
+
+  // Protect admin routes (except login)
+  if (isAdminArea && !isAdminLogin) {
+    if (!session) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/admin/login'
+      url.searchParams.set('redirectedFrom', pathname)
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // Protect crew routes (except login)
+  if (isCrewArea && !isCrewLogin) {
+    if (!session) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/crew/login'
+      url.searchParams.set('redirectedFrom', pathname)
+      return NextResponse.redirect(url)
+    }
+  }
+
+  return res
 }
 
 export const config = {

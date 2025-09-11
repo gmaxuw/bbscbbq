@@ -306,11 +306,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
             .select('created_at, id')
             .order('created_at', { ascending: false })
             .limit(1)
-            .single()
+            .maybeSingle()
             
           if (orderError) {
             console.log('⚠️ Polling order check failed (RLS):', orderError.message)
             return // Skip this poll cycle
+          }
+
+          if (!latestOrder) {
+            // No orders yet; nothing to do
+            return
           }
 
           if (latestOrder) {
@@ -327,7 +332,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
                 .from('orders')
                 .select('*')
                 .eq('id', latestOrder.id)
-                .single()
+                .maybeSingle()
 
               if (newOrder) {
                 showOrderNotification(newOrder)

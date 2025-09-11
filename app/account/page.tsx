@@ -508,16 +508,23 @@ export default function AccountPage() {
     console.log('Password reset requested for:', forgotPasswordEmail)
     
     try {
-      const supabase = createClient()
-      
-      // Send password reset email using Supabase Auth
-      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `https://bbscbbq.vercel.app/account/reset-password`
+      // Use Edge Function for password reset
+      const response = await fetch('/api/supabase/functions/send-password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: forgotPasswordEmail,
+          redirectTo: `${window.location.origin}/account/reset-password`
+        })
       })
+
+      const result = await response.json()
       
-      if (error) {
-        console.error('Password reset error:', error)
-        alert('Error sending reset email. Please try again.')
+      if (!response.ok || !result.success) {
+        console.error('Password reset error:', result.error)
+        alert(`Error sending reset email: ${result.error || 'Please try again.'}`)
         return
       }
       
