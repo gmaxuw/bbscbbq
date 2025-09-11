@@ -35,26 +35,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Try Edge Function first, fallback to direct Supabase call
-    try {
-      const edgeResponse = await fetch(`${supabaseUrl}/functions/v1/send-password-reset`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify({ email, redirectTo })
-      })
-
-      if (edgeResponse.ok) {
-        const result = await edgeResponse.json()
-        return NextResponse.json(result, { status: 200 })
-      }
-    } catch (edgeError) {
-      console.warn('Edge Function failed, falling back to direct Supabase call:', edgeError)
-    }
-
-    // Fallback: Direct Supabase call
+    // Direct Supabase call for password reset
     const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
       redirectTo: redirectTo,
     })
