@@ -5,7 +5,7 @@
  * with customer authentication. It uses a separate session management system.
  */
 
-import { createClientComponentClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 
 interface AdminUser {
   id: string
@@ -20,7 +20,7 @@ interface AdminUser {
 
 class AdminAuthManager {
   private static instance: AdminAuthManager
-  private supabase = createClientComponentClient()
+  private supabase = createClient()
   private adminSession: AdminUser | null = null
   private sessionKey = 'admin_session_data'
 
@@ -91,7 +91,7 @@ class AdminAuthManager {
       }
 
       // Create a separate Supabase client for admin auth
-      const adminSupabase = createClientComponentClient()
+      const adminSupabase = createClient()
       
       // Sign in with Supabase Auth
       const { data: authData, error: authError } = await adminSupabase.auth.signInWithPassword({

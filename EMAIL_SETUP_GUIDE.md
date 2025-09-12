@@ -49,7 +49,7 @@ Your password reset and notification emails are not working because Supabase nee
 3. **SMTP Host**: `smtp.resend.com`
 4. **SMTP Port**: `587`
 5. **SMTP User**: `resend`
-6. **SMTP Password**: Your Resend API key
+6. **SMTP Password**: API
 7. **Sender Email**: `noreply@yourdomain.com` (or use Resend's default)
 
 ---

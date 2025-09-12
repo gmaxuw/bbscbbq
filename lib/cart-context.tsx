@@ -44,19 +44,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log('🛒 Cart context loading...')
     if (typeof window !== 'undefined') {
-      const savedCart = localStorage.getItem('bbq-cart')
-      console.log('🛒 Saved cart from localStorage:', savedCart)
-      if (savedCart) {
-        try {
-          const parsedCart = JSON.parse(savedCart)
-          console.log('🛒 Parsed cart:', parsedCart)
-          setItems(parsedCart)
-        } catch (error) {
-          console.error('❌ Failed to load cart from localStorage:', error)
-        }
-      }
-      
-      // Load platform fee
+      // Load platform fee first
       loadPlatformFee()
       
       // Set up real-time subscription for platform fee changes
@@ -78,7 +66,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
         )
         .subscribe()
       
-      // Sync with database first, then mark loading complete
+      // Load cart from localStorage FIRST
+      const savedCart = localStorage.getItem('bbq-cart')
+      console.log('🛒 Saved cart from localStorage:', savedCart)
+      if (savedCart) {
+        try {
+          const parsedCart = JSON.parse(savedCart)
+          console.log('🛒 Parsed cart:', parsedCart)
+          setItems(parsedCart)
+        } catch (error) {
+          console.error('❌ Failed to load cart from localStorage:', error)
+        }
+      }
+      
+      // Then sync with database (but don't override if database is empty)
       syncCartWithDatabase().finally(() => {
         console.log('🛒 Cart loading complete')
         setIsLoading(false)
@@ -166,11 +167,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // Update localStorage with synced cart
         localStorage.setItem('bbq-cart', JSON.stringify(dbCartItems))
       } else {
-        // No database cart, upload local cart to database
-        if (items.length > 0) {
-          console.log('🛒 Uploading local cart to database:', items)
-          await uploadCartToDatabase(items)
+        // No database cart, check if we have local cart to upload
+        const localCart = localStorage.getItem('bbq-cart')
+        if (localCart) {
+          try {
+            const parsedLocalCart = JSON.parse(localCart)
+            if (parsedLocalCart.length > 0) {
+              console.log('🛒 Uploading local cart to database:', parsedLocalCart)
+              await uploadCartToDatabase(parsedLocalCart)
+              // DON'T override the current items - keep localStorage data
+            }
+          } catch (error) {
+            console.error('❌ Failed to parse local cart:', error)
+          }
         }
+        // If no local cart either, keep current items (don't clear them)
+        console.log('🛒 No database or local cart found, keeping current items')
       }
     } catch (error) {
       console.error('🛒 Error syncing cart with database:', error)
@@ -188,7 +200,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
     
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      console.log('🛒 No user logged in, skipping database upload')
+      return
+    }
+    
+    console.log('🛒 Uploading cart to database for user:', user.id, 'Items:', cartItems.length)
 
     try {
       // Clear existing cart in database

@@ -8,28 +8,27 @@
  * - Error handling and logging
  * 
  * WARNING: This is part of the admin dashboard system
- * STATUS: INTEGRATED - Uses locked design system
+ * STATUS: UPDATED FOR 2025 - No more auth-helpers dependency
  * LOCATION: Core infrastructure for admin functionality
  * PURPOSE: Provide Supabase access for all admin operations
  */
 
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { createClientComponentClient as createSupabaseClientComponent } from '@supabase/auth-helpers-nextjs'
 
-// Environment variables for Supabase configuration
+// Environment variables for Supabase 2025 configuration
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Check if we have valid environment variables
-const hasValidEnvVars = supabaseUrl && supabaseAnonKey && 
+// Check if we have valid environment variables (2025 compatible)
+const hasValidEnvVars = supabaseUrl && supabasePublishableKey && 
   supabaseUrl.startsWith('https://') && 
-  !supabaseAnonKey.includes('placeholder-key')
+  !supabasePublishableKey.includes('placeholder-key')
 
 // Debug: Log environment variables (only in development)
 if (process.env.NODE_ENV === 'development') {
-  console.log('🔍 Environment Variables Debug:', {
+  console.log('🔍 Environment Variables Debug (2025):', {
     supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING',
-    supabaseAnonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 30)}...` : 'MISSING',
+    supabasePublishableKey: supabasePublishableKey ? `${supabasePublishableKey.substring(0, 30)}...` : 'MISSING',
     nodeEnv: process.env.NODE_ENV,
     hasValidEnvVars: hasValidEnvVars
   })
@@ -37,20 +36,21 @@ if (process.env.NODE_ENV === 'development') {
 
 // Debug logging for mobile troubleshooting
 if (typeof window !== 'undefined') {
-  console.log('Supabase Client Debug:', {
+  console.log('Supabase Client Debug (2025):', {
     hasValidEnvVars,
     supabaseUrl: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'undefined',
-    supabaseAnonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'undefined'
+    supabasePublishableKey: supabasePublishableKey ? `${supabasePublishableKey.substring(0, 20)}...` : 'undefined'
   })
 }
 
-// Create a legacy Supabase client (without Next.js auth cookie integration)
+// Create Supabase client with 2025 compatible configuration
 export const supabase = hasValidEnvVars 
-  ? createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+  ? createSupabaseClient(supabaseUrl, supabasePublishableKey, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined
       },
       realtime: {
         params: {
@@ -58,11 +58,12 @@ export const supabase = hasValidEnvVars
         }
       }
     })
-  : createSupabaseClient('https://prqfpxrtopguvelmflhk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBycWZweHJ0b3BndXZlbG1mbGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NzQ4NzIsImV4cCI6MjA1MTU1MDg3Mn0.placeholder-key-replace-with-actual', {
+  : createSupabaseClient('https://prqfpxrtopguvelmflhk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBycWZweHJ0b3BndXZlbG1mbGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0NzAxMDcsImV4cCI6MjA3MjA0NjEwN30.AjdPycuLam0DW6PMutFrLXfHD9Zgztjp0cXMvDxTr64', {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined
       },
       realtime: {
         params: {
@@ -71,12 +72,30 @@ export const supabase = hasValidEnvVars
       }
     })
 
-// Export createClient function that RETURNS the Next.js auth-helpers client.
-// This ensures auth sessions are synced to cookies that middleware can read.
-export const createClient = () => createSupabaseClientComponent()
+// Export createClient function - simplified for 2025 (no more auth-helpers)
+export const createClient = () => supabase
 
-// Export cookie-based client factory explicitly for components (handles cookies automatically)
-export const createClientComponentClient = createSupabaseClientComponent
+// For backward compatibility - same as createClient
+export const createClientComponentClient = () => supabase
+
+// Server-side client for admin operations (use with SERVICE_ROLE_KEY)
+export const createServerClient = () => {
+  const secretKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY
+  if (!secretKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for server-side operations')
+  }
+  
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    secretKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  )
+}
 
 // Database table names for type safety
 export const TABLES = {

@@ -16,6 +16,7 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isCrew, setIsCrew] = useState(false)
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -30,7 +31,9 @@ export default function ResetPasswordPage() {
     const refreshToken = urlParams.get('refresh_token') || searchParams.get('refresh_token')
     const type = urlParams.get('type') || searchParams.get('type')
     const isAdminParam = urlParams.get('admin') === 'true' || searchParams.get('admin') === 'true'
+    const isCrewParam = urlParams.get('crew') === 'true' || searchParams.get('crew') === 'true'
     setIsAdmin(isAdminParam)
+    setIsCrew(isCrewParam)
     
     console.log('Password reset URL analysis:', {
       hash,
@@ -122,6 +125,8 @@ export default function ResetPasswordPage() {
       setTimeout(async () => {
         if (isAdmin) {
           router.push('/admin/login')
+        } else if (isCrew) {
+          router.push('/crew/login')
         } else {
           // Check if user is admin/crew and redirect accordingly
           const { data: { user } } = await supabase.auth.getUser()
@@ -133,8 +138,10 @@ export default function ResetPasswordPage() {
               .eq('user_id', user.id)
               .single()
             
-            if (adminUser && (adminUser.role === 'admin' || adminUser.role === 'crew')) {
+            if (adminUser && adminUser.role === 'admin') {
               router.push('/admin/login')
+            } else if (adminUser && adminUser.role === 'crew') {
+              router.push('/crew/login')
             } else {
               router.push('/account')
             }

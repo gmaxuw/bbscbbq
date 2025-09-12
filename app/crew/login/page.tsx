@@ -26,6 +26,9 @@ export default function CrewLogin() {
   const [isRegistering, setIsRegistering] = useState(false)
   const [branches, setBranches] = useState<any[]>([])
   const [isRateLimited, setIsRateLimited] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -283,6 +286,34 @@ export default function CrewLogin() {
     }
   }
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsResettingPassword(true)
+
+    try {
+      // Use direct Supabase auth for password reset
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: `${window.location.origin}/account/reset-password?crew=true&email=${encodeURIComponent(forgotPasswordEmail)}`
+      })
+
+      if (error) {
+        console.error('Password reset error:', error)
+        setError(`Error sending reset email: ${error.message || 'Please try again.'}`)
+        return
+      }
+
+      alert('Password reset link sent to your email!')
+      setShowForgotPassword(false)
+      setForgotPasswordEmail('')
+
+    } catch (error) {
+      console.error('Password reset error:', error)
+      setError('Error sending reset email')
+    } finally {
+      setIsResettingPassword(false)
+    }
+  }
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -536,6 +567,18 @@ export default function CrewLogin() {
               </div>
             </div>
             
+            {/* Forgot Password Link */}
+            <div className="text-right mt-2">
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-lays-dark-red hover:text-lays-bright-red hover:underline transition-colors"
+                disabled={isLoading}
+              >
+                Forgot your password?
+              </button>
+            </div>
+            
             <button
               type="submit"
               disabled={isLoading || isRateLimited}
@@ -677,6 +720,47 @@ export default function CrewLogin() {
               </p>
             </div>
           </form>
+        )}
+
+        {/* Forgot Password Form */}
+        {showForgotPassword && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reset Crew Password</h3>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Crew Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  className="bbq-input w-full"
+                  placeholder="Enter your crew email"
+                  disabled={isResettingPassword}
+                />
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  type="submit"
+                  disabled={isResettingPassword}
+                  className="bbq-button-primary flex-1"
+                >
+                  {isResettingPassword ? 'Sending...' : 'Send Reset Link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(false)}
+                  className="bbq-button-secondary flex-1"
+                  disabled={isResettingPassword}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         )}
 
         {/* Additional Info */}
