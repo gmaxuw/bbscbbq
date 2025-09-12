@@ -39,6 +39,22 @@ export default function CrewLogin() {
 
   const loadBranches = async () => {
     try {
+      console.log('🔄 Loading branches for crew registration...')
+      
+      // Test connection first
+      const { data: testData, error: testError } = await supabase
+        .from('branches')
+        .select('count')
+        .limit(1)
+      
+      if (testError) {
+        console.error('❌ Supabase connection test failed:', testError)
+        setError('Database connection failed. Please check your internet connection and try again.')
+        return
+      }
+      
+      console.log('✅ Supabase connection test passed')
+      
       const { data, error } = await supabase
         .from('branches')
         .select('*')
@@ -46,13 +62,16 @@ export default function CrewLogin() {
         .order('name')
 
       if (error) {
-        console.error('Error loading branches:', error)
+        console.error('❌ Error loading branches:', error)
+        setError('Failed to load branch data. Please try again.')
         return
       }
 
+      console.log('✅ Branches loaded successfully:', data?.length || 0)
       setBranches(data || [])
     } catch (error) {
-      console.error('Error loading branches:', error)
+      console.error('❌ Error loading branches:', error)
+      setError('Network error. Please check your internet connection and try again.')
     }
   }
 
@@ -334,6 +353,8 @@ export default function CrewLogin() {
       console.log('🆕 CREW REGISTRATION ATTEMPT!')
 
       // Check if email already exists in admin_users
+      console.log('🔍 Checking email availability for:', registerData.email.toLowerCase().trim())
+      
       const { data: existingAdminUser, error: checkError } = await supabase
         .from('admin_users')
         .select('email, role, name')
@@ -341,10 +362,16 @@ export default function CrewLogin() {
         .maybeSingle()
 
       if (checkError) {
-        console.error('Error checking existing email:', checkError)
-        setError('Error checking email availability. Please try again.')
+        console.error('❌ Error checking existing email:', checkError)
+        if (checkError.message.includes('connection') || checkError.message.includes('network')) {
+          setError('Network error. Please check your internet connection and try again.')
+        } else {
+          setError('Error checking email availability. Please try again.')
+        }
         return
       }
+      
+      console.log('✅ Email availability check completed')
 
       if (existingAdminUser) {
         setError(`This email is already registered as ${existingAdminUser.role}. Please use a different email or contact admin.`)

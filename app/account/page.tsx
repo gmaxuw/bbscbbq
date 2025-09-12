@@ -373,7 +373,24 @@ export default function AccountPage() {
       
       console.log('Customer account created successfully:', authData.user)
       
-      // Store customer data for order lookup and display
+      // Check if email confirmation is required
+      if (authData.user && !authData.user.email_confirmed_at) {
+        // Email confirmation required - don't log in yet
+        alert('Account created successfully! Please check your email and click the verification link to complete your registration.')
+        
+        // Clear form
+        setRegisterData({
+          fullName: '',
+          email: '',
+          phone: '',
+          password: '',
+          confirmPassword: ''
+        })
+        
+        return
+      }
+      
+      // Email already confirmed or confirmation not required - proceed with login
       if (typeof window !== 'undefined') {
         localStorage.setItem('customer_email', registerData.email)
         localStorage.setItem('customer_name', registerData.fullName)
@@ -394,7 +411,7 @@ export default function AccountPage() {
       setUserId(authData.user.id)
       setIsLoggedIn(true)
       
-      alert('Account created successfully!')
+      alert('Account created successfully! You are now logged in.')
       
     } catch (error) {
       console.error('Registration error:', error)

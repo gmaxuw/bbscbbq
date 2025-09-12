@@ -108,6 +108,12 @@ export default function LoginModal({ isOpen, onClose, onSuccess, onGuestContinue
         return
       }
 
+      // Check if email confirmation is required
+      if (authData.user && !authData.user.email_confirmed_at) {
+        setError('Account created successfully! Please check your email and click the verification link to complete your registration.')
+        return
+      }
+
       // Store customer data
       if (typeof window !== 'undefined') {
         localStorage.setItem('customer_email', authData.user.email || '')

@@ -247,7 +247,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // Update quantity if item already exists
         const updatedItems = prevItems.map(item =>
           item.id === newItem.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + 1, image: newItem.image || item.image }
             : item
         )
         console.log('🛒 Updated existing item, new cart:', updatedItems)

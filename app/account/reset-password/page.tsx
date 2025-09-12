@@ -22,10 +22,22 @@ function ResetPasswordContent() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
+    const supabase = createClient()
+    
+    // Set up auth state change listener for password recovery
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', { event, session: session ? 'present' : 'missing' })
+      
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('Password recovery event detected')
+        // User is now authenticated for password reset
+        // Don't set error, allow them to proceed with password reset
+      }
+    })
+
     // Check if we have the necessary parameters from the reset link
-    // Supabase uses hash fragments (#) for password reset links
     const hash = window.location.hash
-    const urlParams = new URLSearchParams(hash.substring(1)) // Remove the # and parse
+    const urlParams = new URLSearchParams(hash.substring(1))
     
     const accessToken = urlParams.get('access_token') || searchParams.get('access_token')
     const refreshToken = urlParams.get('refresh_token') || searchParams.get('refresh_token')
@@ -44,7 +56,7 @@ function ResetPasswordContent() {
       searchParams: Object.fromEntries(searchParams.entries())
     })
     
-    // Check for error parameters in the URL (like otp_expired)
+    // Check for error parameters in the URL
     const errorParam = urlParams.get('error')
     const errorCode = urlParams.get('error_code')
     const errorDescription = urlParams.get('error_description')
@@ -60,24 +72,9 @@ function ResetPasswordContent() {
       return
     }
 
-    // For password reset, we need either access_token + refresh_token OR type=recovery
-    // If neither is present, show error
-    if ((!accessToken || !refreshToken) && type !== 'recovery') {
-      // Check if user is already authenticated (they might have clicked the link while logged in)
-      const checkAuth = async () => {
-        try {
-          const supabase = createClient()
-          const { data: { user } } = await supabase.auth.getUser()
-          if (user) {
-            setError('You are already logged in. If you want to change your password, please log out first and try again.')
-          } else {
-            setError('Invalid or expired reset link. Please request a new password reset.')
-          }
-        } catch (error) {
-          setError('Invalid or expired reset link. Please request a new password reset.')
-        }
-      }
-      checkAuth()
+    // Clean up subscription on unmount
+    return () => {
+      subscription.unsubscribe()
     }
   }, [searchParams])
 
@@ -100,6 +97,17 @@ function ResetPasswordContent() {
     try {
       const supabase = createClient()
       
+      // First, check if user is authenticated
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        console.error('User not authenticated:', userError)
+        setError('You must be logged in to reset your password. Please try again.')
+        return
+      }
+      
+      console.log('User authenticated, updating password...')
+      
       // Update the user's password
       const { error } = await supabase.auth.updateUser({
         password: password
@@ -107,10 +115,11 @@ function ResetPasswordContent() {
       
       if (error) {
         console.error('Password update error:', error)
-        setError('Failed to update password. Please try again.')
+        setError(`Failed to update password: ${error.message}`)
         return
       }
       
+      console.log('Password updated successfully')
       setSuccess(true)
       
       // Check if this is an admin password reset

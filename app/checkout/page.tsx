@@ -473,10 +473,18 @@ export default function CheckoutPage() {
                 <div key={item.id} className="flex items-center space-x-4 py-3 border-b border-gray-200 last:border-b-0">
                   <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
                     {item.image ? (
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover rounded-lg" />
-                    ) : (
-                      <ShoppingCart className="w-8 h-8 text-gray-400" />
-                    )}
+                      <img 
+                        src={item.image} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={(e) => {
+                          console.log('Image failed to load:', item.image)
+                          e.currentTarget.style.display = 'none'
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                        }}
+                      />
+                    ) : null}
+                    <ShoppingCart className={`w-8 h-8 text-gray-400 ${item.image ? 'hidden' : ''}`} />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-medium text-gray-900">{item.name}</h3>
