@@ -35,6 +35,12 @@ export default function AdminLoginPage() {
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
+        // Clear any redirect parameters to prevent loops
+        if (window.location.search.includes('redirectedFrom')) {
+          console.log('🧹 Clearing redirect parameters to prevent loops')
+          window.history.replaceState({}, '', window.location.pathname)
+        }
+
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         // If there's a session error (like rate limiting), skip auth check to prevent loops

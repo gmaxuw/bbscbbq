@@ -106,9 +106,9 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
-     * - admin/login (login pages)
-     * - crew/login (login pages)
+     * - admin/* (ALL admin routes - let them handle their own auth)
+     * - crew/login (crew login pages)
      */
-    '/((?!_next/static|_next/image|favicon.ico|admin/login|crew/login|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|admin|crew/login|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
