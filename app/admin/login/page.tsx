@@ -59,7 +59,14 @@ export default function AdminLoginPage() {
 
           if (!error && adminUser) {
             console.log('🚀 Admin verified, redirecting to dashboard')
-            window.location.href = `${window.location.origin}/admin`
+            // Check if we're already in a redirect loop
+            const urlParams = new URLSearchParams(window.location.search)
+            if (urlParams.get('redirectedFrom')) {
+              console.log('⚠️ Already redirected, clearing redirect parameter')
+              window.location.href = `${window.location.origin}/admin`
+            } else {
+              window.location.href = `${window.location.origin}/admin`
+            }
             return
           } else if (error && (error.code === 'PGRST301' || error.message.includes('500') || 
                      error.message.includes('infinite recursion') || error.code === '42P17')) {

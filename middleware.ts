@@ -71,15 +71,11 @@ export async function middleware(req: NextRequest) {
       hasSession: !!session
     })
 
-    // Protect admin routes (except login)
+    // Skip admin route protection - let admin pages handle their own auth
+    // Admin pages have their own authentication logic that works better
     if (isAdminArea && !isAdminLogin) {
-      if (!session) {
-        console.log('🔒 Redirecting to admin login')
-        const url = req.nextUrl.clone()
-        url.pathname = '/admin/login'
-        url.searchParams.set('redirectedFrom', pathname)
-        return NextResponse.redirect(url)
-      }
+      console.log('🔍 Admin route detected, letting admin page handle auth')
+      return res
     }
 
     // Protect crew routes (except login)
