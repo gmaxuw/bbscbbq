@@ -426,9 +426,24 @@ export default function CrewLogin() {
       console.log('⏳ Waiting for auth user to be available in database...')
       await new Promise(resolve => setTimeout(resolve, 2000))
 
-      // Create admin_users record
+      // Sign in the user first to establish authentication context
+      console.log('🔐 Signing in user to establish authentication context...')
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: registerData.email.toLowerCase().trim(),
+        password: registerData.password
+      })
+
+      if (signInError || !signInData.user) {
+        console.error('❌ Sign in after registration failed:', signInError)
+        setError('Account created but failed to establish session. Please try logging in manually.')
+        return
+      }
+
+      console.log('✅ User signed in successfully, creating admin_users record...')
+
+      // Create admin_users record with authenticated user
       console.log('👥 Creating admin_users record for:', {
-        user_id: authData.user.id,
+        user_id: signInData.user.id,
         email: registerData.email.toLowerCase().trim(),
         name: registerData.fullName,
         role: 'crew',
@@ -438,7 +453,7 @@ export default function CrewLogin() {
       const { error: adminError } = await supabase
         .from('admin_users')
         .insert([{
-          user_id: authData.user.id,
+          user_id: signInData.user.id,
           email: registerData.email.toLowerCase().trim(),
           name: registerData.fullName,
           role: 'crew',

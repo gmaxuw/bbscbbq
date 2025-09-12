@@ -170,8 +170,8 @@ export default function OrderManagement() {
             product:products(name)
           )
         `)
-        .neq('order_status', 'completed') // Exclude completed orders from main view
         .order('created_at', { ascending: false })
+        .limit(1000)
 
       console.log('📊 Orders query result:', { data, error })
 

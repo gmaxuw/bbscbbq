@@ -108,6 +108,24 @@ export default function LoginModal({ isOpen, onClose, onSuccess, onGuestContinue
         return
       }
 
+      // Create customer record in users table
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          user_id: authData.user.id,
+          email: registerData.email,
+          full_name: registerData.fullName,
+          phone: registerData.phone,
+          role: 'customer',
+          is_active: true
+        })
+
+      if (userError) {
+        console.error('Error creating customer record:', userError)
+        setError('Account created but failed to save profile. Please contact support.')
+        return
+      }
+
       // Check if email confirmation is required
       if (authData.user && !authData.user.email_confirmed_at) {
         setError('Account created successfully! Please check your email and click the verification link to complete your registration.')

@@ -59,15 +59,19 @@ export async function middleware(req: NextRequest) {
     const { pathname } = req.nextUrl
     const isAdminArea = pathname.startsWith('/admin')
     const isCrewArea = pathname.startsWith('/crew')
+    const isCustomerArea = pathname.startsWith('/account') || pathname.startsWith('/cart') || pathname.startsWith('/favorites') || pathname.startsWith('/orders')
     const isAdminLogin = pathname.startsWith('/admin/login')
     const isCrewLogin = pathname.startsWith('/crew/login')
+    const isCustomerLogin = pathname.startsWith('/account/login') || pathname.startsWith('/account/register')
     
     console.log('🔍 Route Debug:', {
       pathname,
       isAdminArea,
       isCrewArea,
+      isCustomerArea,
       isAdminLogin,
       isCrewLogin,
+      isCustomerLogin,
       hasSession: !!session
     })
 
@@ -84,6 +88,17 @@ export async function middleware(req: NextRequest) {
         console.log('🔒 Redirecting to crew login')
         const url = req.nextUrl.clone()
         url.pathname = '/crew/login'
+        url.searchParams.set('redirectedFrom', pathname)
+        return NextResponse.redirect(url)
+      }
+    }
+
+    // Protect customer routes (except login/register)
+    if (isCustomerArea && !isCustomerLogin) {
+      if (!session) {
+        console.log('🔒 Redirecting to account page for customer login')
+        const url = req.nextUrl.clone()
+        url.pathname = '/account'
         url.searchParams.set('redirectedFrom', pathname)
         return NextResponse.redirect(url)
       }

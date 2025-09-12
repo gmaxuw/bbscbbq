@@ -99,13 +99,15 @@ export default function CustomerOrdersPage() {
               image_url
             )
           ),
-          branch:branches (
+          branch:branches!inner (
             name,
             address,
-            phone
+            phone,
+            is_active
           )
         `)
         .or(`customer_email.eq.${userEmail},customer_phone.eq.${userPhone}`)
+        .eq('branches.is_active', true)
         .order('created_at', { ascending: false })
 
       if (error) {

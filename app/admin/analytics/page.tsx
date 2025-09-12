@@ -188,7 +188,10 @@ export default function AdminAnalytics() {
         .lte('created_at', dateRange.end)
         .order('created_at', { ascending: true })
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Analytics orders query failed:', error)
+        throw new Error(`Failed to load analytics data: ${error.message}`)
+      }
 
       // Group orders by date - HISTORICAL DATA
       const dailyData: { [key: string]: { 

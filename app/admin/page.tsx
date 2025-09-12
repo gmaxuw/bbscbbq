@@ -226,22 +226,22 @@ export default function AdminDashboard() {
         todayOrders: todayOrdersResult.error ? todayOrdersResult.error.message : `${todayOrdersResult.data?.length || 0} today orders`
       })
 
-      // Handle RLS errors gracefully - for now, just log and continue
+      // Handle errors properly
       if (ordersResult.error) {
-        console.warn('Orders query failed:', ordersResult.error.message)
-        // Try to get at least some data for demo purposes
-        if (ordersResult.error.message.includes('RLS') || ordersResult.error.message.includes('permission')) {
-          console.log('🔓 RLS blocking orders query - this is expected for demo')
-        }
+        console.error('❌ Orders query failed:', ordersResult.error)
+        throw new Error(`Orders query failed: ${ordersResult.error.message}`)
       }
       if (productsResult.error) {
-        console.warn('Products query failed:', productsResult.error.message)
+        console.error('❌ Products query failed:', productsResult.error)
+        throw new Error(`Products query failed: ${productsResult.error.message}`)
       }
       if (branchesResult.error) {
-        console.warn('Branches query failed:', branchesResult.error.message)
+        console.error('❌ Branches query failed:', branchesResult.error)
+        throw new Error(`Branches query failed: ${branchesResult.error.message}`)
       }
       if (todayOrdersResult.error) {
-        console.warn('Today Orders query failed:', todayOrdersResult.error.message)
+        console.error('❌ Today Orders query failed:', todayOrdersResult.error)
+        throw new Error(`Today Orders query failed: ${todayOrdersResult.error.message}`)
       }
 
       const orders = ordersResult.data || []

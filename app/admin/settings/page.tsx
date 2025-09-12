@@ -276,7 +276,10 @@ function AdminSettingsContent() {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Products query failed:', error)
+        throw new Error(`Failed to load products: ${error.message}`)
+      }
       setProducts(data || [])
     } catch (error) {
       console.error('Failed to load products:', error)

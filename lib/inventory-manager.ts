@@ -181,11 +181,16 @@ class InventoryManager {
     const total_amount = orderData.items.reduce((sum, item) => sum + item.subtotal, 0)
     const total_commission = orderData.items.reduce((sum, item) => sum + (item.unit_commission * item.quantity), 0)
 
+    // Generate order number
+    const order_number = `BBQ-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert([{
+        order_number: order_number,
         customer_name: orderData.customer_name,
         customer_phone: orderData.customer_phone,
+        customer_email: orderData.user_id ? (await supabase.auth.getUser()).data.user?.email : null,
         branch_id: orderData.branch_id,
         pickup_time: orderData.pickup_time || new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
         subtotal: total_amount,
@@ -195,8 +200,7 @@ class InventoryManager {
         payment_status: 'pending',
         payment_method: orderData.payment_method || 'gcash',
         gcash_reference: orderData.payment_reference,
-        payment_screenshot_url: screenshotUrl,
-        user_id: orderData.user_id
+        payment_screenshot_url: screenshotUrl
       }])
       .select()
       .single()
