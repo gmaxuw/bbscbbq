@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, XCircle, Clock, Package, ChefHat } from 'lucide-react'
 import Navigation from '@/components/layout/Navigation'
@@ -35,7 +35,7 @@ interface Order {
   }
 }
 
-export default function VerifyOrderPage() {
+function VerifyOrderContent() {
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -348,5 +348,20 @@ export default function VerifyOrderPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function VerifyOrderPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-lays-dark-red border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <VerifyOrderContent />
+    </Suspense>
   )
 }

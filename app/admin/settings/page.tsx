@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Save, Eye, RefreshCw, Image, Type, Settings, Star, MapPin, Clock, ShoppingCart, ArrowLeft, Plus, Edit, Trash2, Search, Users, Phone, Mail, EyeOff, DollarSign, User, ImageIcon, X, Upload, Package, DollarSign as DollarSignIcon, TrendingUp, CheckCircle, XCircle, AlertTriangle, Calendar, FileText, Filter, Copy } from 'lucide-react'
@@ -60,7 +60,7 @@ interface ProductImage {
   created_at: string
 }
 
-export default function AdminSettingsPage() {
+function AdminSettingsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [settings, setSettings] = useState<HeroSettings | null>(null)
@@ -3339,5 +3339,20 @@ export default function AdminSettingsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function AdminSettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-lays-dark-red border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AdminSettingsContent />
+    </Suspense>
   )
 }
