@@ -93,8 +93,8 @@ export async function middleware(req: NextRequest) {
       }
     }
 
-    // Protect customer routes (except login/register)
-    if (isCustomerArea && !isCustomerLogin) {
+    // Protect customer routes (except login/register) - but skip /account itself to prevent loops
+    if (isCustomerArea && !isCustomerLogin && pathname !== '/account') {
       if (!session) {
         console.log('🔒 Redirecting to account page for customer login')
         const url = req.nextUrl.clone()
