@@ -182,7 +182,7 @@ class InventoryManager {
     const total_commission = orderData.items.reduce((sum, item) => sum + (item.unit_commission * item.quantity), 0)
 
     // Generate order number
-    const order_number = `BBQ-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+    const order_number = `BBQ-${Date.now().toString().slice(-8)}-${Math.random().toString(36).substr(2, 3).toUpperCase()}`
 
     const { data: order, error: orderError } = await supabase
       .from('orders')

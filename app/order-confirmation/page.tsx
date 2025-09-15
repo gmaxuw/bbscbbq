@@ -13,25 +13,76 @@ function OrderConfirmationContent() {
 
   useEffect(() => {
     if (orderId) {
-      // In a real app, you'd fetch order details from the database
-      // For now, we'll simulate the order details
-      setTimeout(() => {
-        setOrderDetails({
-          id: orderId,
-          customer_name: 'John Doe', // This would come from the order
-          customer_phone: '+63 912 345 6789',
-          total_amount: 450.00,
-          order_status: 'pending',
-          estimated_ready_time: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
-          items: [
-            { name: 'BBQ Pork Belly', quantity: 2, price: 150.00 },
-            { name: 'BBQ Chicken', quantity: 1, price: 150.00 }
-          ]
-        })
-        setIsLoading(false)
-      }, 1000)
+      fetchOrderDetails(orderId)
     }
   }, [orderId])
+
+  const fetchOrderDetails = async (orderId: string) => {
+    try {
+      const response = await fetch(`/api/orders/${orderId}`)
+      if (response.ok) {
+        const orderData = await response.json()
+        setOrderDetails(orderData)
+      } else {
+        // Fallback: fetch directly from Supabase
+        const { createClient } = await import('@/lib/supabase')
+        const supabase = createClient()
+        
+        const { data: order, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            customer_name,
+            customer_email,
+            customer_phone,
+            total_amount,
+            order_status,
+            payment_status,
+            created_at,
+            pickup_time,
+            branch_id,
+            branches(name, address, phone),
+            order_items(product_name, quantity, unit_price)
+          `)
+          .eq('id', orderId)
+          .single()
+
+        if (error) {
+          console.error('Error fetching order:', error)
+          return
+        }
+
+        if (order) {
+          setOrderDetails({
+            id: order.id,
+            order_number: order.order_number,
+            customer_name: order.customer_name,
+            customer_email: order.customer_email,
+            customer_phone: order.customer_phone,
+            total_amount: parseFloat(order.total_amount),
+            order_status: order.order_status,
+            payment_status: order.payment_status,
+            created_at: order.created_at,
+            pickup_time: order.pickup_time,
+            branch_name: (order.branches as any)?.name || 'Unknown Branch',
+            branch_address: (order.branches as any)?.address || '',
+            branch_phone: (order.branches as any)?.phone || '',
+            estimated_ready_time: new Date(order.pickup_time),
+            items: order.order_items?.map((item: any) => ({
+              name: item.product_name,
+              quantity: item.quantity,
+              price: parseFloat(item.unit_price)
+            })) || []
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching order details:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   if (isLoading) {
     return (

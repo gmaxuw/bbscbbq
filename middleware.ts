@@ -75,22 +75,11 @@ export async function middleware(req: NextRequest) {
       hasSession: !!session
     })
 
-    // Skip admin route protection - let admin pages handle their own auth
-    // Admin pages have their own authentication logic that works better
-    if (isAdminArea && !isAdminLogin) {
-      console.log('🔍 Admin route detected, letting admin page handle auth')
+    // Skip admin and crew route protection - let pages handle their own auth
+    // These pages have their own authentication logic that works better
+    if ((isAdminArea && !isAdminLogin) || (isCrewArea && !isCrewLogin)) {
+      console.log('🔍 Admin/Crew route detected, letting page handle auth')
       return res
-    }
-
-    // Protect crew routes (except login)
-    if (isCrewArea && !isCrewLogin) {
-      if (!session) {
-        console.log('🔒 Redirecting to crew login')
-        const url = req.nextUrl.clone()
-        url.pathname = '/crew/login'
-        url.searchParams.set('redirectedFrom', pathname)
-        return NextResponse.redirect(url)
-      }
     }
 
     // Protect customer routes (except login/register) - but skip /account itself to prevent loops

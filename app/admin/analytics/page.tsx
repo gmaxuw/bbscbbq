@@ -39,7 +39,6 @@ interface DailyReport {
   total_subtotal: number
   total_discount: number
   total_commission: number
-  total_platform_fees: number
   net_profit: number
   average_order_value: number
   orders_by_status: Record<string, number>
@@ -48,7 +47,6 @@ interface DailyReport {
 interface FinancialAnalytics {
   total_revenue: number // OUR ACTUAL REVENUE (commission + platform fee)
   total_commission: number
-  total_platform_fees: number
   net_profit: number // Same as total_revenue
   average_order_value: number
   total_orders: number
@@ -60,7 +58,6 @@ interface TimeSeriesData {
   date: string
   revenue: number
   commission: number
-  platform_fees: number
   orders: number
   lastMonthRevenue?: number
   lastMonthCommission?: number
@@ -109,8 +106,8 @@ export default function AdminAnalytics() {
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily')
   const [comparisonType, setComparisonType] = useState<'revenue' | 'orders' | 'profit'>('revenue')
   const [dateRange, setDateRange] = useState({
-    start: '2025-09-01', // Start from September to include actual orders
-    end: '2025-09-15' // End mid-September to include all current orders
+    start: '2025-01-01', // Start from beginning of year to include all orders
+    end: '2025-12-31' // End of year to include all current orders
   })
   const [branches, setBranches] = useState<Array<{id: string, name: string}>>([])
   const [user, setUser] = useState<any>(null)
@@ -179,11 +176,10 @@ export default function AdminAnalytics() {
     try {
       setIsLoading(true)
       
-      // Get real daily data from database - HISTORICAL ACCURACY
+      // Get real daily data from database - ALL ORDERS (not just completed)
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, total_amount, total_commission, subtotal, promo_discount, platform_fee, order_status')
-        .eq('order_status', 'completed')
+        .select('created_at, total_amount, total_commission, subtotal, promo_discount, order_status, payment_status')
         .gte('created_at', dateRange.start)
         .lte('created_at', dateRange.end)
         .order('created_at', { ascending: true })
@@ -199,8 +195,7 @@ export default function AdminAnalytics() {
         revenue: number, 
         subtotal: number, 
         discount: number, 
-        commission: number,
-        platform_fees: number
+        commission: number
       } } = {}
       
       orders?.forEach(order => {
@@ -211,8 +206,7 @@ export default function AdminAnalytics() {
             revenue: 0, 
             subtotal: 0, 
             discount: 0, 
-            commission: 0,
-            platform_fees: 0
+            commission: 0
           }
         }
         dailyData[date].orders += 1
@@ -220,7 +214,6 @@ export default function AdminAnalytics() {
         dailyData[date].subtotal += parseFloat(order.subtotal || '0') // Historical vendor payments
         dailyData[date].discount += parseFloat(order.promo_discount || '0') // Historical discounts
         dailyData[date].commission += parseFloat(order.total_commission || '0') // Historical commission
-        dailyData[date].platform_fees += parseFloat(order.platform_fee || '0') // Historical platform fees
       })
 
       // Convert to array format for the selected date range
@@ -237,7 +230,6 @@ export default function AdminAnalytics() {
           subtotal: 0, 
           discount: 0, 
           commission: 0,
-          platform_fees: 0
         }
         dailyReports.push({
           order_date: dateStr,
@@ -246,8 +238,7 @@ export default function AdminAnalytics() {
           total_subtotal: data.subtotal,
           total_discount: data.discount,
           total_commission: data.commission,
-          total_platform_fees: data.platform_fees, // HISTORICAL platform fees
-          net_profit: data.commission + data.platform_fees, // HISTORICAL Commission + Platform Fee
+          net_profit: data.commission, // HISTORICAL Commission
           average_order_value: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
           orders_by_status: {}
         })
@@ -272,7 +263,6 @@ export default function AdminAnalytics() {
           total_commission,
           subtotal,
           promo_discount,
-          platform_fee,
           order_status,
           branches!inner(name)
         `)
@@ -290,7 +280,6 @@ export default function AdminAnalytics() {
         subtotal: number, 
         discount: number, 
         commission: number,
-        platform_fees: number
       } } = {}
       
       orders?.forEach(order => {
@@ -305,7 +294,6 @@ export default function AdminAnalytics() {
             subtotal: 0, 
             discount: 0, 
             commission: 0,
-            platform_fees: 0
           }
         }
         branchData[branchId].orders += 1
@@ -313,7 +301,6 @@ export default function AdminAnalytics() {
         branchData[branchId].subtotal += parseFloat(order.subtotal || '0') // Historical vendor payments
         branchData[branchId].discount += parseFloat(order.promo_discount || '0') // Historical discounts
         branchData[branchId].commission += parseFloat(order.total_commission || '0') // Historical commission
-        branchData[branchId].platform_fees += parseFloat(order.platform_fee || '0') // Historical platform fees
       })
 
       // Convert to array format - HISTORICAL ACCURACY
@@ -325,7 +312,7 @@ export default function AdminAnalytics() {
         total_subtotal: data.subtotal,
         total_discount: data.discount,
         total_commission: data.commission,
-        net_profit: data.commission + data.platform_fees, // HISTORICAL Commission + Platform Fee
+        net_profit: data.commission, // HISTORICAL Commission
         average_order_value: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
         completion_rate: 100
       }))
@@ -480,7 +467,7 @@ export default function AdminAnalytics() {
       // Get all completed orders in date range - USE STORED VALUES ONLY
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('total_amount, total_commission, subtotal, promo_discount, platform_fee, created_at')
+        .select('total_amount, total_commission, subtotal, promo_discount, created_at')
         .eq('order_status', 'completed')
         .gte('created_at', dateRange.start)
         .lte('created_at', dateRange.end)
@@ -495,7 +482,7 @@ export default function AdminAnalytics() {
       // Calculate financial metrics - CORRECTED CALCULATIONS
       const totalAmount = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0 // What customers pay
       const totalCommission = orders?.reduce((sum, order) => sum + parseFloat(order.total_commission || '0'), 0) || 0
-      const totalPlatformFees = orders?.reduce((sum, order) => sum + parseFloat(order.platform_fee || '0'), 0) || 0
+      const totalPlatformFees = 0 // Platform fees not available in current schema
       const vendorPayments = orders?.reduce((sum, order) => sum + parseFloat(order.subtotal || '0'), 0) || 0 // What stalls earn
       
       // CORRECTED CALCULATIONS:
@@ -517,7 +504,6 @@ export default function AdminAnalytics() {
       setFinancialAnalytics({
         total_revenue: ourRevenue, // Our actual revenue (commission + platform fee)
         total_commission: totalCommission,
-        total_platform_fees: totalPlatformFees,
         net_profit: ourRevenue, // Same as our revenue
         average_order_value: averageOrderValue,
         total_orders: totalOrders,
@@ -547,7 +533,7 @@ export default function AdminAnalytics() {
       // Get current month orders
       const { data: currentMonthOrders, error: currentError } = await supabase
         .from('orders')
-        .select('total_amount, total_commission, platform_fee, created_at')
+        .select('total_amount, total_commission, created_at')
         .eq('order_status', 'completed')
         .gte('created_at', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`)
         .lt('created_at', `${currentYear}-${String(currentMonth + 2).padStart(2, '0')}-01`)
@@ -556,7 +542,7 @@ export default function AdminAnalytics() {
       // Get last month orders
       const { data: lastMonthOrders, error: lastError } = await supabase
         .from('orders')
-        .select('total_amount, total_commission, platform_fee, created_at')
+        .select('total_amount, total_commission, created_at')
         .eq('order_status', 'completed')
         .gte('created_at', `${lastYear}-${String(lastMonth + 1).padStart(2, '0')}-01`)
         .lt('created_at', `${lastYear}-${String(lastMonth + 2).padStart(2, '0')}-01`)
@@ -565,8 +551,8 @@ export default function AdminAnalytics() {
       if (currentError || lastError) throw currentError || lastError
 
       // Group by days for both months
-      const currentMonthData: { [key: string]: { revenue: number, commission: number, platform_fees: number, orders: number } } = {}
-      const lastMonthData: { [key: string]: { revenue: number, commission: number, platform_fees: number, orders: number } } = {}
+      const currentMonthData: { [key: string]: { revenue: number, commission: number, orders: number } } = {}
+      const lastMonthData: { [key: string]: { revenue: number, commission: number, orders: number } } = {}
 
       // Process current month
       currentMonthOrders?.forEach(order => {
@@ -574,12 +560,11 @@ export default function AdminAnalytics() {
         const dayKey = orderDate.getDate().toString()
         
         if (!currentMonthData[dayKey]) {
-          currentMonthData[dayKey] = { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
+          currentMonthData[dayKey] = { revenue: 0, commission: 0, orders: 0 }
         }
         
-        currentMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') + parseFloat(order.platform_fee || '0') // HISTORICAL REVENUE
+        currentMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') // HISTORICAL REVENUE
         currentMonthData[dayKey].commission += parseFloat(order.total_commission || '0') // HISTORICAL COMMISSION
-        currentMonthData[dayKey].platform_fees += parseFloat(order.platform_fee || '0') // HISTORICAL PLATFORM FEE
         currentMonthData[dayKey].orders += 1
       })
 
@@ -589,12 +574,11 @@ export default function AdminAnalytics() {
         const dayKey = orderDate.getDate().toString()
         
         if (!lastMonthData[dayKey]) {
-          lastMonthData[dayKey] = { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
+          lastMonthData[dayKey] = { revenue: 0, commission: 0, orders: 0 }
         }
         
-        lastMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') + parseFloat(order.platform_fee || '0') // HISTORICAL REVENUE
+        lastMonthData[dayKey].revenue += parseFloat(order.total_commission || '0') // HISTORICAL REVENUE
         lastMonthData[dayKey].commission += parseFloat(order.total_commission || '0') // HISTORICAL COMMISSION
-        lastMonthData[dayKey].platform_fees += parseFloat(order.platform_fee || '0') // HISTORICAL PLATFORM FEE
         lastMonthData[dayKey].orders += 1
       })
 
@@ -602,18 +586,16 @@ export default function AdminAnalytics() {
       const comparisonData: TimeSeriesData[] = []
       for (let day = 1; day <= 30; day++) {
         const dayKey = day.toString()
-        const currentData = currentMonthData[dayKey] || { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
-        const lastData = lastMonthData[dayKey] || { revenue: 0, commission: 0, platform_fees: 0, orders: 0 }
+        const currentData = currentMonthData[dayKey] || { revenue: 0, commission: 0, orders: 0 }
+        const lastData = lastMonthData[dayKey] || { revenue: 0, commission: 0, orders: 0 }
         
         comparisonData.push({
           date: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${dayKey.padStart(2, '0')}`,
           revenue: currentData.revenue,
           commission: currentData.commission,
-          platform_fees: currentData.platform_fees,
           orders: currentData.orders,
           lastMonthRevenue: lastData.revenue,
           lastMonthCommission: lastData.commission,
-          lastMonthPlatformFees: lastData.platform_fees,
           lastMonthOrders: lastData.orders
         })
       }
@@ -903,7 +885,7 @@ export default function AdminAnalytics() {
                       switch (comparisonType) {
                         case 'revenue': return data.revenue
                         case 'orders': return data.orders
-                        case 'profit': return data.commission + data.platform_fees
+                        case 'profit': return data.commission
                         default: return data.revenue
                       }
                     }
@@ -996,7 +978,7 @@ export default function AdminAnalytics() {
                   Current Month: {
                     comparisonType === 'revenue' ? formatCurrency(timeSeriesData.reduce((sum, d) => sum + d.revenue, 0)) :
                     comparisonType === 'orders' ? timeSeriesData.reduce((sum, d) => sum + d.orders, 0).toString() :
-                    formatCurrency(timeSeriesData.reduce((sum, d) => sum + d.commission + d.platform_fees, 0))
+                    formatCurrency(timeSeriesData.reduce((sum, d) => sum + d.commission, 0))
                   }
                 </span>
               </div>

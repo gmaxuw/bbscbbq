@@ -122,7 +122,7 @@ export default function CrewDashboard() {
       // Simple data refresh + crew-specific notifications
       const refreshInterval = setInterval(() => {
         loadOrders()
-      }, 30000) // Refresh every 30 seconds
+      }, 10000) // Refresh every 10 seconds for faster updates
 
       // Set up crew-specific real-time notifications
       const setupCrewNotifications = async () => {
@@ -341,6 +341,16 @@ export default function CrewDashboard() {
 
       if (crewError || !crewUser || crewUser.role !== 'crew') {
         console.error('❌ Invalid crew user or role:', crewError)
+        
+        // If it's an RLS error, don't sign out - just show error
+        if (crewError && (crewError.code === 'PGRST116' || crewError.message?.includes('406'))) {
+          console.log('⚠️ RLS policy error - user exists in auth but query blocked')
+          setError('Authentication error. Please contact your administrator.')
+          setIsLoading(false)
+          setAuthChecked(true)
+          return
+        }
+        
         await supabase.auth.signOut()
         router.push('/crew/login')
         return

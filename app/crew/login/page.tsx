@@ -83,30 +83,42 @@ export default function CrewLogin() {
         if (session?.user) {
           console.log('✅ Crew session found, checking role for:', session.user.id)
           
-          // Check if user is crew
-          const { data: crewUser, error } = await supabase
-            .from('admin_users')
-            .select('role, name, branch_id')
-            .eq('user_id', session.user.id)
-            .eq('is_active', true)
-            .single()
+          // Wait a moment for session to be fully established
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          // Check if user is crew - use a more permissive approach
+          try {
+            const { data: crewUser, error } = await supabase
+              .from('admin_users')
+              .select('role, name, branch_id')
+              .eq('user_id', session.user.id)
+              .eq('is_active', true)
+              .single()
 
-          if (!error && crewUser && crewUser.role === 'crew') {
-            console.log('🚀 Crew verified, redirecting to dashboard')
+            if (!error && crewUser && crewUser.role === 'crew') {
+              console.log('🚀 Crew verified, redirecting to dashboard')
+              window.location.href = '/crew/dashboard'
+              return
+            } else {
+              console.log('❌ Crew user not found or invalid role:', error?.message)
+              // Clear invalid session
+              await supabase.auth.signOut()
+            }
+          } catch (queryError) {
+            console.log('⚠️ Query failed, checking if user exists in auth only:', queryError)
+            // If query fails due to RLS, check if user exists in auth
+            // and redirect anyway - let the dashboard handle the role check
+            console.log('🚀 Redirecting to dashboard for auth verification')
             window.location.href = '/crew/dashboard'
             return
-          } else {
-            console.log('❌ Crew user not found for:', session.user.id)
-            // Clear invalid session
-            await supabase.auth.signOut()
           }
         } else {
           console.log('📝 No active session, showing login form')
         }
       } catch (error) {
         console.error('Session check error:', error)
-        // Clear session on error
-        await supabase.auth.signOut()
+        // Don't clear session on general errors, just show login form
+        console.log('📝 Error in session check, showing login form')
       }
     }
     
@@ -136,9 +148,6 @@ export default function CrewLogin() {
         setError('Please enter a valid email address')
         return
       }
-
-      // Clear any existing sessions first
-      await supabase.auth.signOut()
 
       // Sign in with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -450,6 +459,7 @@ export default function CrewLogin() {
         branch_id: registerData.branchId
       })
 
+      // Try direct insertion first
       const { error: adminError } = await supabase
         .from('admin_users')
         .insert([{
@@ -461,18 +471,46 @@ export default function CrewLogin() {
           is_active: false // Pending admin approval
         }])
 
+      // If direct insertion fails, try server-side API as fallback
       if (adminError) {
-        console.error('❌ Admin user creation error:', adminError)
-        if (adminError.code === '23505') { // Unique constraint violation
-          setError('❌ This email is already registered. Please use a different email or contact admin.')
-        } else if (adminError.code === '23503') { // Foreign key constraint violation
-          setError('❌ Invalid branch selection. Please select a valid branch and try again.')
-        } else if (adminError.code === '23502') { // Not null constraint violation
-          setError('❌ Missing required information. Please fill in all fields.')
-        } else {
-          setError('❌ Error creating crew record: ' + adminError.message)
+        console.log('⚠️ Direct insertion failed, trying server-side API...', adminError.message)
+        
+        try {
+          const response = await fetch('/api/crew/create-crew-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: signInData.user.id,
+              email: registerData.email.toLowerCase().trim(),
+              name: registerData.fullName,
+              branch_id: registerData.branchId
+            })
+          })
+
+          const result = await response.json()
+
+          if (!response.ok) {
+            throw new Error(result.error || 'Server-side creation failed')
+          }
+
+          console.log('✅ Server-side crew user creation successful')
+        } catch (apiError) {
+          console.error('❌ Both direct and server-side creation failed:', apiError)
+          if (adminError.code === '23505') { // Unique constraint violation
+            setError('❌ This email is already registered. Please use a different email or contact admin.')
+          } else if (adminError.code === '23503') { // Foreign key constraint violation
+            setError('❌ Invalid branch selection. Please select a valid branch and try again.')
+          } else if (adminError.code === '23502') { // Not null constraint violation
+            setError('❌ Missing required information. Please fill in all fields.')
+          } else {
+            setError('❌ Error creating crew record: ' + adminError.message)
+          }
+          return
         }
-        return
+      } else {
+        console.log('✅ Direct admin user record creation successful')
       }
 
       console.log('✅ Admin user record created successfully')

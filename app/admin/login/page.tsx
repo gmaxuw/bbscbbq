@@ -282,10 +282,37 @@ export default function AdminLoginPage() {
           is_active: true
         }])
 
+      // If direct insertion fails, try server-side API as fallback
       if (adminError) {
-        console.error('❌ Admin user creation error:', adminError)
-        setError('Error creating admin record')
-        return
+        console.log('⚠️ Direct admin insertion failed, trying server-side API...', adminError.message)
+        
+        try {
+          const response = await fetch('/api/admin/create-admin-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: authData.user.id,
+              email: registerData.email.toLowerCase().trim(),
+              name: registerData.fullName
+            })
+          })
+
+          const result = await response.json()
+
+          if (!response.ok) {
+            throw new Error(result.error || 'Server-side creation failed')
+          }
+
+          console.log('✅ Server-side admin user creation successful')
+        } catch (apiError) {
+          console.error('❌ Both direct and server-side admin creation failed:', apiError)
+          setError('Error creating admin record: ' + adminError.message)
+          return
+        }
+      } else {
+        console.log('✅ Direct admin user record creation successful')
       }
 
       console.log('✅ Admin registration successful!')
