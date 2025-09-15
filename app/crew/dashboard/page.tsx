@@ -95,6 +95,7 @@ export default function CrewDashboard() {
   const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
