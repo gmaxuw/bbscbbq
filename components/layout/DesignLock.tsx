@@ -24,6 +24,9 @@ interface DesignLockProps {
 
 export default function DesignLock({ pageName, allowedComponents = [] }: DesignLockProps) {
   useEffect(() => {
+    // Only run in browser environment
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+
     // Design compliance check on component mount
     validateDesignCompliance()
     

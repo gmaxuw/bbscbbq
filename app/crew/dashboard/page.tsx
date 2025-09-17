@@ -648,6 +648,9 @@ export default function CrewDashboard() {
   const showCrewOrderNotification = (order: any) => {
     console.log('🍖 Crew new order notification:', order)
     
+    // Only run in browser environment
+    if (typeof document === 'undefined') return
+    
     const notification = document.createElement('div')
     notification.className = 'fixed top-4 right-4 bg-orange-500 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm transform translate-x-full transition-transform duration-300'
     notification.innerHTML = `
@@ -685,6 +688,9 @@ export default function CrewDashboard() {
   // Show order status notification for crew
   const showCrewStatusNotification = (order: any) => {
     console.log('📝 Crew status notification:', order)
+    
+    // Only run in browser environment
+    if (typeof document === 'undefined') return
     
     let statusMessage = ''
     let statusIcon = '📝'
@@ -1624,9 +1630,11 @@ export default function CrewDashboard() {
                       onClick={() => {
                         setNewOrderNotification(null)
                         // Scroll to the order in the list
-                        const orderElement = document.getElementById(`order-${newOrderNotification.id}`)
-                        if (orderElement) {
-                          orderElement.scrollIntoView({ behavior: 'smooth' })
+                        if (typeof document !== 'undefined') {
+                          const orderElement = document.getElementById(`order-${newOrderNotification.id}`)
+                          if (orderElement) {
+                            orderElement.scrollIntoView({ behavior: 'smooth' })
+                          }
                         }
                       }}
                       className="flex-1 bbq-button-secondary"

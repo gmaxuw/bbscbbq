@@ -97,7 +97,11 @@ export default function CrewLogin() {
 
             if (!error && crewUser && crewUser.role === 'crew') {
               console.log('🚀 Crew verified, redirecting to dashboard')
-              window.location.href = '/crew/dashboard'
+              if (typeof window !== 'undefined') {
+                window.location.href = '/crew/dashboard'
+              } else {
+                router.push('/crew/dashboard')
+              }
               return
             } else {
               console.log('❌ Crew user not found or invalid role:', error?.message)
@@ -109,7 +113,11 @@ export default function CrewLogin() {
             // If query fails due to RLS, check if user exists in auth
             // and redirect anyway - let the dashboard handle the role check
             console.log('🚀 Redirecting to dashboard for auth verification')
-            window.location.href = '/crew/dashboard'
+            if (typeof window !== 'undefined') {
+              window.location.href = '/crew/dashboard'
+            } else {
+              router.push('/crew/dashboard')
+            }
             return
           }
         } else {
@@ -300,7 +308,11 @@ export default function CrewLogin() {
       const { data: { session: newSession } } = await supabase.auth.getSession()
       if (newSession) {
         console.log('✅ Session confirmed, redirecting to crew dashboard')
-        window.location.href = '/crew/dashboard'
+        if (typeof window !== 'undefined') {
+          window.location.href = '/crew/dashboard'
+        } else {
+          router.push('/crew/dashboard')
+        }
       } else {
         console.log('❌ Session not found after login')
         setError('Session error - please try again')
@@ -321,7 +333,7 @@ export default function CrewLogin() {
     try {
       // Use direct Supabase auth for password reset
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `${window.location.origin}/account/reset-password?crew=true&email=${encodeURIComponent(forgotPasswordEmail)}`
+        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/account/reset-password?crew=true&email=${encodeURIComponent(forgotPasswordEmail)}`
       })
 
       if (error) {
@@ -398,7 +410,7 @@ export default function CrewLogin() {
             full_name: registerData.fullName,
             role: 'crew'
           },
-          emailRedirectTo: `${window.location.origin}/crew/dashboard`
+          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/crew/dashboard`
         }
       })
 
@@ -435,40 +447,39 @@ export default function CrewLogin() {
       console.log('⏳ Waiting for auth user to be available in database...')
       await new Promise(resolve => setTimeout(resolve, 2000))
 
-      // Sign in the user first to establish authentication context
-      console.log('🔐 Signing in user to establish authentication context...')
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: registerData.email.toLowerCase().trim(),
-        password: registerData.password
-      })
-
-      if (signInError || !signInData.user) {
-        console.error('❌ Sign in after registration failed:', signInError)
-        setError('Account created but failed to establish session. Please try logging in manually.')
-        return
-      }
-
-      console.log('✅ User signed in successfully, creating admin_users record...')
-
-      // Create admin_users record with authenticated user
+      // Create admin_users record immediately after auth user creation
       console.log('👥 Creating admin_users record for:', {
-        user_id: signInData.user.id,
+        user_id: authData.user.id,
         email: registerData.email.toLowerCase().trim(),
         name: registerData.fullName,
         role: 'crew',
         branch_id: registerData.branchId
       })
+      
+      // DEBUG: Log the selected branch details
+      const selectedBranch = branches.find(b => b.id === registerData.branchId)
+      console.log('🔍 Selected branch details:', selectedBranch)
+      console.log('🔍 All available branches:', branches.map(b => ({ id: b.id, name: b.name })))
+      
+      // Validate branch selection
+      if (!selectedBranch) {
+        console.error('❌ Invalid branch selection!')
+        setError('Invalid branch selection. Please select a valid branch and try again.')
+        return
+      }
+      
+      console.log('✅ Branch validation passed:', selectedBranch.name)
 
       // Try direct insertion first
       const { error: adminError } = await supabase
         .from('admin_users')
         .insert([{
-          user_id: signInData.user.id,
+          user_id: authData.user.id,
           email: registerData.email.toLowerCase().trim(),
           name: registerData.fullName,
           role: 'crew',
           branch_id: registerData.branchId,
-          is_active: false // Pending admin approval
+          is_active: true // Active crew member
         }])
 
       // If direct insertion fails, try server-side API as fallback
@@ -482,7 +493,7 @@ export default function CrewLogin() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              user_id: signInData.user.id,
+              user_id: authData.user.id,
               email: registerData.email.toLowerCase().trim(),
               name: registerData.fullName,
               branch_id: registerData.branchId
@@ -510,10 +521,30 @@ export default function CrewLogin() {
           return
         }
       } else {
-        console.log('✅ Direct admin user record creation successful')
+        console.log('✅ Direct admin_users record creation successful')
       }
 
-      console.log('✅ Admin user record created successfully')
+      // Check if email confirmation is required
+      if (authData.user && !authData.user.email_confirmed_at) {
+        console.log('📧 Email confirmation required. Sending confirmation email...')
+        setError('✅ Registration successful! Please check your email and click the confirmation link to activate your account. Then you can login.')
+        return
+      }
+
+      // Sign in the user if email is already confirmed
+      console.log('🔐 Signing in user to establish authentication context...')
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: registerData.email.toLowerCase().trim(),
+        password: registerData.password
+      })
+
+      if (signInError || !signInData.user) {
+        console.error('❌ Sign in after registration failed:', signInError)
+        setError('Account created but failed to establish session. Please try logging in manually.')
+        return
+      }
+
+      console.log('✅ User signed in successfully!')
 
       console.log('✅ Crew registration successful!')
       setError('')

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         name,
         role: 'crew',
         branch_id,
-        is_active: false // Pending admin approval
+        is_active: true // Active crew member
       }])
       .select()
 

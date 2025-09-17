@@ -178,8 +178,21 @@ class InventoryManager {
     const screenshotUrl = orderData.payment_screenshot_url || null
 
     // Create order
-    const total_amount = orderData.items.reduce((sum, item) => sum + item.subtotal, 0)
+    const subtotal = orderData.items.reduce((sum, item) => sum + item.subtotal, 0)
     const total_commission = orderData.items.reduce((sum, item) => sum + (item.unit_commission * item.quantity), 0)
+    
+    // Get platform fee from settings
+    const { data: platformFeeData, error: platformFeeError } = await supabase
+      .from('platform_settings')
+      .select('setting_value')
+      .eq('setting_key', 'platform_fee')
+      .eq('is_active', true)
+      .single()
+    
+    const platform_fee = platformFeeError ? 15 : parseFloat(platformFeeData?.setting_value || '15')
+    
+    // Calculate total amount including platform fee
+    const total_amount = subtotal + platform_fee
 
     // Generate order number
     const order_number = `BBQ-${Date.now().toString().slice(-8)}-${Math.random().toString(36).substr(2, 3).toUpperCase()}`
@@ -193,7 +206,7 @@ class InventoryManager {
         customer_email: orderData.user_id ? (await supabase.auth.getUser()).data.user?.email : null,
         branch_id: orderData.branch_id,
         pickup_time: orderData.pickup_time || new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-        subtotal: total_amount,
+        subtotal: subtotal,
         total_amount: total_amount,
         total_commission: total_commission,
         order_status: 'pending',
@@ -246,11 +259,17 @@ class InventoryManager {
   }): Promise<{ success: boolean; order_id?: string }> {
     const orderId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
+    // Calculate offline order with platform fee
+    const subtotal = orderData.items.reduce((sum, item) => sum + item.subtotal, 0)
+    const total_commission = orderData.items.reduce((sum, item) => sum + (item.unit_commission * item.quantity), 0)
+    const platform_fee = 15 // Default platform fee for offline orders
+    const total_amount = subtotal + platform_fee
+
     const pendingOrder: PendingOrder = {
       id: orderId,
       items: orderData.items,
-      total_amount: orderData.items.reduce((sum, item) => sum + item.subtotal, 0),
-      total_commission: orderData.items.reduce((sum, item) => sum + (item.unit_commission * item.quantity), 0),
+      total_amount: total_amount,
+      total_commission: total_commission,
       customer_name: orderData.customer_name,
       customer_phone: orderData.customer_phone,
       timestamp: Date.now(),

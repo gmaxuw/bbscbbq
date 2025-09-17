@@ -480,15 +480,22 @@ export default function AdminAnalytics() {
 
       console.log('✅ Financial orders loaded:', orders?.length || 0)
 
-      // Calculate financial metrics - CORRECTED CALCULATIONS
+      // Calculate financial metrics - CORRECTED CALCULATIONS WITH PLATFORM FEES
       const totalAmount = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0 // What customers pay
       const totalCommission = orders?.reduce((sum, order) => sum + parseFloat(order.total_commission || '0'), 0) || 0
-      const totalPlatformFees = 0 // Platform fees not available in current schema
       const vendorPayments = orders?.reduce((sum, order) => sum + parseFloat(order.subtotal || '0'), 0) || 0 // What stalls earn
       
+      // Calculate platform fees: total_amount - subtotal - commission
+      const totalPlatformFees = orders?.reduce((sum, order) => {
+        const orderTotal = parseFloat(order.total_amount || '0')
+        const orderSubtotal = parseFloat(order.subtotal || '0')
+        const orderCommission = parseFloat(order.total_commission || '0')
+        return sum + (orderTotal - orderSubtotal - orderCommission)
+      }, 0) || 0
+      
       // CORRECTED CALCULATIONS:
-      const ourRevenue = totalCommission + totalPlatformFees // Our actual revenue
-      const grossRevenue = ourRevenue + vendorPayments // Total revenue = Our Revenue + Store Revenue
+      const ourRevenue = totalCommission + totalPlatformFees // Our actual revenue (commission + platform fees)
+      const grossRevenue = totalAmount // Total revenue = what customers actually paid
       const totalOrders = orders?.length || 0
       const averageOrderValue = totalOrders > 0 ? totalAmount / totalOrders : 0
 
