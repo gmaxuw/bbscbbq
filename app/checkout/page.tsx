@@ -363,6 +363,11 @@ export default function CheckoutPage() {
         return
       }
 
+      if (!customerData.branch_id) {
+        setErrors(['Please select a pickup location'])
+        return
+      }
+
       if (!paymentData.reference || !paymentData.screenshotUrl) {
         setErrors(['Please provide payment reference number and upload screenshot'])
         return
@@ -388,6 +393,14 @@ export default function CheckoutPage() {
         payment_screenshot_url: paymentData.screenshotUrl,
         user_id: isAuthenticated ? currentUser?.id : null
       }
+
+      // DEBUG: Log the order data being sent
+      console.log('🔍 Order data being sent:', {
+        branch_id: orderData.branch_id,
+        customer_name: orderData.name,
+        customer_phone: orderData.phone,
+        selected_branch: branches.find(b => b.id === orderData.branch_id)?.name || 'NOT FOUND'
+      })
 
       const result = await checkout(orderData)
       

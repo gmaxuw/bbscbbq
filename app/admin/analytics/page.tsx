@@ -46,12 +46,14 @@ interface DailyReport {
 
 interface FinancialAnalytics {
   total_revenue: number // OUR ACTUAL REVENUE (commission + platform fee)
-  total_commission: number
+  total_commission: number // Commission (₱)
   net_profit: number // Same as total_revenue
   average_order_value: number
   total_orders: number
-  gross_revenue: number // Total customer payments
-  vendor_payments: number // What goes to vendors
+  gross_revenue: number // Total revenue = Our Revenue + Store Revenue
+  store_revenue: number // Store Revenue (seller's base price × qty)
+  customer_payments: number // Customer Payments = Gross Revenue
+  platform_fees: number // Platform fees collected (₱)
 }
 
 interface TimeSeriesData {
@@ -72,6 +74,7 @@ interface BranchReport {
   total_revenue: number
   total_subtotal: number
   total_commission: number
+  total_platform_fees: number
   net_profit: number
   total_discount: number
   average_order_value: number
@@ -267,11 +270,25 @@ export default function AdminAnalytics() {
           order_status,
           branches!inner(name)
         `)
-        .eq('order_status', 'completed')
+        // Show all orders, not just completed ones
+        // .eq('order_status', 'completed')
         .gte('created_at', dateRange.start)
         .lte('created_at', dateRange.end)
 
       if (error) throw error
+
+      console.log('🏪 Branch Performance - Real data from Supabase:', {
+        totalOrders: orders?.length || 0,
+        dateRange: dateRange,
+        sampleOrders: orders?.slice(0, 3).map(order => ({
+          branch_id: order.branch_id,
+          branch_name: (order as any).branches?.name,
+          total_amount: order.total_amount,
+          total_commission: order.total_commission,
+          subtotal: order.subtotal,
+          order_status: order.order_status
+        }))
+      })
 
       // Group orders by branch - HISTORICAL DATA
       const branchData: { [key: string]: { 
@@ -281,6 +298,7 @@ export default function AdminAnalytics() {
         subtotal: number, 
         discount: number, 
         commission: number,
+        platform_fees: number,
       } } = {}
       
       orders?.forEach(order => {
@@ -295,6 +313,7 @@ export default function AdminAnalytics() {
             subtotal: 0, 
             discount: 0, 
             commission: 0,
+            platform_fees: 0,
           }
         }
         branchData[branchId].orders += 1
@@ -302,6 +321,12 @@ export default function AdminAnalytics() {
         branchData[branchId].subtotal += parseFloat(order.subtotal || '0') // Historical vendor payments
         branchData[branchId].discount += parseFloat(order.promo_discount || '0') // Historical discounts
         branchData[branchId].commission += parseFloat(order.total_commission || '0') // Historical commission
+        
+        // Calculate platform fee for this order: total_amount - subtotal
+        const orderTotal = parseFloat(order.total_amount || '0')
+        const orderSubtotal = parseFloat(order.subtotal || '0')
+        const orderPlatformFee = orderTotal - orderSubtotal
+        branchData[branchId].platform_fees += orderPlatformFee
       })
 
       // Convert to array format - HISTORICAL ACCURACY
@@ -313,10 +338,22 @@ export default function AdminAnalytics() {
         total_subtotal: data.subtotal,
         total_discount: data.discount,
         total_commission: data.commission,
-        net_profit: data.commission, // HISTORICAL Commission
+        total_platform_fees: data.platform_fees,
+        net_profit: data.commission + data.platform_fees, // Our Revenue = Commission + Platform Fee
         average_order_value: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
-        completion_rate: 100
+        completion_rate: 100 // All orders are considered "completed" for now
       }))
+
+      console.log('📊 Branch Performance - Calculated Results:', 
+        branchReports.map(report => ({
+          branch_name: report.branch_name,
+          total_orders: report.total_orders,
+          total_revenue: report.total_revenue,
+          total_commission: report.total_commission,
+          total_platform_fees: report.total_platform_fees,
+          net_profit: report.net_profit
+        }))
+      )
 
       setBranchReports(branchReports)
     } catch (error) {
@@ -465,11 +502,11 @@ export default function AdminAnalytics() {
       console.log('💰 Loading financial analytics...')
       console.log('📅 Date range:', dateRange)
       
-      // Get all completed orders in date range - USE STORED VALUES ONLY
+      // Get ALL orders in date range - USE STORED VALUES ONLY
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('total_amount, total_commission, subtotal, promo_discount, created_at')
-        .eq('order_status', 'completed')
+        .select('total_amount, total_commission, subtotal, promo_discount, created_at, order_status')
+        // Show all orders, not just completed ones
         .gte('created_at', dateRange.start)
         .lte('created_at', dateRange.end)
 
@@ -480,32 +517,36 @@ export default function AdminAnalytics() {
 
       console.log('✅ Financial orders loaded:', orders?.length || 0)
 
-      // Calculate financial metrics - CORRECTED CALCULATIONS WITH PLATFORM FEES
-      const totalAmount = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0 // What customers pay
-      const totalCommission = orders?.reduce((sum, order) => sum + parseFloat(order.total_commission || '0'), 0) || 0
-      const vendorPayments = orders?.reduce((sum, order) => sum + parseFloat(order.subtotal || '0'), 0) || 0 // What stalls earn
+      // Calculate financial metrics - MARKETPLACE BUSINESS MODEL
+      const totalAmount = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0) || 0 // Customer Payments
+      const totalCommission = orders?.reduce((sum, order) => sum + parseFloat(order.total_commission || '0'), 0) || 0 // Commission (₱)
+      const subtotal = orders?.reduce((sum, order) => sum + parseFloat(order.subtotal || '0'), 0) || 0 // Subtotal (includes commission)
       
-      // Calculate platform fees: total_amount - subtotal - commission
+      // Calculate platform fees: total_amount - subtotal
       const totalPlatformFees = orders?.reduce((sum, order) => {
         const orderTotal = parseFloat(order.total_amount || '0')
         const orderSubtotal = parseFloat(order.subtotal || '0')
-        const orderCommission = parseFloat(order.total_commission || '0')
-        return sum + (orderTotal - orderSubtotal - orderCommission)
+        return sum + (orderTotal - orderSubtotal)
       }, 0) || 0
       
-      // CORRECTED CALCULATIONS:
-      const ourRevenue = totalCommission + totalPlatformFees // Our actual revenue (commission + platform fees)
-      const grossRevenue = totalAmount // Total revenue = what customers actually paid
+      // Store Revenue = Subtotal - Commission (seller's base price × qty)
+      const storeRevenue = subtotal - totalCommission
+      
+      // MARKETPLACE BUSINESS MODEL CALCULATIONS:
+      const ourRevenue = totalCommission + totalPlatformFees // Our Revenue = Commission (₱) + Platform Fee (₱)
+      const grossRevenue = ourRevenue + storeRevenue // Gross Revenue = Our Revenue + Store Revenue
+      const customerPayments = totalAmount // Customer Payments = Gross Revenue (same amount)
       const totalOrders = orders?.length || 0
       const averageOrderValue = totalOrders > 0 ? totalAmount / totalOrders : 0
 
-      console.log('💰 Financial calculations:', {
-        totalAmount,
-        totalCommission,
-        totalPlatformFees,
-        vendorPayments,
+      console.log('💰 Financial calculations (Marketplace Model):', {
+        customerPayments,
         ourRevenue,
         grossRevenue,
+        storeRevenue,
+        totalCommission,
+        totalPlatformFees,
+        subtotal,
         totalOrders
       })
 
@@ -516,7 +557,9 @@ export default function AdminAnalytics() {
         average_order_value: averageOrderValue,
         total_orders: totalOrders,
         gross_revenue: grossRevenue, // Total revenue = Our Revenue + Store Revenue
-        vendor_payments: vendorPayments // What stalls earn
+        store_revenue: storeRevenue, // Store Revenue (seller's base price × qty)
+        customer_payments: customerPayments, // Customer Payments = Gross Revenue
+        platform_fees: totalPlatformFees // Platform fees collected
       })
 
       // Calculate real metrics for summary cards
@@ -771,16 +814,19 @@ export default function AdminAnalytics() {
           <div className="bbq-card p-4 sm:p-6 mb-6 sm:mb-8">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Financial Overview</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Our Revenue - Commission + Platform Fee */}
               <div className="bg-green-50 p-4 rounded-lg">
-            <div className="flex items-center">
+                <div className="flex items-center">
                   <span className="text-2xl">💰</span>
                   <div className="ml-3">
                     <p className="text-sm font-medium text-green-800">Our Revenue</p>
-                    <p className="text-2xl font-bold text-green-900">{formatCurrency(financialAnalytics.total_revenue)}</p>
-                    <p className="text-xs text-green-600">Commission + Platform Fee</p>
+                    <p className="text-2xl font-bold text-green-900">{formatCurrency(financialAnalytics.total_revenue || 0)}</p>
+                    <p className="text-xs text-green-600">Commission (₱) + Platform Fee (₱)</p>
+                  </div>
+                </div>
               </div>
-              </div>
-            </div>
+              
+              {/* Gross Revenue - Our Revenue + Store Revenue */}
               <div className="bg-orange-50 p-4 rounded-lg">
                 <div className="flex items-center">
                   <TrendingUp className="w-8 h-8 text-orange-600" />
@@ -788,25 +834,29 @@ export default function AdminAnalytics() {
                     <p className="text-sm font-medium text-orange-800">Gross Revenue</p>
                     <p className="text-2xl font-bold text-orange-900">{formatCurrency(financialAnalytics.gross_revenue || 0)}</p>
                     <p className="text-xs text-orange-600">Our Revenue + Store Revenue</p>
-          </div>
+                  </div>
                 </div>
               </div>
+              
+              {/* Store Revenue - Seller's base price × quantity */}
               <div className="bg-blue-50 p-4 rounded-lg">
                 <div className="flex items-center">
                   <BarChart3 className="w-8 h-8 text-blue-600" />
                   <div className="ml-3">
                     <p className="text-sm font-medium text-blue-800">Store Revenue</p>
-                    <p className="text-2xl font-bold text-blue-900">{formatCurrency(financialAnalytics.vendor_payments || 0)}</p>
-                    <p className="text-xs text-blue-600">What stalls earn</p>
+                    <p className="text-2xl font-bold text-blue-900">{formatCurrency(financialAnalytics.store_revenue || 0)}</p>
+                    <p className="text-xs text-blue-600">Seller's base price × qty</p>
                   </div>
                 </div>
               </div>
+              
+              {/* Customer Payments - Total amount customers pay */}
               <div className="bg-purple-50 p-4 rounded-lg">
                 <div className="flex items-center">
                   <PieChart className="w-8 h-8 text-purple-600" />
                   <div className="ml-3">
                     <p className="text-sm font-medium text-purple-800">Customer Payments</p>
-                    <p className="text-2xl font-bold text-purple-900">{formatCurrency(financialAnalytics.gross_revenue || 0)}</p>
+                    <p className="text-2xl font-bold text-purple-900">{formatCurrency(financialAnalytics.customer_payments || 0)}</p>
                     <p className="text-xs text-purple-600">Total amount customers pay</p>
                   </div>
                 </div>
@@ -1014,7 +1064,7 @@ export default function AdminAnalytics() {
               <div className="ml-3 sm:ml-4 min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Orders</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{financialAnalytics?.total_orders || 0}</p>
-                <p className="text-xs text-gray-400">Completed orders</p>
+                <p className="text-xs text-gray-400">All orders</p>
               </div>
             </div>
           </div>
@@ -1096,6 +1146,10 @@ export default function AdminAnalytics() {
                       <div className="text-sm font-medium text-gray-900">{formatCurrency(report.total_commission)}</div>
                     </div>
                     <div>
+                      <div className="text-sm text-gray-500">Platform Fee</div>
+                      <div className="text-sm font-medium text-gray-900">{formatCurrency(report.total_platform_fees)}</div>
+                    </div>
+                    <div>
                       <div className="text-sm text-gray-500">Avg Order</div>
                       <div className="text-sm font-medium text-gray-900">{formatCurrency(report.average_order_value)}</div>
                     </div>
@@ -1127,6 +1181,7 @@ export default function AdminAnalytics() {
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform Fee</th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Order</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion</th>
@@ -1146,6 +1201,9 @@ export default function AdminAnalytics() {
                     </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatCurrency(report.total_commission)}
+                      </td>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(report.total_platform_fees)}
                       </td>
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <span className="font-semibold text-emerald-600">

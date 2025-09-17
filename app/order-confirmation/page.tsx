@@ -19,66 +19,67 @@ function OrderConfirmationContent() {
 
   const fetchOrderDetails = async (orderId: string) => {
     try {
-      const response = await fetch(`/api/orders/${orderId}`)
-      if (response.ok) {
-        const orderData = await response.json()
-        setOrderDetails(orderData)
-      } else {
-        // Fallback: fetch directly from Supabase
-        const { createClient } = await import('@/lib/supabase')
-        const supabase = createClient()
+      // Fetch directly from Supabase (no API route needed)
+      const { createClient } = await import('@/lib/supabase')
+      const supabase = createClient()
+      
+      console.log('🔍 Fetching order details for:', orderId)
+      
+      const { data: order, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          customer_name,
+          customer_email,
+          customer_phone,
+          total_amount,
+          order_status,
+          payment_status,
+          created_at,
+          pickup_time,
+          branch_id,
+          branches(name, address, phone),
+          order_items(product_name, quantity, unit_price)
+        `)
+        .eq('id', orderId)
+        .single()
+
+      if (error) {
+        console.error('❌ Error fetching order:', error)
+        throw error
+      }
+
+      if (order) {
+        console.log('✅ Order details fetched:', order)
+        console.log('🏪 Branch data:', order.branches)
         
-        const { data: order, error } = await supabase
-          .from('orders')
-          .select(`
-            id,
-            order_number,
-            customer_name,
-            customer_email,
-            customer_phone,
-            total_amount,
-            order_status,
-            payment_status,
-            created_at,
-            pickup_time,
-            branch_id,
-            branches(name, address, phone),
-            order_items(product_name, quantity, unit_price)
-          `)
-          .eq('id', orderId)
-          .single()
-
-        if (error) {
-          console.error('Error fetching order:', error)
-          return
-        }
-
-        if (order) {
-          setOrderDetails({
-            id: order.id,
-            order_number: order.order_number,
-            customer_name: order.customer_name,
-            customer_email: order.customer_email,
-            customer_phone: order.customer_phone,
-            total_amount: parseFloat(order.total_amount),
-            order_status: order.order_status,
-            payment_status: order.payment_status,
-            created_at: order.created_at,
-            pickup_time: order.pickup_time,
-            branch_name: (order.branches as any)?.name || 'Unknown Branch',
-            branch_address: (order.branches as any)?.address || '',
-            branch_phone: (order.branches as any)?.phone || '',
-            estimated_ready_time: new Date(order.pickup_time),
-            items: order.order_items?.map((item: any) => ({
-              name: item.product_name,
-              quantity: item.quantity,
-              price: parseFloat(item.unit_price)
-            })) || []
-          })
-        }
+        setOrderDetails({
+          id: order.id,
+          order_number: order.order_number,
+          customer_name: order.customer_name,
+          customer_email: order.customer_email,
+          customer_phone: order.customer_phone,
+          total_amount: parseFloat(order.total_amount),
+          order_status: order.order_status,
+          payment_status: order.payment_status,
+          created_at: order.created_at,
+          pickup_time: order.pickup_time,
+          branch_name: (order.branches as any)?.name || 'Unknown Branch',
+          branch_address: (order.branches as any)?.address || '',
+          branch_phone: (order.branches as any)?.phone || '',
+          estimated_ready_time: new Date(order.pickup_time),
+          items: order.order_items?.map((item: any) => ({
+            name: item.product_name,
+            quantity: item.quantity,
+            price: parseFloat(item.unit_price)
+          })) || []
+        })
+      } else {
+        console.error('❌ No order found with ID:', orderId)
       }
     } catch (error) {
-      console.error('Error fetching order details:', error)
+      console.error('❌ Error fetching order details:', error)
     } finally {
       setIsLoading(false)
     }
@@ -166,8 +167,17 @@ function OrderConfirmationContent() {
               <MapPin className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600">Pickup Location</p>
-                <p className="font-medium text-gray-900">Main Branch - Downtown</p>
-                <p className="text-sm text-gray-600">123 Main Street, Surigao City</p>
+                <p className="font-medium text-gray-900">
+                  {orderDetails?.branch_name || 'Loading...'}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {orderDetails?.branch_address || 'Loading...'}
+                </p>
+                {orderDetails?.branch_phone && (
+                  <p className="text-sm text-gray-500">
+                    📞 {orderDetails.branch_phone}
+                  </p>
+                )}
               </div>
             </div>
           </div>
