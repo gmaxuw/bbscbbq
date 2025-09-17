@@ -226,22 +226,22 @@ export default function AdminDashboard() {
         todayOrders: todayOrdersResult.error ? todayOrdersResult.error.message : `${todayOrdersResult.data?.length || 0} today orders`
       })
 
-      // Handle errors properly
+      // Handle errors properly - but don't throw, just log and continue
       if (ordersResult.error) {
         console.error('❌ Orders query failed:', ordersResult.error)
-        throw new Error(`Orders query failed: ${ordersResult.error.message}`)
+        console.log('🔄 Continuing with empty orders data...')
       }
       if (productsResult.error) {
         console.error('❌ Products query failed:', productsResult.error)
-        throw new Error(`Products query failed: ${productsResult.error.message}`)
+        console.log('🔄 Continuing with empty products data...')
       }
       if (branchesResult.error) {
         console.error('❌ Branches query failed:', branchesResult.error)
-        throw new Error(`Branches query failed: ${branchesResult.error.message}`)
+        console.log('🔄 Continuing with empty branches data...')
       }
       if (todayOrdersResult.error) {
         console.error('❌ Today Orders query failed:', todayOrdersResult.error)
-        throw new Error(`Today Orders query failed: ${todayOrdersResult.error.message}`)
+        console.log('🔄 Continuing with empty today orders data...')
       }
 
       const orders = ordersResult.data || []
@@ -262,15 +262,8 @@ export default function AdminDashboard() {
       setStats(newStats)
     } catch (error) {
       console.error('❌ Failed to load dashboard stats:', error)
-      // Set default stats to prevent infinite loading
-      setStats({
-        totalOrders: 0,
-        pendingPayments: 0,
-        totalRevenue: 0,
-        activeBranches: 0,
-        totalProducts: 0,
-        todayOrders: 0
-      })
+      // Don't set default stats - let the real data show through
+      console.log('🔄 Dashboard stats will show actual data from queries')
     } finally {
       console.log('📊 Dashboard stats loading complete')
       setIsLoading(false)

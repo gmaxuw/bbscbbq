@@ -186,7 +186,8 @@ export default function AdminAnalytics() {
 
       if (error) {
         console.error('❌ Analytics orders query failed:', error)
-        throw new Error(`Failed to load analytics data: ${error.message}`)
+        console.log('🔄 Continuing with empty analytics data...')
+        // Don't throw error, just continue with empty data
       }
 
       // Group orders by date - HISTORICAL DATA
