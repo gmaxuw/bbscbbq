@@ -443,19 +443,6 @@ export default function CrewLogin() {
 
       console.log('✅ Auth user created successfully:', authData.user.id)
 
-      // Wait a moment for the auth user to be fully created in the database
-      console.log('⏳ Waiting for auth user to be available in database...')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      // Create admin_users record immediately after auth user creation
-      console.log('👥 Creating admin_users record for:', {
-        user_id: authData.user.id,
-        email: registerData.email.toLowerCase().trim(),
-        name: registerData.fullName,
-        role: 'crew',
-        branch_id: registerData.branchId
-      })
-      
       // DEBUG: Log the selected branch details
       const selectedBranch = branches.find(b => b.id === registerData.branchId)
       console.log('🔍 Selected branch details:', selectedBranch)
@@ -469,6 +456,15 @@ export default function CrewLogin() {
       }
       
       console.log('✅ Branch validation passed:', selectedBranch.name)
+
+      // Create admin_users record immediately after auth signup (before email confirmation check)
+      console.log('👥 Creating admin_users record for:', {
+        user_id: authData.user.id,
+        email: registerData.email.toLowerCase().trim(),
+        name: registerData.fullName,
+        role: 'crew',
+        branch_id: registerData.branchId
+      })
 
       // Try direct insertion first
       const { error: adminError } = await supabase
@@ -525,40 +521,55 @@ export default function CrewLogin() {
       }
 
       // Check if email confirmation is required
-      if (authData.user && !authData.user.email_confirmed_at) {
-        console.log('📧 Email confirmation required. Sending confirmation email...')
-        setError('✅ Registration successful! Please check your email and click the confirmation link to activate your account. Then you can login.')
+      if (!authData.user.email_confirmed_at) {
+        console.log('📧 Email confirmation required')
+        setError('Registration successful! Please check your email and click the confirmation link to activate your crew account.')
+        
+        // Reset form and show login
+        setRegisterData({
+          fullName: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          branchId: ''
+        })
+        setShowRegisterForm(false)
         return
       }
 
-      // Sign in the user if email is already confirmed
-      console.log('🔐 Signing in user to establish authentication context...')
+      // If email is already confirmed, sign in to complete the flow
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: registerData.email.toLowerCase().trim(),
         password: registerData.password
       })
 
       if (signInError || !signInData.user) {
-        console.error('❌ Sign in after registration failed:', signInError)
-        setError('Account created but failed to establish session. Please try logging in manually.')
+        console.error('❌ Failed to sign in after registration:', signInError)
+        setError('Account created! Please sign in manually after confirming your email.')
+        
+        // Reset form and show login
+        setRegisterData({
+          fullName: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          branchId: ''
+        })
+        setShowRegisterForm(false)
         return
       }
 
-      console.log('✅ User signed in successfully!')
-
+      console.log('✅ User signed in after registration')
       console.log('✅ Crew registration successful!')
-      setError('')
-      alert('✅ Crew account created successfully!\n\n📧 Please check your email to verify your account.\n🚀 After verification, you will be redirected to the crew dashboard.\n⏳ Your application is pending admin approval.')
       
-      // Reset form and show login
-      setRegisterData({
-        fullName: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        branchId: ''
-      })
-      setShowRegisterForm(false)
+      // Wait for session to fully hydrate, then redirect
+      console.log('⏳ Waiting for session hydration...')
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Redirect to crew dashboard
+      if (typeof window !== 'undefined') {
+        window.location.href = '/crew/dashboard'
+      }
 
     } catch (error) {
       console.error('Registration error:', error)

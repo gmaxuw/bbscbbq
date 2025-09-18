@@ -259,7 +259,7 @@ export default function AdminLoginPage() {
 
       console.log('✅ Admin account created successfully!')
 
-      // Create admin_users record immediately after auth signup
+      // Create admin_users record immediately after auth signup (before email confirmation check)
       console.log('📝 Creating admin record in admin_users table...')
       const { error: adminError } = await supabase
         .from('admin_users')
@@ -320,7 +320,7 @@ export default function AdminLoginPage() {
         return
       }
 
-      // If email is already confirmed, try to sign in
+      // If email is already confirmed, sign in to complete the flow
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: registerData.email.toLowerCase().trim(),
         password: registerData.password
