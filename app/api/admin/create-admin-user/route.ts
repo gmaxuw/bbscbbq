@@ -1,5 +1,5 @@
+import { createClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,10 +12,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createServerClient()
+    // Create Supabase client with service role
+    const supabase = createClient()
 
-    // Insert admin user using service role (bypasses RLS)
-    const { data, error } = await supabase
+    // Insert admin user record
+    const { error } = await supabase
       .from('admin_users')
       .insert([{
         user_id,
@@ -24,17 +25,16 @@ export async function POST(request: NextRequest) {
         role: 'admin',
         is_active: true
       }])
-      .select()
 
     if (error) {
       console.error('Admin user creation error:', error)
       return NextResponse.json(
         { error: error.message },
-        { status: 400 }
+        { status: 500 }
       )
     }
 
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Admin user creation error:', error)
     return NextResponse.json(

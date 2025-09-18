@@ -257,7 +257,25 @@ export default function AdminLoginPage() {
         return
       }
 
-      // Sign in the user first to get proper authentication context
+      console.log('✅ Admin account created successfully!')
+
+      // Check if email confirmation is required
+      if (!authData.user.email_confirmed_at) {
+        console.log('📧 Email confirmation required')
+        setError('Registration successful! Please check your email and click the confirmation link to activate your admin account.')
+        
+        // Reset form and show login
+        setRegisterData({
+          fullName: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        })
+        setShowRegisterForm(false)
+        return
+      }
+
+      // If email is already confirmed, try to sign in
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: registerData.email.toLowerCase().trim(),
         password: registerData.password
@@ -265,7 +283,16 @@ export default function AdminLoginPage() {
 
       if (signInError || !signInData.user) {
         console.error('❌ Failed to sign in after registration:', signInError)
-        setError('Account created but failed to sign in. Please try logging in manually.')
+        setError('Account created! Please sign in manually after confirming your email.')
+        
+        // Reset form and show login
+        setRegisterData({
+          fullName: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        })
+        setShowRegisterForm(false)
         return
       }
 
@@ -330,7 +357,7 @@ export default function AdminLoginPage() {
         window.location.href = `${window.location.origin}/admin`
       } else {
         console.log('❌ Session not found after registration')
-        alert('Admin account created! Please sign in manually.')
+        setError('Admin account created! Please sign in manually.')
         
         // Reset form and show login
         setRegisterData({
@@ -602,9 +629,6 @@ export default function AdminLoginPage() {
                 )}
               </button>
 
-              <p className="text-xs text-gray-500 text-center mt-4">
-                ⚠️ Temporary: This will be removed once proper admin management is set up
-              </p>
             </div>
           </form>
         ) : (
@@ -651,15 +675,10 @@ export default function AdminLoginPage() {
         {/* Additional Info */}
         <div className="text-center mt-8">
           <p className="text-sm text-gray-600">
-            {showRegisterForm ? (
-              <>⚠️ Temporary admin registration - will be removed later</>
-            ) : (
-              <>Admin access only. Need help?{' '}
-                <Link href="/contact" className="text-lays-dark-red hover:underline">
-                  Contact Support
-                </Link>
-              </>
-            )}
+            Admin access only. Need help?{' '}
+            <Link href="/contact" className="text-lays-dark-red hover:underline">
+              Contact Support
+            </Link>
           </p>
         </div>
       </div>
