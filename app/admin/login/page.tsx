@@ -259,46 +259,8 @@ export default function AdminLoginPage() {
 
       console.log('✅ Admin account created successfully!')
 
-      // Check if email confirmation is required
-      if (!authData.user.email_confirmed_at) {
-        console.log('📧 Email confirmation required')
-        setError('Registration successful! Please check your email and click the confirmation link to activate your admin account.')
-        
-        // Reset form and show login
-        setRegisterData({
-          fullName: '',
-          email: '',
-          password: '',
-          confirmPassword: ''
-        })
-        setShowRegisterForm(false)
-        return
-      }
-
-      // If email is already confirmed, try to sign in
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: registerData.email.toLowerCase().trim(),
-        password: registerData.password
-      })
-
-      if (signInError || !signInData.user) {
-        console.error('❌ Failed to sign in after registration:', signInError)
-        setError('Account created! Please sign in manually after confirming your email.')
-        
-        // Reset form and show login
-        setRegisterData({
-          fullName: '',
-          email: '',
-          password: '',
-          confirmPassword: ''
-        })
-        setShowRegisterForm(false)
-        return
-      }
-
-      console.log('✅ User signed in after registration')
-
-      // Now create admin_users record with authenticated user
+      // Create admin_users record immediately after auth signup
+      console.log('📝 Creating admin record in admin_users table...')
       const { error: adminError } = await supabase
         .from('admin_users')
         .insert([{
@@ -341,6 +303,45 @@ export default function AdminLoginPage() {
       } else {
         console.log('✅ Direct admin user record creation successful')
       }
+
+      // Check if email confirmation is required
+      if (!authData.user.email_confirmed_at) {
+        console.log('📧 Email confirmation required')
+        setError('Registration successful! Please check your email and click the confirmation link to activate your admin account.')
+        
+        // Reset form and show login
+        setRegisterData({
+          fullName: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        })
+        setShowRegisterForm(false)
+        return
+      }
+
+      // If email is already confirmed, try to sign in
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: registerData.email.toLowerCase().trim(),
+        password: registerData.password
+      })
+
+      if (signInError || !signInData.user) {
+        console.error('❌ Failed to sign in after registration:', signInError)
+        setError('Account created! Please sign in manually after confirming your email.')
+        
+        // Reset form and show login
+        setRegisterData({
+          fullName: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        })
+        setShowRegisterForm(false)
+        return
+      }
+
+      console.log('✅ User signed in after registration')
 
       console.log('✅ Admin registration successful!')
       
