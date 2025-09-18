@@ -287,7 +287,7 @@ export default function AccountPage() {
         return
       }
       
-      // Get customer data from auth.users with role metadata
+      // Get customer data from auth.users
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
@@ -295,19 +295,32 @@ export default function AccountPage() {
         return
       }
       
-      // Check if user has customer role
-      const userRole = user.user_metadata?.role
-      if (userRole === 'admin') {
-        // Redirect admin users to admin dashboard
-        window.location.href = '/admin'
-        return
-      } else if (userRole === 'crew') {
-        // Redirect crew users to crew dashboard
-        window.location.href = '/crew/dashboard'
-        return
-      } else if (userRole !== 'customer') {
-        alert('This account is not a customer account.')
-        return
+      // Check customer record in users table
+      const { data: customerRecord, error: customerError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('role', 'customer')
+        .eq('is_active', true)
+        .single()
+
+      if (customerError || !customerRecord) {
+        // Fallback to metadata check for backward compatibility
+        const userRole = user.user_metadata?.role
+        if (userRole === 'admin') {
+          // Redirect admin users to admin dashboard
+          window.location.href = '/admin'
+          return
+        } else if (userRole === 'crew') {
+          // Redirect crew users to crew dashboard
+          window.location.href = '/crew/dashboard'
+          return
+        } else if (userRole !== 'customer') {
+          alert('This account is not a customer account.')
+          return
+        }
+      } else {
+        console.log('✅ Customer record found in users table:', customerRecord)
       }
       
       console.log('Customer login successful:', user)
@@ -380,6 +393,27 @@ export default function AccountPage() {
       }
       
       console.log('Customer account created successfully:', authData.user)
+      
+      // Create customer record in users table
+      console.log('📝 Creating customer record in users table...')
+      const { error: userError } = await supabase
+        .from('users')
+        .insert([{
+          user_id: authData.user.id,
+          email: registerData.email.toLowerCase().trim(),
+          full_name: registerData.fullName,
+          phone: registerData.phone,
+          role: 'customer',
+          is_active: true
+        }])
+
+      if (userError) {
+        console.error('❌ Error creating customer record in users table:', userError)
+        // Don't fail registration if users table insert fails, but log it
+        console.warn('⚠️ Customer auth created but users table insert failed')
+      } else {
+        console.log('✅ Customer record created in users table successfully')
+      }
       
       // Check if email confirmation is required
       if (authData.user && !authData.user.email_confirmed_at) {
