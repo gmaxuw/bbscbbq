@@ -12,6 +12,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid email format' },
+        { status: 400 }
+      )
+    }
+
     // Get Supabase project URL and service key
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://prqfpxrtopguvelmflhk.supabase.co'
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY
@@ -39,21 +48,41 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Supabase password reset error:', error)
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 400 }
-      )
+      
+      // Handle specific error types
+      if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
+        return NextResponse.json(
+          { success: false, error: 'Too many password reset requests. Please wait 5 minutes before trying again.' },
+          { status: 429 }
+        )
+      } else if (error.message.includes('Invalid email')) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid email address' },
+          { status: 400 }
+        )
+      } else if (error.message.includes('User not found')) {
+        return NextResponse.json(
+          { success: false, error: 'No account found with this email address' },
+          { status: 404 }
+        )
+      } else {
+        return NextResponse.json(
+          { success: false, error: error.message },
+          { status: 400 }
+        )
+      }
     }
 
+    console.log('✅ Password reset email sent successfully to:', email)
     return NextResponse.json(
-      { success: true, message: 'Password reset email sent' },
+      { success: true, message: 'Password reset email sent successfully' },
       { status: 200 }
     )
     
   } catch (error) {
     console.error('API route error:', error)
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: 'Internal server error. Please try again later.' },
       { status: 500 }
     )
   }

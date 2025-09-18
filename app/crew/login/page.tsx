@@ -330,6 +330,19 @@ export default function CrewLogin() {
     e.preventDefault()
     setIsResettingPassword(true)
 
+    // Rate limiting: Check if user has requested reset recently
+    const lastResetKey = `crew_password_reset_${forgotPasswordEmail}`
+    const lastResetTime = localStorage.getItem(lastResetKey)
+    const now = Date.now()
+    const cooldownPeriod = 60000 // 1 minute cooldown
+
+    if (lastResetTime && (now - parseInt(lastResetTime)) < cooldownPeriod) {
+      const remainingTime = Math.ceil((cooldownPeriod - (now - parseInt(lastResetTime))) / 1000)
+      setError(`Please wait ${remainingTime} seconds before requesting another password reset.`)
+      setIsResettingPassword(false)
+      return
+    }
+
     try {
       // Use direct Supabase auth for password reset
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
@@ -338,17 +351,31 @@ export default function CrewLogin() {
 
       if (error) {
         console.error('Password reset error:', error)
-        setError(`Error sending reset email: ${error.message || 'Please try again.'}`)
+        
+        // Handle specific error types
+        if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
+          setError('Too many password reset requests. Please wait 5 minutes before trying again.')
+          // Set a longer cooldown for rate limit errors
+          localStorage.setItem(lastResetKey, (now + 300000).toString()) // 5 minutes
+        } else if (error.message.includes('Invalid email')) {
+          setError('Invalid email address. Please check and try again.')
+        } else if (error.message.includes('User not found')) {
+          setError('No account found with this email address.')
+        } else {
+          setError(`Error sending reset email: ${error.message || 'Please try again.'}`)
+        }
         return
       }
 
-      alert('Password reset link sent to your email!')
+      // Success - set cooldown and show success message
+      localStorage.setItem(lastResetKey, now.toString())
+      alert('Password reset link sent to your email! Check your inbox and spam folder.')
       setShowForgotPassword(false)
       setForgotPasswordEmail('')
 
     } catch (error) {
       console.error('Password reset error:', error)
-      setError('Error sending reset email')
+      setError('Error sending reset email. Please try again later.')
     } finally {
       setIsResettingPassword(false)
     }

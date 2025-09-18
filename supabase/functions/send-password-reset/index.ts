@@ -23,6 +23,21 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid email format' 
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -39,16 +54,53 @@ Deno.serve(async (req: Request) => {
 
     if (error) {
       console.error('❌ Password reset error:', error);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: error.message 
-        }),
-        {
-          headers: { 'Content-Type': 'application/json' },
-          status: 400
-        }
-      );
+      
+      // Handle specific error types
+      if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Too many password reset requests. Please wait 5 minutes before trying again.' 
+          }),
+          {
+            headers: { 'Content-Type': 'application/json' },
+            status: 429
+          }
+        );
+      } else if (error.message.includes('Invalid email')) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Invalid email address' 
+          }),
+          {
+            headers: { 'Content-Type': 'application/json' },
+            status: 400
+          }
+        );
+      } else if (error.message.includes('User not found')) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'No account found with this email address' 
+          }),
+          {
+            headers: { 'Content-Type': 'application/json' },
+            status: 404
+          }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: error.message 
+          }),
+          {
+            headers: { 'Content-Type': 'application/json' },
+            status: 400
+          }
+        );
+      }
     }
 
     console.log('✅ Password reset link generated for:', email);
