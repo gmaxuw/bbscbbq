@@ -297,7 +297,15 @@ export default function AccountPage() {
       
       // Check if user has customer role
       const userRole = user.user_metadata?.role
-      if (userRole !== 'customer') {
+      if (userRole === 'admin') {
+        // Redirect admin users to admin dashboard
+        window.location.href = '/admin'
+        return
+      } else if (userRole === 'crew') {
+        // Redirect crew users to crew dashboard
+        window.location.href = '/crew/dashboard'
+        return
+      } else if (userRole !== 'customer') {
         alert('This account is not a customer account.')
         return
       }

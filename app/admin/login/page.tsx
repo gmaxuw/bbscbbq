@@ -198,7 +198,7 @@ export default function AdminLoginPage() {
     try {
       // Use direct Supabase auth for password reset
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `${window.location.origin}/account/reset-password?admin=true&email=${encodeURIComponent(forgotPasswordEmail)}`
+        redirectTo: `${window.location.origin}/admin/reset-password?email=${encodeURIComponent(forgotPasswordEmail)}`
       })
 
       if (error) {
