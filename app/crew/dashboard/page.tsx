@@ -367,6 +367,25 @@ export default function CrewDashboard() {
       }
 
       console.log('🔍 Fetching branch data for branch_id:', crewUser.branch_id)
+      
+      // First test: Can we access branches table at all?
+      console.log('🧪 Testing basic branches access...')
+      const { data: allBranches, error: allBranchesError } = await supabase
+        .from('branches')
+        .select('id, name, is_active')
+        .limit(5)
+      
+      console.log('All branches query result:', { allBranches, allBranchesError })
+      
+      if (allBranchesError) {
+        console.error('❌ Cannot access branches table at all:', allBranchesError)
+        console.log('This suggests an RLS policy issue')
+        await supabase.auth.signOut()
+        router.push('/crew/login')
+        return
+      }
+      
+      // Second test: Try to get the specific branch
       const { data: branchData, error: branchError } = await supabase
         .from('branches')
         .select('name')
@@ -374,21 +393,30 @@ export default function CrewDashboard() {
         .single()
 
       if (branchError || !branchData) {
-        console.error('❌ Error fetching branch:', branchError)
+        console.error('❌ Error fetching specific branch:', branchError)
         console.log('Branch error details:', branchError?.message, branchError?.code)
+        console.log('Available branches:', allBranches)
         
-        // Try to get any branch data to test RLS
-        console.log('🧪 Testing branches table access...')
-        const { data: testBranches, error: testError } = await supabase
-          .from('branches')
-          .select('id, name, is_active')
-          .limit(1)
-        
-        console.log('Test branches query result:', { testBranches, testError })
-        
-        await supabase.auth.signOut()
-        router.push('/crew/login')
-        return
+        // Try to find the branch in the available branches
+        const foundBranch = allBranches?.find(b => b.id === crewUser.branch_id)
+        if (foundBranch) {
+          console.log('✅ Found branch in available branches:', foundBranch)
+          // Use the found branch data
+          const crewData = {
+            id: user.id,
+            full_name: crewUser.name || user.email?.split('@')[0] || 'Crew Member',
+            branch_id: crewUser.branch_id,
+            branch_name: foundBranch.name
+          }
+          setCrewMember(crewData)
+          setAuthChecked(true)
+          return
+        } else {
+          console.log('❌ Branch not found in available branches')
+          await supabase.auth.signOut()
+          router.push('/crew/login')
+          return
+        }
       }
 
       console.log('✅ Branch found:', branchData.name)
