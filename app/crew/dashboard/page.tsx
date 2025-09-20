@@ -93,7 +93,7 @@ export default function CrewDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderModal, setShowOrderModal] = useState(false)
   const [historyDateFilter, setHistoryDateFilter] = useState('today')
-  // realtimeSubscription removed - using unified system
+  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -120,15 +120,68 @@ export default function CrewDashboard() {
     if (crewMember && crewMember.branch_id) {
       console.log('Crew member loaded, setting up orders and realtime')
       loadOrders()
-      // Data refresh handled by unified system
+      setupRealtimeSubscription()
       
       return () => {
-        // Cleanup handled by unified system
+        // Clean up real-time subscription
+        if (realtimeSubscription) {
+          console.log('🔄 Cleaning up real-time subscription')
+          supabase.removeChannel(realtimeSubscription)
+        }
       }
     }
   }, [crewMember])
 
-  // Realtime cleanup handled by unified system
+  // Setup real-time subscription for orders
+  const setupRealtimeSubscription = () => {
+    if (!crewMember?.branch_id) return
+
+    console.log('🔄 Setting up real-time subscription for orders...')
+    
+    // Clean up existing subscription
+    if (realtimeSubscription) {
+      console.log('🔄 Cleaning up existing subscription')
+      supabase.removeChannel(realtimeSubscription)
+    }
+
+    // Create new subscription
+    const channel = supabase
+      .channel('crew-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `branch_id=eq.${crewMember.branch_id}`
+        },
+        (payload) => {
+          console.log('📦 Real-time order update:', payload)
+          // Reload orders when there's a change
+          loadOrders()
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Real-time subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Real-time orders subscription active')
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Real-time subscription error')
+        }
+      })
+
+    setRealtimeSubscription(channel)
+  }
+
+  // Cleanup real-time subscription on unmount
+  useEffect(() => {
+    return () => {
+      if (realtimeSubscription) {
+        console.log('🔄 Component unmounting, cleaning up real-time subscription')
+        supabase.removeChannel(realtimeSubscription)
+      }
+    }
+  }, [realtimeSubscription])
 
   useEffect(() => {
     filterOrders()
