@@ -89,6 +89,7 @@ export default function OrderManagement() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [paymentFilter, setPaymentFilter] = useState('all')
   const [user, setUser] = useState<any>(null)
+  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -99,8 +100,65 @@ export default function OrderManagement() {
   useEffect(() => {
     if (user) {
       loadOrders()
+      setupRealtimeSubscription()
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (realtimeSubscription) {
+        supabase.removeChannel(realtimeSubscription)
+      }
     }
   }, [user])
+
+  // Set up real-time subscription for admin orders
+  const setupRealtimeSubscription = () => {
+    try {
+      console.log('🔄 Setting up admin real-time subscription...')
+
+      const subscription = supabase
+        .channel('admin_orders_changes')
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'orders'
+          },
+          (payload) => {
+            console.log('🔄 Admin order change detected:', payload.eventType, payload.new)
+            
+            // Refresh orders data for all changes
+            console.log('📊 Admin order update detected, refreshing data...')
+            loadOrders()
+          }
+        )
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'order_items'
+          },
+          (payload) => {
+            console.log('🔄 Admin order items change detected:', payload.eventType)
+            // Reload orders when order items change
+            loadOrders()
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Admin real-time subscription status:', status)
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Admin real-time subscription active')
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Admin real-time subscription error')
+          }
+        })
+
+      setRealtimeSubscription(subscription)
+      return subscription
+    } catch (error) {
+      console.error('Failed to setup admin real-time subscription:', error)
+    }
+  }
 
   useEffect(() => {
     filterOrders()

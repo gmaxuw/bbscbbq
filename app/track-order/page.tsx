@@ -44,6 +44,7 @@ export default function TrackOrderPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
 
   const supabase = createClient()
 
@@ -54,8 +55,54 @@ export default function TrackOrderPage() {
     if (orderNum) {
       setOrderNumber(orderNum)
       loadOrder(orderNum)
+      setupRealtimeSubscription(orderNum)
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (realtimeSubscription) {
+        supabase.removeChannel(realtimeSubscription)
+      }
     }
   }, [])
+
+  // Set up real-time subscription for order tracking
+  const setupRealtimeSubscription = (orderNum: string) => {
+    try {
+      console.log('🔄 Setting up track-order real-time subscription for:', orderNum)
+
+      const subscription = supabase
+        .channel('track_order_changes')
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'orders',
+            filter: `order_number=eq.${orderNum}`
+          },
+          (payload) => {
+            console.log('🔄 Track order change detected:', payload.eventType, payload.new)
+            
+            // Refresh order data
+            console.log('📱 Track order update detected, refreshing data...')
+            loadOrder(orderNum)
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Track order real-time subscription status:', status)
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Track order real-time subscription active')
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Track order real-time subscription error')
+          }
+        })
+
+      setRealtimeSubscription(subscription)
+      return subscription
+    } catch (error) {
+      console.error('Failed to setup track order real-time subscription:', error)
+    }
+  }
 
   const loadOrder = async (orderNum: string) => {
     try {

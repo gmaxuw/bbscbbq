@@ -58,22 +58,76 @@ export default function CustomerOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
+  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
 
   const supabase = createClient()
 
   useEffect(() => {
     loadOrders()
+    setupRealtimeSubscription()
     
-    // Remove auto-refresh to prevent annoying UX
-    // Users can manually refresh if needed
-    // const refreshInterval = setInterval(() => {
-    //   loadOrders()
-    // }, 30000) // Refresh every 30 seconds
-
-    // return () => {
-    //   clearInterval(refreshInterval)
-    // }
+    // Cleanup on unmount
+    return () => {
+      if (realtimeSubscription) {
+        supabase.removeChannel(realtimeSubscription)
+      }
+    }
   }, [])
+
+  // Set up real-time subscription for customer orders
+  const setupRealtimeSubscription = () => {
+    try {
+      console.log('🔄 Setting up customer real-time subscription...')
+
+      const subscription = supabase
+        .channel('customer_orders_changes')
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'orders'
+          },
+          async (payload) => {
+            console.log('🔄 Customer order change detected:', payload.eventType, payload.new)
+            
+            // Get current user's email and phone for filtering
+            const userEmail = localStorage.getItem('customer_email') || 'demo@example.com'
+            const userPhone = localStorage.getItem('customer_phone') || ''
+            
+            // Check if this order belongs to the current customer
+            const order = payload.new || payload.old
+            const isCustomerOrder = order && (
+              order.customer_email === userEmail || 
+              order.customer_phone === userPhone
+            )
+            
+            if (isCustomerOrder) {
+              console.log('📱 Customer order update detected, refreshing data...')
+              // Refresh orders data
+              loadOrders()
+              
+              // Show notification for status updates
+              if (payload.eventType === 'UPDATE' && payload.new) {
+                showOrderStatusNotification(payload.new)
+              }
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Customer real-time subscription status:', status)
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Customer real-time subscription active')
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Customer real-time subscription error')
+          }
+        })
+
+      setRealtimeSubscription(subscription)
+      return subscription
+    } catch (error) {
+      console.error('Failed to setup customer real-time subscription:', error)
+    }
+  }
 
   const loadOrders = async (isManualRefresh = false) => {
     try {
