@@ -97,8 +97,8 @@ export default function CustomerOrdersPage() {
             // Check if this order belongs to the current customer
             const order = payload.new || payload.old
             const isCustomerOrder = order && (
-              order.customer_email === userEmail || 
-              order.customer_phone === userPhone
+              (order as any).customer_email === userEmail || 
+              (order as any).customer_phone === userPhone
             )
             
             if (isCustomerOrder) {
