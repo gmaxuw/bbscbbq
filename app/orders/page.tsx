@@ -66,6 +66,9 @@ export default function CustomerOrdersPage() {
     loadOrders()
     setupRealtimeSubscription()
     
+    // Test Supabase connection
+    testSupabaseConnection()
+    
     // Cleanup on unmount
     return () => {
       if (realtimeSubscription) {
@@ -74,10 +77,36 @@ export default function CustomerOrdersPage() {
     }
   }, [])
 
+  // Test Supabase connection and real-time capabilities
+  const testSupabaseConnection = async () => {
+    try {
+      console.log('🧪 Testing Supabase connection...')
+      
+      // Test basic connection
+      const { data: { user } } = await supabase.auth.getUser()
+      console.log('🔍 Supabase auth user:', user)
+      
+      // Test real-time connection
+      const testChannel = supabase.channel('test_connection')
+      testChannel.subscribe((status) => {
+        console.log('🧪 Test channel status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Supabase real-time connection working')
+          supabase.removeChannel(testChannel)
+        }
+      })
+      
+    } catch (error) {
+      console.error('❌ Supabase connection test failed:', error)
+    }
+  }
+
   // Set up real-time subscription for customer orders
   const setupRealtimeSubscription = () => {
     try {
       console.log('🔄 Setting up customer real-time subscription...')
+      console.log('🔍 Customer auth check - localStorage email:', localStorage.getItem('customer_email'))
+      console.log('🔍 Customer auth check - localStorage phone:', localStorage.getItem('customer_phone'))
 
       const subscription = supabase
         .channel('customer_orders_changes')
@@ -89,17 +118,26 @@ export default function CustomerOrdersPage() {
           },
           async (payload) => {
             console.log('🔄 Customer order change detected:', payload.eventType, payload.new)
+            console.log('🔍 Full payload:', payload)
             
             // Get current user's email and phone for filtering
             const userEmail = localStorage.getItem('customer_email') || 'demo@example.com'
             const userPhone = localStorage.getItem('customer_phone') || ''
             
+            console.log('🔍 Filtering by email:', userEmail, 'phone:', userPhone)
+            
             // Check if this order belongs to the current customer
             const order = payload.new || payload.old
+            console.log('🔍 Order data:', order)
+            
             const isCustomerOrder = order && (
               (order as any).customer_email === userEmail || 
               (order as any).customer_phone === userPhone
             )
+            
+            console.log('🔍 Is customer order?', isCustomerOrder)
+            console.log('🔍 Order email:', (order as any)?.customer_email, 'matches?', (order as any)?.customer_email === userEmail)
+            console.log('🔍 Order phone:', (order as any)?.customer_phone, 'matches?', (order as any)?.customer_phone === userPhone)
             
             if (isCustomerOrder) {
               console.log('📱 Customer order update detected, refreshing data...')
@@ -108,8 +146,11 @@ export default function CustomerOrdersPage() {
               
               // Show notification for status updates
               if (payload.eventType === 'UPDATE' && payload.new) {
+                console.log('🔔 Showing status notification for customer order')
                 showOrderStatusNotification(payload.new)
               }
+            } else {
+              console.log('🚫 Order not for this customer, ignoring')
             }
           }
         )
@@ -117,15 +158,21 @@ export default function CustomerOrdersPage() {
           console.log('📡 Customer real-time subscription status:', status)
           if (status === 'SUBSCRIBED') {
             console.log('✅ Customer real-time subscription active')
+            console.log('🔍 Subscription object:', subscription)
           } else if (status === 'CHANNEL_ERROR') {
             console.error('❌ Customer real-time subscription error')
+          } else if (status === 'TIMED_OUT') {
+            console.error('⏰ Customer real-time subscription timed out')
+          } else if (status === 'CLOSED') {
+            console.error('🔒 Customer real-time subscription closed')
           }
         })
 
       setRealtimeSubscription(subscription)
+      console.log('🔍 Customer subscription created:', subscription)
       return subscription
     } catch (error) {
-      console.error('Failed to setup customer real-time subscription:', error)
+      console.error('❌ Failed to setup customer real-time subscription:', error)
     }
   }
 

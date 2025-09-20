@@ -101,6 +101,9 @@ export default function OrderManagement() {
     if (user) {
       loadOrders()
       setupRealtimeSubscription()
+      
+      // Test Supabase connection
+      testSupabaseConnection()
     }
     
     // Cleanup on unmount
@@ -111,10 +114,35 @@ export default function OrderManagement() {
     }
   }, [user])
 
+  // Test Supabase connection and real-time capabilities
+  const testSupabaseConnection = async () => {
+    try {
+      console.log('🧪 Testing admin Supabase connection...')
+      
+      // Test basic connection
+      const { data: { user } } = await supabase.auth.getUser()
+      console.log('🔍 Admin Supabase auth user:', user)
+      
+      // Test real-time connection
+      const testChannel = supabase.channel('test_admin_connection')
+      testChannel.subscribe((status) => {
+        console.log('🧪 Admin test channel status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Admin Supabase real-time connection working')
+          supabase.removeChannel(testChannel)
+        }
+      })
+      
+    } catch (error) {
+      console.error('❌ Admin Supabase connection test failed:', error)
+    }
+  }
+
   // Set up real-time subscription for admin orders
   const setupRealtimeSubscription = () => {
     try {
       console.log('🔄 Setting up admin real-time subscription...')
+      console.log('🔍 Admin user:', user)
 
       const subscription = supabase
         .channel('admin_orders_changes')
@@ -126,6 +154,7 @@ export default function OrderManagement() {
           },
           (payload) => {
             console.log('🔄 Admin order change detected:', payload.eventType, payload.new)
+            console.log('🔍 Full admin payload:', payload)
             
             // Refresh orders data for all changes
             console.log('📊 Admin order update detected, refreshing data...')
@@ -140,6 +169,7 @@ export default function OrderManagement() {
           },
           (payload) => {
             console.log('🔄 Admin order items change detected:', payload.eventType)
+            console.log('🔍 Admin order items payload:', payload)
             // Reload orders when order items change
             loadOrders()
           }
@@ -148,15 +178,21 @@ export default function OrderManagement() {
           console.log('📡 Admin real-time subscription status:', status)
           if (status === 'SUBSCRIBED') {
             console.log('✅ Admin real-time subscription active')
+            console.log('🔍 Admin subscription object:', subscription)
           } else if (status === 'CHANNEL_ERROR') {
             console.error('❌ Admin real-time subscription error')
+          } else if (status === 'TIMED_OUT') {
+            console.error('⏰ Admin real-time subscription timed out')
+          } else if (status === 'CLOSED') {
+            console.error('🔒 Admin real-time subscription closed')
           }
         })
 
       setRealtimeSubscription(subscription)
+      console.log('🔍 Admin subscription created:', subscription)
       return subscription
     } catch (error) {
-      console.error('Failed to setup admin real-time subscription:', error)
+      console.error('❌ Failed to setup admin real-time subscription:', error)
     }
   }
 
