@@ -250,6 +250,10 @@ export default function CrewDashboard() {
 
   const handleLogout = async () => {
     try {
+      // End crew monitoring session before logout
+      const { crewMonitoring } = await import('@/lib/crew-monitoring')
+      await crewMonitoring.endSession()
+      
       await supabase.auth.signOut()
       router.push('/crew/login')
     } catch (error) {

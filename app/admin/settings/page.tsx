@@ -153,54 +153,83 @@ function AdminSettingsContent() {
   // Branch Management Functions
   const loadBranches = async () => {
     try {
+      console.log('🔄 Loading branches...')
       const supabase = createClient()
 
-      // Load branches with performance data
+      // Load basic branch data first (fast query)
       const { data: branchData, error: branchError } = await supabase
         .from('branches')
         .select('*')
         .order('name')
 
-      if (branchError) throw branchError
-
-      // Load crew count for each branch from admin_users table
-      const { data: crewData, error: crewError } = await supabase
-        .from('admin_users')
-        .select('branch_id')
-        .eq('role', 'crew')
-        .eq('is_active', true)
-
-      if (crewError) {
-        console.log('No crew data available yet:', crewError)
+      if (branchError) {
+        console.error('Branch loading error:', branchError)
+        throw branchError
       }
 
-      // Load order count and revenue for each branch
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select('branch_id, total_amount')
-        .eq('order_status', 'completed')
+      console.log('✅ Basic branches loaded:', branchData?.length || 0)
 
-      if (orderError) {
-        console.log('No order data available yet:', orderError)
-      }
+      // Set basic data immediately
+      const basicBranches = branchData?.map(branch => ({
+        ...branch,
+        crew_count: 0,
+        order_count: 0,
+        total_revenue: 0,
+        pending_orders: []
+      })) || []
 
-      // Process branch data with counts
-      const branchesWithStats = branchData?.map(branch => {
-        const crewCount = crewData?.filter(crew => crew.branch_id === branch.id).length || 0
-        const branchOrders = orderData?.filter(order => order.branch_id === branch.id) || []
-        const orderCount = branchOrders.length
-        const totalRevenue = branchOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0)
+      setBranches(basicBranches)
 
-        return {
-          ...branch,
-          crew_count: crewCount,
-          order_count: orderCount,
-          total_revenue: totalRevenue,
-          pending_orders: [] // Will be loaded separately
-        }
-      }) || []
+      // Load additional stats in parallel (non-blocking)
+      Promise.all([
+        // Load crew count
+        supabase
+          .from('admin_users')
+          .select('branch_id')
+          .eq('role', 'crew')
+          .eq('is_active', true)
+          .then(({ data: crewData, error: crewError }) => {
+            if (crewError) {
+              console.log('Crew data error (non-critical):', crewError)
+              return []
+            }
+            return crewData || []
+          }),
+        
+        // Load order stats
+        supabase
+          .from('orders')
+          .select('branch_id, total_amount')
+          .eq('order_status', 'completed')
+          .then(({ data: orderData, error: orderError }) => {
+            if (orderError) {
+              console.log('Order data error (non-critical):', orderError)
+              return []
+            }
+            return orderData || []
+          })
+      ]).then(([crewData, orderData]) => {
+        // Update branches with stats (non-blocking)
+        const branchesWithStats = basicBranches.map(branch => {
+          const crewCount = crewData?.filter(crew => crew.branch_id === branch.id).length || 0
+          const branchOrders = orderData?.filter(order => order.branch_id === branch.id) || []
+          const orderCount = branchOrders.length
+          const totalRevenue = branchOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0)
 
-      setBranches(branchesWithStats)
+          return {
+            ...branch,
+            crew_count: crewCount,
+            order_count: orderCount,
+            total_revenue: totalRevenue,
+            pending_orders: []
+          }
+        })
+
+        setBranches(branchesWithStats)
+        console.log('✅ Branch stats updated')
+      }).catch(error => {
+        console.error('Error loading branch stats (non-critical):', error)
+      })
 
       // Load pending orders for each branch
       await loadPendingOrders()

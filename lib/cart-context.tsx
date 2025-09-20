@@ -87,7 +87,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       
       // Fallback timeout to prevent infinite loading
       const timeout = setTimeout(() => {
-        console.log('⏰ Cart loading timeout - forcing completion')
+        console.log('⏰ Cart loading timeout - forcing completion (this is normal)')
         setIsLoading(false)
       }, 5000) // 5 second timeout
       

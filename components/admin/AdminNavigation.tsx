@@ -27,7 +27,8 @@ import {
   Menu,
   X,
   Bell,
-  User
+  User,
+  Activity
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 
@@ -74,6 +75,12 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
       description: 'Manage orders and payments'
     },
     {
+      name: 'Crew Monitoring',
+      href: '/admin/crew-monitoring',
+      icon: Activity,
+      description: 'Monitor crew activity and performance'
+    },
+    {
       name: 'Analytics',
       href: '/admin/analytics',
       icon: BarChart3,
@@ -112,7 +119,9 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
               {navigationItems.map((item) => {
                 const Icon = item.icon
                 // Map the navigation names to currentPage values
-                const pageKey = item.name === 'Dashboard' ? 'dashboard' : item.name.toLowerCase()
+                const pageKey = item.name === 'Dashboard' ? 'dashboard' : 
+                               item.name === 'Crew Monitoring' ? 'crew-monitoring' : 
+                               item.name.toLowerCase()
                 const isActive = currentPage === pageKey
                 
                 return (
@@ -204,7 +213,9 @@ export default function AdminNavigation({ currentPage = 'dashboard', userName = 
               {navigationItems.map((item) => {
                 const Icon = item.icon
                 // Map the navigation names to currentPage values
-                const pageKey = item.name === 'Dashboard' ? 'dashboard' : item.name.toLowerCase()
+                const pageKey = item.name === 'Dashboard' ? 'dashboard' : 
+                               item.name === 'Crew Monitoring' ? 'crew-monitoring' : 
+                               item.name.toLowerCase()
                 const isActive = currentPage === pageKey
                 
                 return (

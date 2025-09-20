@@ -286,10 +286,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
           console.error('❌ Global real-time failed! Setting up polling...')
           setupGlobalPolling()
         } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Global real-time timed out! Setting up polling...')
+          console.log('⏰ Global real-time timed out - switching to polling (this is normal)')
           setupGlobalPolling()
         } else if (status === 'CLOSED') {
-          console.log('🔒 Global real-time closed! Setting up polling...')
+          console.log('🔒 Global real-time closed - switching to polling (this is normal)')
           setupGlobalPolling()
         }
       })

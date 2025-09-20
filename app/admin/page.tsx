@@ -35,6 +35,11 @@ import {
 import { createClient } from '@/lib/supabase'
 import { adminAuth } from '@/lib/admin-auth'
 import AdminLayout from '@/components/admin/AdminLayout'
+import { CrewMonitoringDashboard } from '@/components/admin/CrewMonitoringDashboard'
+import { CrewMonitoringProvider } from '@/lib/crew-monitoring-context'
+import '@/lib/crew-monitoring-debug'
+import '@/lib/test-crew-monitoring'
+import '@/lib/test-crew-login'
 import Link from 'next/link'
 
 interface DashboardStats {
@@ -512,13 +517,14 @@ export default function AdminDashboard() {
   }
 
   return (
-    <AdminLayout 
-      currentPage="dashboard" 
-      userName={user?.full_name || 'Admin'}
-      pageTitle="Dashboard Overview"
-      pageDescription={`Welcome back, ${user?.full_name || 'Administrator'}. Here's your business overview.`}
-      notificationCount={notificationCount}
-    >
+    <CrewMonitoringProvider enableAutoTracking={true} enableRealTimeUpdates={true}>
+      <AdminLayout 
+        currentPage="dashboard" 
+        userName={user?.full_name || 'Admin'}
+        pageTitle="Dashboard Overview"
+        pageDescription={`Welcome back, ${user?.full_name || 'Administrator'}. Here's your business overview.`}
+        notificationCount={notificationCount}
+      >
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 mb-8">
@@ -646,6 +652,14 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Crew Monitoring Section - Only show for admin users */}
+      {user?.role === 'admin' && (
+        <div className="mb-8">
+          <CrewMonitoringDashboard />
+        </div>
+      )}
     </AdminLayout>
+    </CrewMonitoringProvider>
   )
 }

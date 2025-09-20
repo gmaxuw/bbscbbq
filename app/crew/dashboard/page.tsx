@@ -40,6 +40,7 @@ import {
 import { createClient } from '@/lib/supabase'
 import DesignLock from '@/components/layout/DesignLock'
 import { generateOrderQRCodeClient } from '@/lib/qr-generator-client'
+import { CrewMonitoringProvider } from '@/lib/crew-monitoring-context'
 
 interface Order {
   id: string
@@ -960,6 +961,10 @@ export default function CrewDashboard() {
 
   const handleSignOut = async () => {
     try {
+      // End crew monitoring session before logout
+      const { crewMonitoring } = await import('@/lib/crew-monitoring')
+      await crewMonitoring.endSession()
+      
       await supabase.auth.signOut()
       router.push('/crew/login')
     } catch (error) {
@@ -1038,8 +1043,9 @@ export default function CrewDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DesignLock pageName="Crew Dashboard" />
+    <CrewMonitoringProvider enableAutoTracking={true} enableRealTimeUpdates={true}>
+      <div className="min-h-screen bg-gray-50">
+        <DesignLock pageName="Crew Dashboard" />
       
       {/* Fixed Navigation Bar - Always Visible */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200">
@@ -1841,5 +1847,6 @@ export default function CrewDashboard() {
         </div>
       </div>
     </div>
+    </CrewMonitoringProvider>
   )
 }

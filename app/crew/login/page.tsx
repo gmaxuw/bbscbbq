@@ -176,7 +176,7 @@ export default function CrewLogin() {
             .single()
 
           if (crewUser) {
-            setError('This crew account exists but needs to be activated. Please contact your administrator to create your login credentials.')
+            setError('This crew account exists but the password needs to be reset. Please use the "Forgot Password" link below to reset your password.')
           } else {
             setError('Invalid email or password. If this is your first login, use the default password: temp123456')
           }
