@@ -366,6 +366,7 @@ export default function CrewDashboard() {
         return
       }
 
+      console.log('🔍 Fetching branch data for branch_id:', crewUser.branch_id)
       const { data: branchData, error: branchError } = await supabase
         .from('branches')
         .select('name')
@@ -374,6 +375,17 @@ export default function CrewDashboard() {
 
       if (branchError || !branchData) {
         console.error('❌ Error fetching branch:', branchError)
+        console.log('Branch error details:', branchError?.message, branchError?.code)
+        
+        // Try to get any branch data to test RLS
+        console.log('🧪 Testing branches table access...')
+        const { data: testBranches, error: testError } = await supabase
+          .from('branches')
+          .select('id, name, is_active')
+          .limit(1)
+        
+        console.log('Test branches query result:', { testBranches, testError })
+        
         await supabase.auth.signOut()
         router.push('/crew/login')
         return

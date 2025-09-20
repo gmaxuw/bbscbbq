@@ -73,6 +73,14 @@ function CrewResetPasswordContent() {
       }
 
       console.log('✅ Crew password reset successful!')
+      
+      // Refresh the session to ensure proper authentication
+      const { error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) {
+        console.error('❌ Session refresh error:', refreshError)
+        // Don't fail the reset, just log the error
+      }
+      
       setSuccess(true)
       
       // Redirect to crew login after 3 seconds
