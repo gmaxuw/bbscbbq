@@ -35,11 +35,7 @@ import {
 import { createClient } from '@/lib/supabase'
 import { adminAuth } from '@/lib/admin-auth'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { CrewMonitoringDashboard } from '@/components/admin/CrewMonitoringDashboard'
-import { CrewMonitoringProvider } from '@/lib/crew-monitoring-context'
-import '@/lib/crew-monitoring-debug'
-import '@/lib/test-crew-monitoring'
-import '@/lib/test-crew-login'
+// Crew monitoring imports removed - using unified system
 import Link from 'next/link'
 
 interface DashboardStats {
@@ -517,10 +513,9 @@ export default function AdminDashboard() {
   }
 
   return (
-    <CrewMonitoringProvider enableAutoTracking={true} enableRealTimeUpdates={true}>
-      <AdminLayout 
-        currentPage="dashboard" 
-        userName={user?.full_name || 'Admin'}
+    <AdminLayout 
+      currentPage="dashboard" 
+      userName={user?.full_name || 'Admin'}
         pageTitle="Dashboard Overview"
         pageDescription={`Welcome back, ${user?.full_name || 'Administrator'}. Here's your business overview.`}
         notificationCount={notificationCount}
@@ -656,10 +651,14 @@ export default function AdminDashboard() {
       {/* Crew Monitoring Section - Only show for admin users */}
       {user?.role === 'admin' && (
         <div className="mb-8">
-          <CrewMonitoringDashboard />
+          <div className="text-center py-8">
+            <p className="text-gray-500">Crew monitoring moved to dedicated page</p>
+            <Link href="/admin/crew-monitoring" className="text-lays-dark-red hover:underline">
+              Go to Crew Monitoring →
+            </Link>
+          </div>
         </div>
       )}
     </AdminLayout>
-    </CrewMonitoringProvider>
   )
 }

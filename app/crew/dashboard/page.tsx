@@ -40,7 +40,7 @@ import {
 import { createClient } from '@/lib/supabase'
 import DesignLock from '@/components/layout/DesignLock'
 import { generateOrderQRCodeClient } from '@/lib/qr-generator-client'
-import { CrewMonitoringProvider } from '@/lib/crew-monitoring-context'
+// CrewMonitoringProvider removed - using unified system
 
 interface Order {
   id: string
@@ -93,7 +93,7 @@ export default function CrewDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderModal, setShowOrderModal] = useState(false)
   const [historyDateFilter, setHistoryDateFilter] = useState('today')
-  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
+  // realtimeSubscription removed - using unified system
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -103,7 +103,6 @@ export default function CrewDashboard() {
   useEffect(() => {
     if (!authChecked) {
       checkAuth()
-      setupOnlineStatus()
       loadOfflineData()
       
       // Safety timeout to prevent infinite loading
@@ -121,75 +120,15 @@ export default function CrewDashboard() {
     if (crewMember && crewMember.branch_id) {
       console.log('Crew member loaded, setting up orders and realtime')
       loadOrders()
-      // Simple data refresh + crew-specific notifications
-      const refreshInterval = setInterval(() => {
-        loadOrders()
-      }, 10000) // Refresh every 10 seconds for faster updates
-
-      // Set up crew-specific real-time notifications
-      const setupCrewNotifications = async () => {
-        if (!crewMember?.branch_id) return
-
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        // Subscribe to orders for this crew's branch
-        const crewChannel = supabase
-          .channel(`crew-${crewMember.branch_id}`)
-          .on('postgres_changes', 
-            { 
-              event: 'INSERT', 
-              schema: 'public', 
-              table: 'orders',
-              filter: `branch_id=eq.${crewMember.branch_id}`
-            }, 
-            (payload) => {
-              console.log('🍖 New order for crew branch:', payload.new)
-              showCrewOrderNotification(payload.new)
-            }
-          )
-          .on('postgres_changes', 
-            { 
-              event: 'UPDATE', 
-              schema: 'public', 
-              table: 'orders',
-              filter: `branch_id=eq.${crewMember.branch_id}`
-            }, 
-            (payload) => {
-              console.log('📝 Order status update for crew:', payload.new)
-              showCrewStatusNotification(payload.new)
-            }
-          )
-          .subscribe()
-
-        return crewChannel
-      }
-
-      setupCrewNotifications().then(channel => {
-        if (channel) {
-          // Store channel for cleanup
-          ;(window as any).crewChannel = channel
-        }
-      })
+      // Data refresh handled by unified system
       
       return () => {
-        clearInterval(refreshInterval)
-        if ((window as any).crewChannel) {
-          (window as any).crewChannel.unsubscribe()
-        }
+        // Cleanup handled by unified system
       }
     }
   }, [crewMember])
 
-  // Cleanup realtime subscription on unmount
-  useEffect(() => {
-    return () => {
-      if (realtimeSubscription) {
-        console.log('🧹 Component unmounting, cleaning up realtime subscription')
-        realtimeSubscription.unsubscribe()
-      }
-    }
-  }, [realtimeSubscription])
+  // Realtime cleanup handled by unified system
 
   useEffect(() => {
     filterOrders()
@@ -201,28 +140,7 @@ export default function CrewDashboard() {
     }
   }, [currentView, historyDateFilter, crewMember?.branch_id])
 
-  const setupOnlineStatus = () => {
-    if (typeof window === 'undefined') return
-    
-    const handleOnline = () => {
-      setIsOnline(true)
-      console.log('🌐 Back online - syncing pending updates')
-      syncPendingUpdates()
-    }
-    const handleOffline = () => {
-      setIsOnline(false)
-      console.log('📴 Gone offline - storing data locally')
-    }
-    
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    setIsOnline(navigator.onLine)
-    
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }
+  // setupOnlineStatus removed - using unified system
 
   const loadOfflineData = () => {
     if (typeof window === 'undefined') return
@@ -624,65 +542,7 @@ export default function CrewDashboard() {
     }
   }
 
-  const setupRealtimeSubscription = () => {
-    if (!crewMember?.branch_id) {
-      console.log('No branch_id for realtime subscription')
-      return
-    }
-
-    try {
-      console.log('Setting up realtime subscription for branch:', crewMember.branch_id)
-
-      const subscription = supabase
-        .channel('crew_orders_changes')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'orders',
-            filter: `branch_id=eq.${crewMember.branch_id}`
-          },
-          (payload) => {
-            console.log('🔄 Order change detected:', payload.eventType, payload.new, payload.old)
-            
-            // Show instant notification for new orders
-            console.log('Crew order change:', payload)
-            console.log('Event type:', payload.eventType)
-            if (payload.eventType === 'INSERT' && payload.new) {
-              showCrewOrderNotification(payload.new)
-            }
-            
-            // Reload orders immediately on any change
-            loadOrders()
-          }
-        )
-        .on('postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'order_items'
-          },
-          (payload) => {
-            console.log('🔄 Order items change detected:', payload.eventType)
-            // Reload orders when order items change
-            loadOrders()
-          }
-        )
-        .subscribe((status) => {
-          console.log('📡 Realtime subscription status:', status)
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ Realtime subscription active')
-          } else if (status === 'CHANNEL_ERROR') {
-            console.error('❌ Realtime subscription error')
-          }
-        })
-
-      setRealtimeSubscription(subscription)
-      return subscription
-    } catch (error) {
-      console.error('Failed to setup realtime subscription:', error)
-    }
-  }
+  // setupRealtimeSubscription removed - using unified system
 
   // Show instant new order notification for crew
   // Show new order notification for crew (FULL NAME + AMOUNT)
@@ -962,8 +822,7 @@ export default function CrewDashboard() {
   const handleSignOut = async () => {
     try {
       // End crew monitoring session before logout
-      const { crewMonitoring } = await import('@/lib/crew-monitoring')
-      await crewMonitoring.endSession()
+      // crewMonitoring removed - using unified system
       
       await supabase.auth.signOut()
       router.push('/crew/login')
@@ -1043,8 +902,7 @@ export default function CrewDashboard() {
   }
 
   return (
-    <CrewMonitoringProvider enableAutoTracking={true} enableRealTimeUpdates={true}>
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         <DesignLock pageName="Crew Dashboard" />
       
       {/* Fixed Navigation Bar - Always Visible */}
@@ -1847,6 +1705,5 @@ export default function CrewDashboard() {
         </div>
       </div>
     </div>
-    </CrewMonitoringProvider>
   )
 }
