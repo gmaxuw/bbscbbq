@@ -114,7 +114,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Sync cart with database
   const syncCartWithDatabase = async () => {
     // Skip cart sync on admin pages
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+    if (typeof window !== 'undefined' && window.location?.pathname?.startsWith('/admin')) {
       console.log('🛒 Admin page detected, skipping cart sync')
       return
     }
@@ -194,7 +194,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Upload local cart to database
   const uploadCartToDatabase = async (cartItems: CartItem[]) => {
     // Skip cart sync on admin pages
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+    if (typeof window !== 'undefined' && window.location?.pathname?.startsWith('/admin')) {
       console.log('🛒 Admin page detected, skipping cart upload')
       return
     }

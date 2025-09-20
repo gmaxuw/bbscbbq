@@ -63,9 +63,9 @@ export const UnifiedCrewDashboard: React.FC = () => {
     for (let i = 0; i < parts.length; i += 2) {
       const value = parseInt(parts[i])
       const unit = parts[i + 1]
-      if (unit.startsWith('hour')) seconds += value * 3600
-      else if (unit.startsWith('minute')) seconds += value * 60
-      else if (unit.startsWith('second')) seconds += value
+      if (unit?.startsWith('hour')) seconds += value * 3600
+      else if (unit?.startsWith('minute')) seconds += value * 60
+      else if (unit?.startsWith('second')) seconds += value
     }
     return seconds
   }

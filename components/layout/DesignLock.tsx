@@ -192,12 +192,12 @@ export default function DesignLock({ pageName, allowedComponents = [] }: DesignL
       if (!cls.trim()) return false
       
       // Allow our custom BBQ classes
-      if (cls.startsWith('bbq-')) return false
+      if (cls?.startsWith('bbq-')) return false
       
       // Allow our custom color classes
-      if (cls.startsWith('text-lays-') || cls.startsWith('bg-lays-') || 
-          cls.startsWith('border-lays-') || cls.startsWith('text-bbq-') ||
-          cls.startsWith('bg-bbq-') || cls.startsWith('border-bbq-')) return false
+      if (cls?.startsWith('text-lays-') || cls?.startsWith('bg-lays-') || 
+          cls?.startsWith('border-lays-') || cls?.startsWith('text-bbq-') ||
+          cls?.startsWith('bg-bbq-') || cls?.startsWith('border-bbq-')) return false
       
       // Allow standard Tailwind classes
       if (allowedTailwindClasses.includes(cls)) return false
