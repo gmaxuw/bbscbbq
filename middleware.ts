@@ -57,12 +57,12 @@ export async function middleware(req: NextRequest) {
     }
     
     const { pathname } = req.nextUrl
-    const isAdminArea = pathname.startsWith('/admin')
-    const isCrewArea = pathname.startsWith('/crew')
-    const isCustomerArea = pathname.startsWith('/account') || pathname.startsWith('/favorites') || pathname.startsWith('/orders')
-    const isAdminLogin = pathname.startsWith('/admin/login')
-    const isCrewLogin = pathname.startsWith('/crew/login')
-    const isCustomerLogin = pathname.startsWith('/account/login') || pathname.startsWith('/account/register')
+    const isAdminArea = pathname?.startsWith('/admin') || false
+    const isCrewArea = pathname?.startsWith('/crew') || false
+    const isCustomerArea = pathname?.startsWith('/account') || pathname?.startsWith('/favorites') || pathname?.startsWith('/orders') || false
+    const isAdminLogin = pathname?.startsWith('/admin/login') || false
+    const isCrewLogin = pathname?.startsWith('/crew/login') || false
+    const isCustomerLogin = pathname?.startsWith('/account/login') || pathname?.startsWith('/account/register') || false
     
     console.log('🔍 Route Debug:', {
       pathname,

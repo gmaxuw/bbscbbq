@@ -2402,7 +2402,7 @@ function AdminSettingsContent() {
                     <div>
                       <p className="text-sm opacity-90">Total Commission per Product</p>
                       <p className="text-2xl font-bold">
-                        ₱{products.reduce((sum, p) => sum + (p.commission || 0), 0).toLocaleString()}
+                        ₱{products.reduce((sum, p) => sum + (parseFloat(p.commission?.toString() || '0') || 0), 0).toLocaleString()}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
@@ -2416,7 +2416,7 @@ function AdminSettingsContent() {
                     <div>
                       <p className="text-sm opacity-90">Avg Commission per Product</p>
                       <p className="text-2xl font-bold">
-                        ₱{products.length > 0 ? (products.reduce((sum, p) => sum + (p.commission || 0), 0) / products.length).toFixed(2) : '0.00'}
+                        ₱{products.length > 0 ? (products.reduce((sum, p) => sum + (parseFloat(p.commission?.toString() || '0') || 0), 0) / products.length).toFixed(2) : '0.00'}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
