@@ -346,7 +346,7 @@ export default function CrewLogin() {
     try {
       // Use direct Supabase auth for password reset
       const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/account/reset-password?crew=true&email=${encodeURIComponent(forgotPasswordEmail)}`
+        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/crew/reset-password?email=${encodeURIComponent(forgotPasswordEmail)}`
       })
 
       if (error) {
