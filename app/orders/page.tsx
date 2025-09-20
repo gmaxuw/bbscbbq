@@ -101,12 +101,80 @@ export default function CustomerOrdersPage() {
     }
   }
 
+  // Manual test function to trigger order refresh
+  const manualTestRefresh = () => {
+    console.log('🧪 Manual test: Refreshing orders...')
+    loadOrders(true)
+  }
+
+  // Test real-time by manually triggering an event
+  const testRealtimeEvent = async () => {
+    try {
+      console.log('🧪 Testing real-time event trigger...')
+      
+      // Test if we can receive any order changes by querying recent orders
+      const { data: recentOrders, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+      
+      if (error) {
+        console.error('❌ Error querying orders:', error)
+      } else {
+        console.log('🔍 Recent orders query result:', recentOrders)
+      }
+      
+      // Test if subscription is actually active
+      if (realtimeSubscription) {
+        console.log('🔍 Current subscription state:', realtimeSubscription.state)
+        console.log('🔍 Current subscription channel:', realtimeSubscription.topic)
+      } else {
+        console.log('❌ No active subscription found')
+      }
+      
+      // Test a simple real-time subscription to see if RLS is blocking
+      console.log('🧪 Testing simple real-time subscription...')
+      const testChannel = supabase.channel('test_simple_realtime')
+      testChannel.on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('🧪 SIMPLE TEST: Received order change:', payload)
+        }
+      )
+      testChannel.subscribe((status) => {
+        console.log('🧪 Simple test subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Simple test subscription working - RLS not blocking')
+          // Clean up after 5 seconds
+          setTimeout(() => {
+            supabase.removeChannel(testChannel)
+            console.log('🧪 Simple test subscription cleaned up')
+          }, 5000)
+        } else {
+          console.log('❌ Simple test subscription failed:', status)
+        }
+      })
+      
+    } catch (error) {
+      console.error('❌ Real-time test failed:', error)
+    }
+  }
+
   // Set up real-time subscription for customer orders
-  const setupRealtimeSubscription = () => {
+  const setupRealtimeSubscription = async () => {
     try {
       console.log('🔄 Setting up customer real-time subscription...')
       console.log('🔍 Customer auth check - localStorage email:', localStorage.getItem('customer_email'))
       console.log('🔍 Customer auth check - localStorage phone:', localStorage.getItem('customer_phone'))
+
+      // Check if we need authentication for real-time
+      const { data: { user } } = await supabase.auth.getUser()
+      console.log('🔍 Supabase auth user for real-time:', user)
 
       const subscription = supabase
         .channel('customer_orders_changes')
@@ -435,6 +503,29 @@ export default function CustomerOrdersPage() {
                 <Package className="w-6 h-6 text-lays-dark-red" />
                 <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
               </div>
+            </div>
+            
+            <div className="flex space-x-2">
+              <button
+                onClick={manualTestRefresh}
+                className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
+              >
+                Test Refresh
+              </button>
+              <button
+                onClick={testRealtimeEvent}
+                className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm"
+              >
+                Test Real-time
+              </button>
+              <button
+                onClick={() => loadOrders(true)}
+                disabled={isRefreshing}
+                className="flex items-center space-x-2 px-4 py-2 bg-lays-orange-gold text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
             </div>
             
             {/* Action Buttons */}
